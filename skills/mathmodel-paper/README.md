@@ -49,4 +49,4 @@ SKILL.md                            # 「文档地图」或「目录结构」登
 - 模板文件头部注明**出处**（论文域条文以本技能 `docs/` 为准），便于双向定位。
 - 脚本一律提供 `argparse` 入口与默认路径，不写死绝对路径；只调整既有内容样式，禁止生成或重建正文。
 - 不引入新的顶层目录；`docs/` 的文件名用小写连字符。
-- 分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](../../CONTRIBUTING.md)（论文规范属 M1 文档与示例）；本节只列本技能的落盘清单。
+- 分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](https://github.com/Escap1ng/mathmodel-kit/blob/main/CONTRIBUTING.md)（论文规范属 M1 文档与示例）；本节只列本技能的落盘清单。

@@ -56,7 +56,7 @@ examples/previews/<template_id>_replica.png # 1:1 效果预览（运行模板生
 
 即「注册表一行 + 索引文档一行」，CLI、CI 与版本号均无需改动（一致性由 CI 的 `manifest-consistency` 校验）。
 
-分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](../../CONTRIBUTING.md)（M2 代码与模板）；本节只列本技能的落盘清单。
+分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](https://github.com/Escap1ng/mathmodel-kit/blob/main/CONTRIBUTING.md)（M2 代码与模板）；本节只列本技能的落盘清单。
 
 模板脚本约定：
 

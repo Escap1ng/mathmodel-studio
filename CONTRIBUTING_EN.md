@@ -169,6 +169,11 @@ python code/check_chapters.py examples/chapter-sample.tex
 python code/score_card.py examples/example-scorecard.json
 ```
 
+When looping over every template (feeding `render_template.py --list` into a shell loop), Git Bash on Windows needs the
+trailing carriage return stripped first: Python writes `\r\n` in text mode there, and the `\r` left inside the template id
+breaks the output path — write `for id in $(python code/tools/render_template.py --list | tr -d '\r')`. CI runs on ubuntu
+and needs no `tr`.
+
 **Submission rules**
 
 - The PR's "Verification" section pastes the **commands actually run and their key output**, not a plan;

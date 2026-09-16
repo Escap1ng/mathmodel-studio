@@ -143,6 +143,10 @@ python code/check_chapters.py examples/chapter-sample.tex
 python code/score_card.py examples/example-scorecard.json
 ```
 
+批量遍历模板（把 `render_template.py --list` 喂进 shell 循环）时，Windows 的 Git Bash 需先去掉行尾回车：
+Python 在 Windows 以文本模式输出 `\r\n`，`\r` 会留在模板 id 里使输出路径失效，写成
+`for id in $(python code/tools/render_template.py --list | tr -d '\r')`；CI 的 ubuntu 环境不需要 `tr`。
+
 **提交规范**
 
 - PR 的「验证」栏贴出**实际执行过的命令与关键输出**，不是计划清单；

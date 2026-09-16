@@ -60,4 +60,4 @@ examples/<template_id>/preview.png     # 用本渲染器导出的 1:1 预览
 SKILL.md                               # 模板索引表加一行
 ```
 
-分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](../../CONTRIBUTING.md)（新增模板属 M2，契约校验与 CI 门禁属 M3）。
+分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](https://github.com/Escap1ng/mathmodel-kit/blob/main/CONTRIBUTING.md)（新增模板属 M2，契约校验与 CI 门禁属 M3）。

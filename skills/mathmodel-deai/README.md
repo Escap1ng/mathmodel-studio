@@ -49,4 +49,4 @@ examples/                          # 必要时补正/反例 fixture
 - 正则用 Python `re` 语法；写错正则应报错而非静默跳过（加载时预编译）。
 - 规范文档里出现的反例一律用反引号包成行内代码，使其自身通过 `check_phrasing.py` 自检。
 - 脚本一律提供 `argparse` 入口，退出码统一为 `0` 成功 / `1` 校验失败 / `2` 用法或环境错误。
-- 分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](../../CONTRIBUTING.md)（词表与规范文档属 M1/M2，示例回归属 M3）。
+- 分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](https://github.com/Escap1ng/mathmodel-kit/blob/main/CONTRIBUTING.md)（词表与规范文档属 M1/M2，示例回归属 M3）。

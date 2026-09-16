@@ -70,7 +70,7 @@ user's own agent host and local TeX/Python environment. The marginal cost is rev
 |---|---|---|
 | pip packaging / PyPI | **Not now** | Skills ship as directories; packaging would break relative-path invocation (`python3 code/...`), and skill directory names contain hyphens, so they cannot be imported as packages |
 | Online API service | **Not now** | Conflicts with local-first and "no operations"; sending user contest data off-device raises privacy/compliance concerns |
-| Building our own agent framework | **No** | Hosts (Claude Code / Codex / Trae, …) already provide the runtime; rebuilding it only adds porting burden |
+| Building our own agent framework | **No** | Hosts (Claude Code / Codex, …) already provide the runtime; rebuilding it only adds porting burden |
 | Fully automatic "paper in one hour" | **No** | See the compliance and positioning analysis in §10 |
 
 ---

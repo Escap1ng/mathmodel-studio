@@ -45,5 +45,5 @@ SKILL.md                           # 问题族速查表加一行（如涉及新�
 
 - 方法必须写明适用场景、数据规模前提与已知失效情形，并给出可复核出处（标准教材或原始文献）；
 - 用户可见的结论不给绝对化判断：本技能提供候选与依据，最终选型由使用者确认；
-- 分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](../../CONTRIBUTING.md)
+- 分模块的贡献标准、提交规范与审核流程见仓库根目录 [CONTRIBUTING.md](https://github.com/Escap1ng/mathmodel-kit/blob/main/CONTRIBUTING.md)
   （方法库与选型文档属 M1 文档与示例）；本节只列本技能的落盘清单。

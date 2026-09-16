@@ -8,6 +8,18 @@
 
 ## [2.0.0] - 2026-09-13
 
+### 修复
+
+- 六个技能 `README.md` 指向仓库根的 `CONTRIBUTING.md` 相对链接（`../../CONTRIBUTING.md`）改为仓库绝对链接：技能目录须能被单独复制到宿主的 skills 目录后独立工作，链到仓库根的相对路径在副本中必断
+- `CONTRIBUTING.md` / `CONTRIBUTING_EN.md` 补 Windows 口径：批量遍历模板时 `render_template.py --list` 在 Git Bash 下输出 CRLF，残留的 `\r` 会让输出路径失效，循环内需 `| tr -d '\r'`（CI 的 ubuntu 环境不受影响）
+
+### 变更
+
+- `.gitignore` 移除某宿主编辑器的本地工作目录忽略项（该段落在 `[2.0.0]` 里刚从 GBK 修成 UTF-8，随后按宿主无关口径整体删除），白皮书中英的宿主举例统一为 Claude Code / Codex
+- `.gitignore` 新增 `.qoder/skills/`：项目级技能安装目录是 `skills/` 的本地运行副本，不入库，以免仓库出现两份同名文件、且 CI 由 `git ls-files` 派生的词表门禁清单重复纳入副本内的 `docs/`
+
+## [2.0.0] - 2026-09-13
+
 ### 新增
 
 - **建模方法库与选型技能 `mathmodel-methods`**：把主技能中的算法库、选型依据与实现范式拆分为独立技能，按问题族（评价/排序、优化、预测、分类聚类、微分方程、仿真、信号、前沿创新）组织

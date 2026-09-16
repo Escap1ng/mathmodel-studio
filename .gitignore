@@ -29,5 +29,5 @@ tmp/
 *.drawio.bkp
 ~$*.drawio
 
-# ---- Trae 工作目录 ----
-.trae/
+# ---- 本地技能安装（skills/ 的项目级运行副本，不入库）----
+.qoder/skills/
