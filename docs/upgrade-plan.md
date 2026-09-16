@@ -1,6 +1,6 @@
 # mathmodel-kit 定位升级方案：从技能集到开放的数模工具箱
 
-> 版本：v2.0.0 ｜ 状态：首期已落地 ｜ 英文版：[upgrade-plan_EN.md](upgrade-plan_EN.md)
+> 版本：v2.0.1 ｜ 状态：首期已落地 ｜ 英文版：[upgrade-plan_EN.md](upgrade-plan_EN.md)
 
 本文回答一个问题：**mathmodel-kit 如何从「一套提示词为中心的 agent 技能集」升级为「开放的、可合作的数模工具箱」**。
 全文结论都尽量绑定仓库中的真实文件与行号，未经验证的推断会显式标注。

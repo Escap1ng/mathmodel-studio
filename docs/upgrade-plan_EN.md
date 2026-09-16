@@ -1,6 +1,6 @@
 # Upgrading mathmodel-kit: From a Skill Set to an Open Modeling Toolbox
 
-> Version: v2.0.0 ｜ Status: Phase 1 delivered ｜ Chinese original: [upgrade-plan.md](upgrade-plan.md)
+> Version: v2.0.1 ｜ Status: Phase 1 delivered ｜ Chinese original: [upgrade-plan.md](upgrade-plan.md)
 
 This document answers one question: **how does mathmodel-kit move from "a prompt-centric agent skill set" to "an open,
 collaborative mathematical-modeling toolbox"?** Claims are tied to real files and line numbers in the repository;
