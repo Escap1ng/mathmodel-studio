@@ -19,7 +19,8 @@ allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob
 3. **出对比表并交由用户选择**：用 [docs/selection-guide.md](docs/selection-guide.md) 的候选对比表模板，
    标注推荐项与一句推荐理由；用户确认后再实现。
 4. **实现与验证**：[docs/implementation-guide.md](docs/implementation-guide.md) 给出推荐库、最小可运行骨架
-   与按问题类型匹配的验证手段；出图交给 `mathmodel-figure` / `mathmodel-diagram`，成稿交给 `mathmodel-paper`。
+   与按问题类型匹配的验证手段；预测类在写模型前先按该文件第 3.5 节确认各附件是训练集还是预测集，
+   用反会让结果退化为 0 或常数；出图交给 `mathmodel-figure` / `mathmodel-diagram`，成稿交给 `mathmodel-paper`。
 
 ## 选型三原则（强制）
 

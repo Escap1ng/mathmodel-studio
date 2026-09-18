@@ -6,6 +6,13 @@
 破坏性变更边界（`MAJOR`）：移除既有 CLI 参数、移除登记表中的字段、移除主题契约字段、
 扩大内容契约或主题契约的必备字段集合。
 
+## [Unreleased]
+
+### 新增
+
+- 预测题的数据角色口径：`mathmodel-methods/docs/implementation-guide.md` 增设第 3.5 节（唯一权威条文），要求建模前逐个登记各附件属于训练集（含目标值）还是预测集（目标列为空、正是待输出结果的部分），并给出角色断言与零值守卫的可运行骨架。此前把两份数据用反没有防线：空目标列被按 0 参与拟合时系数与截距全为 0、输出恒为 0，不做填充的库抛 `Input y contains NaN`；无真值划分上的 R² 恒为 0.0、MAE 变成「预测值到 0 的距离」；join 或筛选清空样本时 `sum()` 为 0、`mean()` 为 NaN——这些都不报错，会一路写进论文
+- 上述口径的摘要指针与判据：`mathmodel-core/SKILL.md` 阶段一新增第 6 项「数据角色（预测题必查）」、阶段四代码规范新增断言要求、常见错误速查新增「预测结果为 0 / 全 NaN / 常数」一行；`mathmodel-methods/SKILL.md` 快速路径第 4 步与 `docs/selection-guide.md` 常见误用表各加一条；`mathmodel-score/docs/self-check.md` 误差分析、`docs/chapter-checklist.md`「准备工作 · 数据处理」与 `mathmodel-paper/docs/writing-rules.md` 论文结构表「五、数据处理」补对应判据
+
 ## [2.0.1] - 2026-09-16
 
 ### 修复
