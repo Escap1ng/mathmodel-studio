@@ -19,6 +19,7 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - **强调色三案可在界面切换**（状态栏色块，或 `?accent=a|b|c`）：A 墨青 `#17494D`、B 靛蓝 `#2B4C7E`、C 朱砂 `#B03A2E`。取值理由见 PLAN.md §4.4。
 - **环境手册** `docs/env-setup.md`：把联网动作写成文档而不是替你执行，含通道实测表、镜像配置与信任边界、版本查法、Windows PowerShell/GBK 坑。
 - **双语 README** `README.md` / `README_EN.md`，Apache-2.0 许可（取自上游原文）。
+- **交接文档** `docs/HANDOFF.md`：把「已证 / 未证」分栏写清（尤其 Windows 真启动与本机 `npm install` 都还没验过）、待维护者定的三项、M1 的具体动作清单（含改 `status` 会触发 R4 这条连锁）、以及这一轮踩过的网络 / Electron / 量具坑。两份 README 各加一行指过去。
 - CI `ci.yml`：ubuntu + windows 双矩阵，跳过 Electron 二进制下载，跑四道无需网络的门禁再加类型检查、构建与产物冒烟。
 - **G6b 结果核验** `scripts/check-window-smoke.mjs`：独立读取真启动的 JSON 结论并复算读数（尺寸、非白像素比、断言条数下限、自述计数与明细是否自洽），带 `--selftest` 用 8 份合成夹具自证会拒绝被污染的结果；已并入 `npm run gate`，不需要 Electron。
 - **G7 真启动冒烟** `tests/window-smoke.cjs` + CI `window-smoke` job：`require` 生产入口起窗，断言加载的是构建产物、内容尺寸 1440×900、非白像素占比 ≥1%、状态栏版本号来自主进程 IPC 应答、阶段轨道 7 节、工作台 6 标签、发送按钮按事实禁用、点色块真的把 `--accent` 换成 B 案靛蓝，截图上传为 artifact。
