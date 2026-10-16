@@ -1,0 +1,45 @@
+node_modules/
+dist/
+dist-ssr/
+out/
+release/
+*.local
+*.log
+
+# Python
+runtime/.venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 打包产物与缓存
+.cache/
+tmp/
+*.7z
+*.dmg
+*.exe
+*.blockmap
+*.zip
+
+# 本地状态（含 provider 密钥的临时导出，绝不入库）
+.secrets/
+*.pem
+*.p12
+.env
+.env.*
+!.env.example
+
+# 建模工作区（阶段二产物，用户内容不入库）
+workspaces/
+第*题_*/
+
+# 编辑器与系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

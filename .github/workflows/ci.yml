@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: 门禁 · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Windows 是这个产品的主平台，不能只在 Linux 上验过就说能构建
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 装契约校验依赖
+        run: python -m pip install --upgrade pip "jsonschema>=4.20"
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # CI 不启动窗口，所以跳过 Electron 二进制下载（约 100 MB，纯浪费）。
+      # 类型检查需要的 electron 类型仍随 npm 包一起装好。
+      # lockfile 提交后这里换成 npm ci。
+      - name: 安装 JS 依赖
+        run: npm install --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      - name: G1 注册表一致性
+        run: node scripts/check-registry.mjs
+
+      - name: G1 反向覆盖（门禁必须能变红）
+        run: node scripts/check-registry.negative.mjs
+
+      - name: G2 契约校验与版本同源
+        run: python scripts/validate_contracts.py
+
+      - name: G3 CLI 退出码契约
+        run: python runtime/selfcheck.py
+
+      - name: 运行时语法检查
+        run: python -m compileall -q runtime
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 构建
+        run: npm run build
+
+      - name: G6 产物冒烟
+        run: node scripts/smoke-dist.mjs
