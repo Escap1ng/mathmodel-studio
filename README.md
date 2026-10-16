@@ -91,7 +91,8 @@ npm run gate
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
 | G7 真启动冒烟 | xvfb 下真起窗口：标题与 1440×900 内容尺寸、按 BGRA 统计非白像素占比 ≥1%、IPC 往返把主进程版本号写进状态栏、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent` | 空白截图过不了像素阈值这一关；`needs: []` 独立跑（`tests/window-smoke.cjs`） |
 
-G7 在容器里必须 `--no-sandbox`，因此**不覆盖**生产窗口的 `sandbox: true` 与 CSP——这两项目前只有静态配置，沙箱行为的人工验证还没做过。
+G7 先把 Electron 的 SUID 沙箱助手修好，再在 `sandbox: true` 下启动，所以 preload 与 IPC 是在沙箱里被验过的，不是靠 `--no-sandbox` 绕过。
+**仍未覆盖**的是 `src/main/index.ts` 自己的窗口配置与导航守卫——冒烟脚本自建窗口、加载构建产物，那条路要等 M2 有 runtime 可握手时补一次真启动测试；CSP 目前也停在静态配置。
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
