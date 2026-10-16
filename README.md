@@ -91,13 +91,16 @@ npm run gate
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
 | G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗（窗口配置、preload、IPC 注册、导航守卫都用它那一份），再断言：加载的是构建产物、内容尺寸 1440×900、按 BGRA 统计非白像素 ≥1%、状态栏版本号来自主进程应答、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent` | 空白截图过不了像素阈值；自建窗口的假版本已经暴露过一次（`app:meta` 报 No handler）（`tests/window-smoke.cjs`） |
 
+| G6b 结果核验 | 读 `screenshots/window-smoke.json` 并**复算读数**：内容尺寸、非白像素比、断言条数下限、自述计数与明细一致 | 带 `--selftest`，8 份合成结果证明「ok=true 但读数不对」照样被拒（`scripts/check-window-smoke.mjs`） |
+
 G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动，所以 preload 与 IPC 是在生产那套 `sandbox: true` 下验的，不是靠 `--no-sandbox` 绕过。
+为什么要有 G6b 这道独立核验：CI 里曾经出现过冒烟打印「10/12 项通过」但 job 是绿的——`app.exit(1)` 被生产入口的 `window-all-closed → app.quit()` 抢先顶掉了。通过与否从此不吊在 Electron 的退出码管道上。
 **仍未覆盖**：需要 runtime 握手的行为（M2 之后才有东西可握）、以及 CSP 违规场景的主动探测。
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
-**执行状态要说清**：G1（含 9 条反向覆盖）、G2（完整与降级两种模式）、G3 在本机跑绿；G1、G2、G3、G6 已在 CI 的 ubuntu + windows 双矩阵跑绿。
-G7 是本轮新写的，还没有执行过一次——它写好了，但尚未被证明跑得过。
+**执行状态要说清**：G1（含 9 条反向覆盖）、G2（完整与降级两种模式）、G3、G6b 自测在本机跑绿；G1、G2、G3、G6 已在 CI 的 ubuntu + windows 双矩阵跑绿。
+G7 与 G6b 对当前这版代码的结果以 Actions 页面为准——G7 先前那几轮的经过与踩坑记录在 `CHANGELOG.md`，没有删。
 
 ## 依赖
 

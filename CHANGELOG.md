@@ -20,6 +20,7 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - **环境手册** `docs/env-setup.md`：把联网动作写成文档而不是替你执行，含通道实测表、镜像配置与信任边界、版本查法、Windows PowerShell/GBK 坑。
 - **双语 README** `README.md` / `README_EN.md`，Apache-2.0 许可（取自上游原文）。
 - CI `ci.yml`：ubuntu + windows 双矩阵，跳过 Electron 二进制下载，跑四道无需网络的门禁再加类型检查、构建与产物冒烟。
+- **G6b 结果核验** `scripts/check-window-smoke.mjs`：独立读取真启动的 JSON 结论并复算读数（尺寸、非白像素比、断言条数下限、自述计数与明细是否自洽），带 `--selftest` 用 8 份合成夹具自证会拒绝被污染的结果；已并入 `npm run gate`，不需要 Electron。
 - **G7 真启动冒烟** `tests/window-smoke.cjs` + CI `window-smoke` job：`require` 生产入口起窗，断言加载的是构建产物、内容尺寸 1440×900、非白像素占比 ≥1%、状态栏版本号来自主进程 IPC 应答、阶段轨道 7 节、工作台 6 标签、发送按钮按事实禁用、点色块真的把 `--accent` 换成 B 案靛蓝，截图上传为 artifact。
 - **窗口内容尺寸基线**：`src/main/index.ts` 加 `useContentSize: true`——默认 `width/height` 含边框，实测内容区只有 1439x872，「以 1440×900 为设计基准」这句话就不可比。
 - **跨平台行尾约定** `.gitattributes`：仓库内统一 LF、签出也发 LF（门禁脚本要在 ubuntu 与 windows 上行为一致），`*.cmd/*.bat/*.ps1` 保持 CRLF，二进制不参与 diff。
@@ -45,7 +46,9 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - **第二轮全绿**：类型检查、`electron-vite build` 与 G6 产物冒烟在 ubuntu 和 windows 上都通过，于是 Electron 44.8.0 + electron-vite 6.0.0 + Vite 8.3.4 + TypeScript 7.0.2 这组版本算经过了真构建验证，不再是「装得上但没编过」。
 - **G7 首跑失败**：Linux 上 `node_modules/electron/dist/chrome-sandbox` 不是 root:4755，Chromium 在任何断言执行之前就 `FATAL:setuid_sandbox_host` 退出（信号 SIGTRAP）。没有用 `--no-sandbox` 绕过——那样等于把生产窗口的 `sandbox: true` 排除在验证之外；改为在 workflow 里把沙箱助手权限修好，于是 G7-3 的 IPC 断言实际是在沙箱内验 preload。
 - **G7 第二、三轮失败都是我自己的脚手架问题**：第二轮 `chmod` 报 no such file，因为二进制要到首次 `npx electron` 才懒下载，改为先显式跑 electron 自己的 `install.js`；第三轮则是我加的诊断命令 `npx electron --version` 排在了 `chmod` 之前，自己踩进同一个 SUID 陷阱。日志里 `chrome-sandbox` 的 `ls -l` 输出把这件事写实了，不再是猜。
-- **G7 第四轮跑起来了，但抓出我自己的脚手架在造假**：窗口画面 2.11% 非白、轨道与标签数量都对，可 `app:meta` 报 `No handler registered` —— 因为那一版冒烟脚本自己 `new BrowserWindow`，从来没加载 `src/main/index.ts`，IPC 处理器自然不存在。「窗口起来了」由此变成一句没验证产品的话。改为 `require(out/main/index.js)` 让生产入口起窗，同时把它顺带照出的尺寸问题修掉（`useContentSize: true`）。
+- **G7 第四轮跑起来了，但抓出脚手架在造假**：画面 2.11% 非白、轨道与标签数量都对，可 `app:meta` 报 `No handler registered`——那一版冒烟自己 `new BrowserWindow`，从没加载 `src/main/index.ts`，IPC 处理器自然不存在，「窗口起来了」于是变成一句没验证产品的话。改为 `require(out/main/index.js)` 让生产入口起窗。
+- **G7 第五轮：绿是假的**。job 显示通过，日志里却写着「10/12 项通过」——`app.exit(1)` 被生产入口的 `window-all-closed → app.quit()` 抢先，退出码被顶成 0。通过与否不能再吊在 Electron 的退出码管道上，于是新增 `scripts/check-window-smoke.mjs`：冒烟把结论落成 `screenshots/window-smoke.json`，核验脚本独立读它并**复算读数**（`ok=true` 但尺寸 1439x899 照样拒），并带 `--selftest` 用 8 份合成结果自证会失败；它被加进 `npm run gate`，本机即可跑。
+- **同轮两条断言本身写错了**：① `app.getVersion()` 在 `electron <脚本>` 这种启动方式下返回的是 Electron 自带 default_app 的版本（实测 44.8.0），不是我们的 0.0.1，所以状态栏断言改成校验形状并另加一条「主进程的 runtime 信息原样穿过 preload 回到页面」；② xvfb 虚拟屏正好 1440×900 时装不下带边框的窗口，内容区被钳成 1439x899，改为 1600x1000。
 
 ### 已知风险
 

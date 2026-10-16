@@ -21,7 +21,6 @@ const { join } = require('node:path')
 
 const OUT_DIR = process.env.SMOKE_OUT || 'screenshots'
 const MIN_INK_RATIO = 0.01
-const EXPECT_VERSION = require('../package.json').version
 const results = []
 const record = (name, ok, detail) => results.push({ name, ok, detail })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -101,11 +100,19 @@ async function main() {
     sendDisabled: document.querySelector('.pill--send')?.disabled ?? null,
     bg: getComputedStyle(document.body).backgroundColor
   })`)
+
+  // executeJavaScript 会等页面里的 Promise，所以这一行就是「页面 → preload → 主进程 → 原路返回」的端到端调用
+  const ipc = await win.webContents.executeJavaScript(`window.studio.meta()`)
   record(
-    'G7-3 IPC 端到端（状态栏含主进程版本号）',
-    String(dom.statusbar).includes(`v${EXPECT_VERSION}`),
-    `期望含 v${EXPECT_VERSION} / 状态栏: ${JSON.stringify(String(dom.statusbar).trim().slice(0, 64))}`
+    'G7-3 IPC 端到端（主进程的 runtime 信息穿过 preload 回到页面）',
+    ipc && ipc.Electron === process.versions.electron && ipc.platform === process.platform,
+    `页面收到 ${JSON.stringify(ipc)} / 主进程实际 electron ${process.versions.electron}、platform ${process.platform}`
   )
+  // 状态栏里的版本由主进程应答渲染出来；这里只校验形状：
+  // 用 `electron <脚本>` 启动时 app 清单是 Electron 自带的 default_app，app.getVersion() 返回的是 Electron 版本，
+  // 打包成安装版后它才会是我们 package.json 的 0.0.1，所以不能把断言写死成 v0.0.1。
+  const shownVersion = String(dom.statusbar).match(/v(\d+\.\d+\.\d+)/)
+  record('G7-3 状态栏渲染出主进程版本号', shownVersion !== null, `状态栏: ${JSON.stringify(String(dom.statusbar).trim().slice(0, 64))}`)
   record('G7-4 阶段轨道 7 节', dom.phases === 7, `实得 ${dom.phases}`)
   record('G7-4 工作台 6 个标签', dom.tabs === 6, `实得 ${dom.tabs}`)
   record('G7-4 输入区按事实禁用', dom.sendDisabled === true, `发送按钮 disabled=${dom.sendDisabled}`)
@@ -119,7 +126,20 @@ async function main() {
   )
   record('G7-4 切到 B 案靛蓝生效', accentB.toLowerCase() === '#2b4c7e', `实得 ${accentB}`)
 
-  win.close()
+  // 结论落盘：CI 的通过与否由 scripts/check-window-smoke.mjs 读这份 JSON 判定，
+  // 不依赖 Electron 的退出码管道——上一版就是 app.exit(1) 被生产入口的
+  // window-all-closed → app.quit() 抢先，10/12 项通过却把 job 跑绿了。
+  const summary = {
+    ok: results.every((r) => r.ok),
+    total: results.length,
+    failed: results.filter((r) => !r.ok).length,
+    contentSize: `${w}x${h}`,
+    inkRatio: Number(ratio.toFixed(4)),
+    minInkRatio: MIN_INK_RATIO,
+    url,
+    results: results.map((r) => ({ name: r.name, ok: r.ok, detail: r.detail }))
+  }
+  writeFileSync(join(OUT_DIR, 'window-smoke.json'), JSON.stringify(summary, null, 2) + '\n')
 }
 
 app
@@ -129,10 +149,21 @@ app
     const failed = results.filter((r) => !r.ok)
     for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.name}\n       ${r.detail}`)
     console.log(`\n${results.length - failed.length}/${results.length} 项通过`)
+    process.exitCode = failed.length === 0 ? 0 : 1
     await sleep(100)
+    // 不关窗口：关掉会触发生产入口的 window-all-closed → app.quit()，把上面的退出码顶掉
     app.exit(failed.length === 0 ? 0 : 1)
   })
   .catch((err) => {
     console.error(`FAIL 冒烟脚本自身异常: ${err && err.stack ? err.stack : err}`)
+    try {
+      mkdirSync(OUT_DIR, { recursive: true })
+      writeFileSync(
+        join(OUT_DIR, 'window-smoke.json'),
+        JSON.stringify({ ok: false, total: results.length, failed: results.length + 1, error: String(err && err.message ? err.message : err) }, null, 2) + '\n'
+      )
+    } catch {
+      /* 落盘失败时仍然靠非零退出码变红 */
+    }
     app.exit(1)
   })
