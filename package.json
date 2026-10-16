@@ -16,6 +16,7 @@
     "check:contracts": "python scripts/validate_contracts.py",
     "check:cli": "python runtime/selfcheck.py",
     "smoke:dist": "node scripts/smoke-dist.mjs",
+    "smoke:window": "electron tests/window-smoke.cjs",
     "gate": "npm run check:registry && npm run check:registry:negative && npm run typecheck && npm run build && npm run smoke:dist && npm run check:contracts && npm run check:cli"
   },
   "devDependencies": {

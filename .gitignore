@@ -19,6 +19,7 @@ __pycache__/
 # 打包产物与缓存
 .cache/
 tmp/
+screenshots/window-smoke.png
 *.7z
 *.dmg
 *.exe
