@@ -89,10 +89,10 @@ npm run gate
 | G2b 版本同源 | `VERSION` / `package.json` / `pyproject.toml` / `mms/__init__.py` 四处一致 | 任一缺项即失败 |
 | G3 CLI 契约 | 退出码 `0 成功 / 1 校验失败 / 2 用法或环境错误` 三码各自可达 | 词表外取值→1、非法 JSON→1、`MMS_HOME` 指向空目录→2、未知子命令→2（`runtime/selfcheck.py`） |
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
-| G7 真启动冒烟 | xvfb 下真起窗口：标题与 1440×900 内容尺寸、按 BGRA 统计非白像素占比 ≥1%、IPC 往返把主进程版本号写进状态栏、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent` | 空白截图过不了像素阈值这一关；`needs: []` 独立跑（`tests/window-smoke.cjs`） |
+| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗（窗口配置、preload、IPC 注册、导航守卫都用它那一份），再断言：加载的是构建产物、内容尺寸 1440×900、按 BGRA 统计非白像素 ≥1%、状态栏版本号来自主进程应答、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent` | 空白截图过不了像素阈值；自建窗口的假版本已经暴露过一次（`app:meta` 报 No handler）（`tests/window-smoke.cjs`） |
 
-G7 先把 Electron 的 SUID 沙箱助手修好，再在 `sandbox: true` 下启动，所以 preload 与 IPC 是在沙箱里被验过的，不是靠 `--no-sandbox` 绕过。
-**仍未覆盖**的是 `src/main/index.ts` 自己的窗口配置与导航守卫——冒烟脚本自建窗口、加载构建产物，那条路要等 M2 有 runtime 可握手时补一次真启动测试；CSP 目前也停在静态配置。
+G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动，所以 preload 与 IPC 是在生产那套 `sandbox: true` 下验的，不是靠 `--no-sandbox` 绕过。
+**仍未覆盖**：需要 runtime 握手的行为（M2 之后才有东西可握）、以及 CSP 违规场景的主动探测。
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 

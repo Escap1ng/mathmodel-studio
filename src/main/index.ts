@@ -8,6 +8,9 @@ function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
+    // 1440×900 是布局的设计基准，所以它必须指内容区：
+    // 默认的 width/height 含窗口边框，实测内容区会掉到 1439x872，跨平台不可比。
+    useContentSize: true,
     minWidth: 1100,
     minHeight: 700,
     show: false,

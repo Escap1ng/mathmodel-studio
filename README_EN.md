@@ -79,10 +79,10 @@ Every gate ships with negative coverage — a checker that only ever returns zer
 | G2b version parity | `VERSION` / `package.json` / `pyproject.toml` / `mms/__init__.py` must agree | any missing or differing value fails |
 | G3 CLI contract | exit codes `0 ok / 1 validation failed / 2 usage or environment` each reachable | out-of-vocabulary value → 1, invalid JSON → 1, empty `MMS_HOME` → 2, unknown subcommand → 2 |
 | G6 desktop scaffold | typecheck + build + the bundle must actually contain this project's CJK copy and design-token names | any failed assertion exits 1 |
-| G7 real launch | under xvfb: title and 1440x900 content size, non-white pixel ratio >= 1% computed from BGRA, IPC round-trip writes the app version into the status bar, 7 phase rows / 6 tabs / send button disabled as a matter of fact, and clicking a swatch really swaps `--accent` | a blank screenshot cannot clear the pixel threshold; runs as an independent job (`tests/window-smoke.cjs`) |
+| G7 real launch | `require`s the production entry `out/main/index.js` so window options, preload, IPC registration and navigation guards all come from that file, then asserts: built artifact loaded, content size 1440x900, non-white pixel ratio >= 1% from BGRA, status-bar version served by the main process, 7 phase rows / 6 tabs / send button disabled as a matter of fact, and clicking a swatch really swaps `--accent` | a blank screenshot cannot clear the pixel threshold; the earlier self-built-window version was caught faking it (`app:meta` → No handler) |
 
-G7 repairs Electron's SUID sandbox helper first and then launches under `sandbox: true`, so the preload and the IPC round-trip are verified *inside* the sandbox rather than bypassed with `--no-sandbox`.
-**Still uncovered**: the window options and navigation guards in `src/main/index.ts` itself — the smoke script builds its own window around the built output, and that path needs a real-launch test once M2 gives the runtime a handshake to wait on. The CSP also remains static configuration only.
+CI repairs Electron's SUID sandbox helper (root:4755) before launching, so preload and IPC are verified under the production `sandbox: true` rather than bypassed with `--no-sandbox`.
+**Still uncovered**: anything needing a runtime handshake (only possible from M2 onward) and active probing of CSP violations.
 
 CLI flags, exit codes, registry fields and artifact paths are **Stable**; `--json` field order and error wording are **Experimental**; geometry constants inside scripts are **Internal**.
 
