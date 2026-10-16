@@ -81,12 +81,15 @@ Every gate ships with negative coverage — a checker that only ever returns zer
 | G6 desktop scaffold | typecheck + build + the bundle must actually contain this project's CJK copy and design-token names | any failed assertion exits 1 |
 | G7 real launch | `require`s the production entry `out/main/index.js` so window options, preload, IPC registration and navigation guards all come from that file, then asserts: built artifact loaded, content size 1440x900, non-white pixel ratio >= 1% from BGRA, status-bar version served by the main process, 7 phase rows / 6 tabs / send button disabled as a matter of fact, and clicking a swatch really swaps `--accent` | a blank screenshot cannot clear the pixel threshold; the earlier self-built-window version was caught faking it (`app:meta` → No handler) |
 
+| G6b result audit | Reads `screenshots/window-smoke.json` and **recomputes the readings** rather than trusting the flag: content size, non-white pixel ratio, an assertion-count floor, and self-reported counts versus the detail list | ships `--selftest` with 8 synthetic results, proving "ok=true but the reading is wrong" is still rejected (`scripts/check-window-smoke.mjs`) |
+
 CI repairs Electron's SUID sandbox helper (root:4755) before launching, so preload and IPC are verified under the production `sandbox: true` rather than bypassed with `--no-sandbox`.
+Why a separate auditor exists: CI once printed "10/12 passed" while the job stayed green — `app.exit(1)` was preempted by the production entry's `window-all-closed → app.quit()`. The verdict no longer hangs on Electron's exit-code plumbing.
 **Still uncovered**: anything needing a runtime handshake (only possible from M2 onward) and active probing of CSP violations.
 
 CLI flags, exit codes, registry fields and artifact paths are **Stable**; `--json` field order and error wording are **Experimental**; geometry constants inside scripts are **Internal**.
 
-**Execution state, stated plainly**: G1 (with its 9 negative controls), G2 (both full and degraded modes) and G3 were run green locally; G1, G2, G3 and G6 are green in CI on the ubuntu + windows matrix. G7 was written this round and has not been executed even once yet — the script exists, but it has not been proven to run.
+**Execution state, stated plainly**: G1 (with its 9 negative controls), G2 (both full and degraded modes), G3 and the G6b selftest were run green locally; G1, G2, G3 and G6 are green in CI on the ubuntu + windows matrix. For G7 and G6b against the current code, read the Actions run — the earlier rounds of G7, including what they got wrong, are kept in `CHANGELOG.md` rather than deleted.
 
 ## Dependencies
 

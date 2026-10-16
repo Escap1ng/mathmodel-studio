@@ -19,7 +19,10 @@ __pycache__/
 # 打包产物与缓存
 .cache/
 tmp/
+# 冒烟产物由 CI 上传为 artifact；只挡这两个具体文件，
+# 免得将来要提交的界面截图（screenshots/*.png）被整目录规则一起吞掉
 screenshots/window-smoke.png
+screenshots/window-smoke.json
 *.7z
 *.dmg
 *.exe
