@@ -20,6 +20,7 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - **环境手册** `docs/env-setup.md`：把联网动作写成文档而不是替你执行，含通道实测表、镜像配置与信任边界、版本查法、Windows PowerShell/GBK 坑。
 - **双语 README** `README.md` / `README_EN.md`，Apache-2.0 许可（取自上游原文）。
 - CI `ci.yml`：ubuntu + windows 双矩阵，跳过 Electron 二进制下载，跑四道无需网络的门禁再加类型检查、构建与产物冒烟。
+- **跨平台行尾约定** `.gitattributes`：仓库内统一 LF、签出也发 LF（门禁脚本要在 ubuntu 与 windows 上行为一致），`*.cmd/*.bat/*.ps1` 保持 CRLF，二进制不参与 diff。
 
 ### 尚未做（避免被当成已完成）
 
@@ -36,3 +37,11 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 ### 已知风险
 
 - `npm install` 未在本机执行过（属联网动作），因此 Electron 44.8.0 / electron-vite 6.0.0 / Vite 8.3.4 / TypeScript 7.0.2 的组合尚未经过一次真构建验证；版本号本身取自镜像 `dist-tags.latest` 并核对了 `electron-vite` 的 peer 范围。
+
+### 被反向覆盖当场抓出的缺陷（已修）
+
+写门禁时先跑了自己的破坏夹具，三处真问题因此暴露——这正是「检查器必须能失败」的用处：
+
+- `minimal_validate`（jsonschema 缺席时的降级校验）放过了非法 `kind`。补上 `kind` / `contribution` / `status` 三个枚举断言，并把 C3 反向覆盖从 2 例扩到 5 例，两种模式现在都是 9/9。
+- `validate_contracts.py` 误把 `jsonschema.Draft202012Validator.check_schema()` 当成返回错误列表的 API 用，`list(None)` 直接 `TypeError` 崩在门禁自己身上。改为按文档语义捕获 `SchemaError`。
+- 徽章匹配正则把域名写成 `shields.org`（实为 `shields.io`），导致 G1 的 R9 恒定报「徽章缺失」。修掉后 R9 才第一次真正比对上。
