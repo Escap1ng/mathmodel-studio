@@ -20,6 +20,7 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - **环境手册** `docs/env-setup.md`：把联网动作写成文档而不是替你执行，含通道实测表、镜像配置与信任边界、版本查法、Windows PowerShell/GBK 坑。
 - **双语 README** `README.md` / `README_EN.md`，Apache-2.0 许可（取自上游原文）。
 - CI `ci.yml`：ubuntu + windows 双矩阵，跳过 Electron 二进制下载，跑四道无需网络的门禁再加类型检查、构建与产物冒烟。
+- **G7 真启动冒烟** `tests/window-smoke.cjs` + CI `window-smoke` job：xvfb 下真起窗口、`capturePage` 后按 BGRA 统计非白像素（阈值 1%，空白截图过不了），再断言 IPC 往返、7 节阶段轨道、6 个工作台标签、发送按钮按事实禁用、点色块真的把 `--accent` 换成 B 案靛蓝，并把截图上传为 artifact。本轮尚未执行过一次。
 - **跨平台行尾约定** `.gitattributes`：仓库内统一 LF、签出也发 LF（门禁脚本要在 ubuntu 与 windows 上行为一致），`*.cmd/*.bat/*.ps1` 保持 CRLF，二进制不参与 diff。
 
 ### 尚未做（避免被当成已完成）
@@ -40,6 +41,7 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - G1、G1 反向覆盖、G2、G3、`compileall` 在 **ubuntu 与 windows 上均全绿**——注册表契约与退出码契约是跨平台自洽的。
 - 类型检查首轮失败：TypeScript 7 以 `TS2882` 拦下 `import './styles/tokens.css'` 这类副作用导入。补 `src/renderer/src/env.d.ts`（`/// <reference types="vite/client" />`）声明资源模块。
 - 顺带把 G6 的色值断言换成设计令牌名断言，避免 minifier 改写颜色造成的假红。
+- **第二轮全绿**：类型检查、`electron-vite build` 与 G6 产物冒烟在 ubuntu 和 windows 上都通过，于是 Electron 44.8.0 + electron-vite 6.0.0 + Vite 8.3.4 + TypeScript 7.0.2 这组版本算经过了真构建验证，不再是「装得上但没编过」。
 
 ### 已知风险
 
