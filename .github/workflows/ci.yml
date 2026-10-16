@@ -92,6 +92,16 @@ jobs:
       - name: 构建
         run: npm run build
 
+      - name: 取回 Electron 二进制并打印实况
+        # 上一轮 chmod 报 No such file or directory：npm install 之后 dist/ 里并没有二进制，
+        # 它是等到首次 npx electron 才懒下载的（那一轮的日志里有 "Downloading Electron binary..."）。
+        # 所以先把二进制显式取回来，再把目录列出来——下次再挂就知道挂在哪儿，而不是猜。
+        run: |
+          node node_modules/electron/install.js
+          ls -l node_modules/electron/ | head -10
+          ls -l node_modules/electron/dist/ | head -12
+          npx electron --version
+
       - name: 修好 Electron 的 SUID 沙箱助手
         # 不改就会 FATAL:setuid_sandbox_host（chrome-sandbox 需 root:4755）而进程在断言前就死。
         # 用 --no-sandbox 绕过也能跑，但那等于把生产窗口的 sandbox: true 排除在验证之外，
