@@ -89,7 +89,7 @@ npm run gate
 | G2b 版本同源 | `VERSION` / `package.json` / `pyproject.toml` / `mms/__init__.py` 四处一致 | 任一缺项即失败 |
 | G3 CLI 契约 | 退出码 `0 成功 / 1 校验失败 / 2 用法或环境错误` 三码各自可达 | 词表外取值→1、非法 JSON→1、`MMS_HOME` 指向空目录→2、未知子命令→2（`runtime/selfcheck.py`） |
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
-| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗（窗口配置、preload、IPC 注册、导航守卫都用它那一份），再断言：加载的是构建产物、内容尺寸 1440×900、按 BGRA 统计非白像素 ≥1%、状态栏版本号来自主进程应答、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent` | 空白截图过不了像素阈值；自建窗口的假版本已经暴露过一次（`app:meta` 报 No handler）（`tests/window-smoke.cjs`） |
+| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗（窗口配置、preload、IPC 注册、导航守卫都用它那一份），再断言：加载的是构建产物、内容尺寸 1440×900、按 BGRA 统计非白像素 ≥1%、状态栏版本号来自主进程应答、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent`、中文字体族确实可用 | 空白截图过不了像素阈值；自建窗口的假版本暴露过一次（`app:meta` 报 No handler），豆腐块截图也暴露过一次（`tests/window-smoke.cjs`） |
 
 | G6b 结果核验 | 读 `screenshots/window-smoke.json` 并**复算读数**：内容尺寸、非白像素比、断言条数下限、自述计数与明细一致 | 带 `--selftest`，8 份合成结果证明「ok=true 但读数不对」照样被拒（`scripts/check-window-smoke.mjs`） |
 
