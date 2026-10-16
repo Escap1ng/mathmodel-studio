@@ -78,11 +78,14 @@ Every gate ships with negative coverage — a checker that only ever returns zer
 | G2 contract validation | registry validated against JSON Schema Draft 2020-12; degrades with a printed note when `jsonschema` is absent | two deliberately invalid registries must be rejected |
 | G2b version parity | `VERSION` / `package.json` / `pyproject.toml` / `mms/__init__.py` must agree | any missing or differing value fails |
 | G3 CLI contract | exit codes `0 ok / 1 validation failed / 2 usage or environment` each reachable | out-of-vocabulary value → 1, invalid JSON → 1, empty `MMS_HOME` → 2, unknown subcommand → 2 |
-| G6 desktop scaffold | typecheck + build + the bundle must actually contain this project's CJK copy and color tokens | any failed assertion exits 1 |
+| G6 desktop scaffold | typecheck + build + the bundle must actually contain this project's CJK copy and design-token names | any failed assertion exits 1 |
+| G7 real launch | under xvfb: title and 1440x900 content size, non-white pixel ratio >= 1% computed from BGRA, IPC round-trip writes the app version into the status bar, 7 phase rows / 6 tabs / send button disabled as a matter of fact, and clicking a swatch really swaps `--accent` | a blank screenshot cannot clear the pixel threshold; runs as an independent job (`tests/window-smoke.cjs`) |
+
+G7 must run with `--no-sandbox` inside the container, so it **does not cover** the production window's `sandbox: true` or the CSP — those exist only as static configuration, and manual verification of sandbox behaviour has not been done.
 
 CLI flags, exit codes, registry fields and artifact paths are **Stable**; `--json` field order and error wording are **Experimental**; geometry constants inside scripts are **Internal**.
 
-**Execution state, stated plainly**: G1, its negative coverage, G2 and G3 were run green on the local machine. G6 requires `npm install` followed by a build, so it has never been executed — the script exists, but it has not yet been proven to run (see the known-risk note in CHANGELOG).
+**Execution state, stated plainly**: G1 (with its 9 negative controls), G2 (both full and degraded modes) and G3 were run green locally; G1, G2, G3 and G6 are green in CI on the ubuntu + windows matrix. G7 was written this round and has not been executed even once yet — the script exists, but it has not been proven to run.
 
 ## Dependencies
 

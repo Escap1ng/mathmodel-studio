@@ -88,12 +88,15 @@ npm run gate
 | G2 契约校验 | 注册表按 JSON Schema Draft 2020-12 校验；`jsonschema` 缺席时降级并说明 | 构造两份非法注册表，必须被拒（`scripts/validate_contracts.py` C3） |
 | G2b 版本同源 | `VERSION` / `package.json` / `pyproject.toml` / `mms/__init__.py` 四处一致 | 任一缺项即失败 |
 | G3 CLI 契约 | 退出码 `0 成功 / 1 校验失败 / 2 用法或环境错误` 三码各自可达 | 词表外取值→1、非法 JSON→1、`MMS_HOME` 指向空目录→2、未知子命令→2（`runtime/selfcheck.py`） |
-| G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与配色令牌 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
+| G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
+| G7 真启动冒烟 | xvfb 下真起窗口：标题与 1440×900 内容尺寸、按 BGRA 统计非白像素占比 ≥1%、IPC 往返把主进程版本号写进状态栏、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent` | 空白截图过不了像素阈值这一关；`needs: []` 独立跑（`tests/window-smoke.cjs`） |
+
+G7 在容器里必须 `--no-sandbox`，因此**不覆盖**生产窗口的 `sandbox: true` 与 CSP——这两项目前只有静态配置，沙箱行为的人工验证还没做过。
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
-**执行状态要说清**：G1、G1 反向覆盖、G2、G3 已在本机跑绿；G6 需要先 `npm install` 再构建，因此尚未执行过——
-它只是写好了，还没有被证明跑得过（详见 CHANGELOG 的已知风险）。
+**执行状态要说清**：G1（含 9 条反向覆盖）、G2（完整与降级两种模式）、G3 在本机跑绿；G1、G2、G3、G6 已在 CI 的 ubuntu + windows 双矩阵跑绿。
+G7 是本轮新写的，还没有执行过一次——它写好了，但尚未被证明跑得过。
 
 ## 依赖
 
