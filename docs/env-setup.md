@@ -102,3 +102,7 @@ npm run gate
 全绿即脚手架自洽。其中只有 `typecheck`、`build`、`smoke:dist` 需要 `npm install` 成功，
 其余四项（`check:registry`、`check:registry:negative`、`check:contracts`、`check:cli`）只吃标准库，
 断网也能跑——这是刻意设计，方便你在任何机器上验证注册表没漂。
+
+想看界面就两条路：`npm run dev` 起开发窗口；或先 `npm run build` 再 `npm run smoke:window`，
+它会 `require` 生产入口真起一次窗口、按像素断言并把截图写到 `screenshots/window-smoke.png`。
+本机有显示器，不需要 xvfb；CI 那条 job 才需要，并且要先修好 Electron 的 SUID 沙箱助手（见 `ci.yml` 的注释）。
