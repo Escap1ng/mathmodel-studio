@@ -43,6 +43,7 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - 顺带把 G6 的色值断言换成设计令牌名断言，避免 minifier 改写颜色造成的假红。
 - **第二轮全绿**：类型检查、`electron-vite build` 与 G6 产物冒烟在 ubuntu 和 windows 上都通过，于是 Electron 44.8.0 + electron-vite 6.0.0 + Vite 8.3.4 + TypeScript 7.0.2 这组版本算经过了真构建验证，不再是「装得上但没编过」。
 - **G7 首跑失败**：Linux 上 `node_modules/electron/dist/chrome-sandbox` 不是 root:4755，Chromium 在任何断言执行之前就 `FATAL:setuid_sandbox_host` 退出（信号 SIGTRAP）。没有用 `--no-sandbox` 绕过——那样等于把生产窗口的 `sandbox: true` 排除在验证之外；改为在 workflow 里把沙箱助手权限修好，于是 G7-3 的 IPC 断言实际是在沙箱内验 preload。
+- **G7 第二、三轮失败都是我自己的脚手架问题**：第二轮 `chmod` 报 no such file，因为二进制要到首次 `npx electron` 才懒下载，改为先显式跑 electron 自己的 `install.js`；第三轮则是我加的诊断命令 `npx electron --version` 排在了 `chmod` 之前，自己踩进同一个 SUID 陷阱。日志里 `chrome-sandbox` 的 `ls -l` 输出把这件事写实了，不再是猜。
 
 ### 已知风险
 
