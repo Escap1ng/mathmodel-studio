@@ -27,6 +27,7 @@
 
 **Status: M0 scaffold.** The three-pane shell, the skill registry with its JSON Schema contracts, and four gates (G1 registry consistency · G2 contracts and version parity · G3 CLI exit codes · G6 dist smoke, each with negative coverage) are in place.
 **It cannot model yet** — LLM access lands at M2, the model-choice card and the explain drawer at M3, the full typesetting chain at M5. Milestones: [PLAN.md](PLAN.md) §7.
+Picking this up or auditing it? Start with [docs/HANDOFF.md](docs/HANDOFF.md): which claims are proven, which are not, and the traps this round already paid for.
 
 ## Quick start
 
