@@ -11,7 +11,8 @@
  *   3 画面真的画出来了：按 BGRA 统计非白像素 ≥1%——空白截图也算「窗口起来了」，那是假绿
  *   4 preload + IPC 端到端：状态栏文本由主进程应答渲染出来（在 sandbox: true 下）
  *   5 结构与交互：阶段轨道 7 节、工作台 6 标签、发送按钮按事实禁用、点色块真的换掉 --accent
- *   6 中文字体族真的可用——像素断言分不清字与空心方框，上一轮的豆腐块截图就是这么混过去的
+ *   6 中文按真字形渲染——用「国」与空心框「□」的墨量比值区分；像素总量和
+ *     document.fonts.check 都分不清字与方框，上一轮的豆腐块截图就是这么混过去的
  *
  * 仍未覆盖：需要 LLM 与 runtime 的行为（M2 起）；沙箱之外的 CSP 违规场景。
  * 退出码：0 全部通过 / 1 任一断言失败 / 2 环境错误（没有构建产物或窗口没起来）
@@ -127,17 +128,27 @@ async function main() {
   )
   record('G7-4 切到 B 案靛蓝生效', accentB.toLowerCase() === '#2b4c7e', `实得 ${accentB}`)
 
-  // 中文字体可用性：上一轮的截图里整片中文都是豆腐块，而非白像素断言照样过了——
-  // 它分不清「字」和「空心方框」。所以字体要单独问，不能靠像素推断。
-  const fontProbe = await win.webContents.executeJavaScript(`(() => {
-    const named = ['HarmonyOS Sans SC', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', 'PingFang SC']
-    const hit = []
-    for (const f of named) {
-      try {
-        if (document.fonts.check('13.5px "' + f + '"', '国赛建模')) hit.push(f)
-      } catch (e) {
-        /* 单个族名查询失败当作不可用，继续问下一个 */
-      }
+  // 中文字体可用性。上一版这里用 document.fonts.check(具名族)，实测五个族名全部「命中」，
+  // 包括 runner 上根本没装的 Microsoft YaHei 与 PingFang SC——Chromium 在有回退字体时对任何族名都返回 true，
+  // 那条断言是假保证。改成能双向区分的度量：把笔画复杂的「国」与空心框「□」画进 canvas 比墨量。
+  // 缺中文字体时「国」就渲染成方框，两者墨量接近、比值≈1；有中文字体时「国」的墨量远高于方框。
+  const glyph = await win.webContents.executeJavaScript(`(() => {
+    const stack = getComputedStyle(document.documentElement).getPropertyValue('--font-cjk')
+    const density = (ch) => {
+      const c = document.createElement('canvas')
+      c.width = 64
+      c.height = 64
+      const x = c.getContext('2d')
+      x.fillStyle = '#ffffff'
+      x.fillRect(0, 0, 64, 64)
+      x.fillStyle = '#000000'
+      x.font = '48px ' + stack
+      x.textBaseline = 'top'
+      x.fillText(ch, 4, 6)
+      const d = x.getImageData(0, 0, 64, 64).data
+      let dark = 0
+      for (let i = 0; i < d.length; i += 4) if (d[i] < 128) dark++
+      return dark
     }
     const s = document.createElement('span')
     s.style.cssText = 'position:absolute;left:-9999px;top:0;font-family:var(--font-cjk);font-size:13.5px'
@@ -145,14 +156,16 @@ async function main() {
     document.body.appendChild(s)
     const width = s.getBoundingClientRect().width
     s.remove()
-    return { hit, width }
+    const complex = density('国')
+    const box = density('□')
+    return { complex, box, ratio: box > 0 ? complex / box : 0, width }
   })()`)
   record(
-    'G7-5 至少一个中文字体族可用',
-    Array.isArray(fontProbe.hit) && fontProbe.hit.length > 0,
-    `命中 ${JSON.stringify(fontProbe.hit)}（一个都没有时中文会整片渲染成豆腐块，而像素断言看不出来）`
+    'G7-5 中文按真字形渲染（不是空心方框）',
+    glyph.complex > 50 && glyph.ratio > 1.5,
+    `「国」暗像素 ${glyph.complex} / 「□」${glyph.box}，比值 ${glyph.ratio.toFixed(2)}（缺字体时两者接近，比值≈1）`
   )
-  record('G7-5 中文探针有实际占位', fontProbe.width > 40, `「国赛建模」13.5px 宽 ${fontProbe.width}`)
+  record('G7-5 中文探针有实际占位', glyph.width > 40, `「国赛建模」13.5px 宽 ${glyph.width}`)
 
   // 结论落盘：CI 的通过与否由 scripts/check-window-smoke.mjs 读这份 JSON 判定，
   // 不依赖 Electron 的退出码管道——上一版就是 app.exit(1) 被生产入口的
