@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Escap1ng/mathmodel-studio/schemas/skill-manifest.schema.json",
+  "title": "技能注册表契约",
+  "description": "skills/manifest.json 的结构契约。枚举值与 manifest 内的词表（kinds/status/contribution/hitl_card_kinds/artifact_kinds）由 check-registry.mjs 交叉校验，两处不一致即门禁失败。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "schema_version",
+    "title",
+    "description",
+    "kinds",
+    "status",
+    "contribution",
+    "cli_contract",
+    "phases",
+    "skills"
+  ],
+  "properties": {
+    "manifest_version": { "type": "string", "pattern": "^\\d+\\.\\d+$" },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+$" },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "version", "license", "note"],
+      "properties": {
+        "source": { "type": "string", "pattern": "^[\\w.-]+/[\\w.-]+$" },
+        "version": { "type": "string", "minLength": 1 },
+        "license": { "type": "string", "minLength": 1 },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "kinds": {
+      "type": "object",
+      "required": ["core", "knowledge", "tool"],
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "status": {
+      "type": "object",
+      "required": ["planned", "vendored"],
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "contribution": {
+      "type": "object",
+      "required": ["open", "maintainer"],
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "cli_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exit_codes", "stability"],
+      "properties": {
+        "exit_codes": { "type": "string", "minLength": 1 },
+        "stability": { "type": "string", "minLength": 1 }
+      }
+    },
+    "hitl_card_kinds": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "artifact_kinds": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "phases": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 6 },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "skills": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/skill" }
+    }
+  },
+  "$defs": {
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "role", "entry", "contribution", "status", "ui"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+        "kind": { "enum": ["core", "knowledge", "tool"] },
+        "role": { "type": "string", "minLength": 1 },
+        "entry": { "type": "string", "minLength": 1 },
+        "contribution": { "enum": ["open", "maintainer"] },
+        "status": { "enum": ["planned", "vendored"] },
+        "docs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "ui": { "$ref": "#/$defs/ui" }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phases", "artifacts", "hitl"],
+      "properties": {
+        "phases": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 6 },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "workspace",
+              "table",
+              "png",
+              "pdf",
+              "svg",
+              "docx",
+              "tex",
+              "json",
+              "report"
+            ]
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "hitl": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "env-preflight",
+              "problem-confirm",
+              "model-choice",
+              "explain",
+              "figure-rework",
+              "score-round"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "mathmodel-studio",
+  "version": "0.0.1",
+  "private": true,
+  "description": "数学建模竞赛桌面 Agent：白底三栏工作台，人在环的选模、解释、门禁与评分",
+  "author": "Escap1ng",
+  "license": "Apache-2.0",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "check:registry": "node scripts/check-registry.mjs",
+    "check:registry:negative": "node scripts/check-registry.negative.mjs",
+    "check:contracts": "python scripts/validate_contracts.py",
+    "check:cli": "python runtime/selfcheck.py",
+    "smoke:dist": "node scripts/smoke-dist.mjs",
+    "gate": "npm run check:registry && npm run check:registry:negative && npm run typecheck && npm run build && npm run smoke:dist && npm run check:contracts && npm run check:cli"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.8.0",
+    "electron-vite": "^6.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}

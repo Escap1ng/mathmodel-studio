@@ -1,0 +1,23 @@
+# 仓库内统一存 LF，签出时也发 LF：CI 在 ubuntu 与 windows 双矩阵跑，
+# 行尾差异会让同一份门禁脚本在两边行为不一致。
+* text=auto eol=lf
+
+# Windows 侧脚本必须 CRLF：PowerShell 5.1 与 cmd 对 LF 容忍度差。
+# 另外 .ps1 若含中文，必须带 UTF-8 BOM，否则 PS 5.1 按 GBK 解析会报语法错或静默吞语句。
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.zip binary
+*.woff2 binary
+
+# 契约与注册表是 diff 的重点，关掉噪声
+*.json text
+*.schema.json text diff=json
