@@ -48,7 +48,8 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - **G7 第二、三轮失败都是我自己的脚手架问题**：第二轮 `chmod` 报 no such file，因为二进制要到首次 `npx electron` 才懒下载，改为先显式跑 electron 自己的 `install.js`；第三轮则是我加的诊断命令 `npx electron --version` 排在了 `chmod` 之前，自己踩进同一个 SUID 陷阱。日志里 `chrome-sandbox` 的 `ls -l` 输出把这件事写实了，不再是猜。
 - **G7 第四轮跑起来了，但抓出脚手架在造假**：画面 2.11% 非白、轨道与标签数量都对，可 `app:meta` 报 `No handler registered`——那一版冒烟自己 `new BrowserWindow`，从没加载 `src/main/index.ts`，IPC 处理器自然不存在，「窗口起来了」于是变成一句没验证产品的话。改为 `require(out/main/index.js)` 让生产入口起窗。
 - **G7 第五轮：绿是假的**。job 显示通过，日志里却写着「10/12 项通过」——`app.exit(1)` 被生产入口的 `window-all-closed → app.quit()` 抢先，退出码被顶成 0。通过与否不能再吊在 Electron 的退出码管道上，于是新增 `scripts/check-window-smoke.mjs`：冒烟把结论落成 `screenshots/window-smoke.json`，核验脚本独立读它并**复算读数**（`ok=true` 但尺寸 1439x899 照样拒），并带 `--selftest` 用 8 份合成结果自证会失败；它被加进 `npm run gate`，本机即可跑。
-- **同轮两条断言本身写错了**：① `app.getVersion()` 在 `electron <脚本>` 这种启动方式下返回的是 Electron 自带 default_app 的版本（实测 44.8.0），不是我们的 0.0.1，所以状态栏断言改成校验形状并另加一条「主进程的 runtime 信息原样穿过 preload 回到页面」；② xvfb 虚拟屏正好 1440×900 时装不下带边框的窗口，内容区被钳成 1439x899，改为 1600x1000。
+- **同轮还有两条断言本身写错了**：① `app.getVersion()` 在 `electron <脚本>` 这种启动方式下返回的是 Electron 自带 default_app 的版本（实测 44.8.0），不是我们的 0.0.1，所以状态栏那条改成校验形状，并另加一条「主进程的 runtime 信息原样穿过 preload 回到页面」；② xvfb 虚拟屏正好 1440×900 时装不下带边框的窗口，内容区被钳成 1439x899，改为 1600x1000。
+- **看了截图才发现：中文全是豆腐块**。13/13 全绿、非白像素 2.09%，但把 PNG 取回来看，整片中文都是空心方框——runner 上没有中文字体，而像素断言分不清「字」与「方框」。补两条断言（G7-5：字体栈里至少一个具名 CJK 族可用、中文探针有实际占位），并给 CI 装 `fonts-noto-cjk`。断言下限随之从 13 抬到 15。
 
 ### 已知风险
 

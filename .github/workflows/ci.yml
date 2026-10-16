@@ -116,8 +116,10 @@ jobs:
           ls -l node_modules/electron/dist/chrome-sandbox
           npx electron --version
 
-      - name: 准备 Xvfb
-        run: sudo apt-get update -q && sudo apt-get install -yq xvfb
+      - name: 准备 Xvfb 与中文字体
+        # fonts-noto-cjk 不是可选装饰：runner 默认没有中文字体，整片界面会渲染成豆腐块，
+        # 而「非白像素 ≥1%」这种断言照样能过。G7-5 现在会直接问字体在不在。
+        run: sudo apt-get update -q && sudo apt-get install -yq xvfb fonts-noto-cjk
 
       - name: G7 无头真启动与像素断言
         # 虚拟屏幕必须大于设计基准：屏幕正好 1440x900 时装不下带边框的窗口，

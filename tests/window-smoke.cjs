@@ -11,6 +11,7 @@
  *   3 画面真的画出来了：按 BGRA 统计非白像素 ≥1%——空白截图也算「窗口起来了」，那是假绿
  *   4 preload + IPC 端到端：状态栏文本由主进程应答渲染出来（在 sandbox: true 下）
  *   5 结构与交互：阶段轨道 7 节、工作台 6 标签、发送按钮按事实禁用、点色块真的换掉 --accent
+ *   6 中文字体族真的可用——像素断言分不清字与空心方框，上一轮的豆腐块截图就是这么混过去的
  *
  * 仍未覆盖：需要 LLM 与 runtime 的行为（M2 起）；沙箱之外的 CSP 违规场景。
  * 退出码：0 全部通过 / 1 任一断言失败 / 2 环境错误（没有构建产物或窗口没起来）
@@ -125,6 +126,33 @@ async function main() {
     `getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()`
   )
   record('G7-4 切到 B 案靛蓝生效', accentB.toLowerCase() === '#2b4c7e', `实得 ${accentB}`)
+
+  // 中文字体可用性：上一轮的截图里整片中文都是豆腐块，而非白像素断言照样过了——
+  // 它分不清「字」和「空心方框」。所以字体要单独问，不能靠像素推断。
+  const fontProbe = await win.webContents.executeJavaScript(`(() => {
+    const named = ['HarmonyOS Sans SC', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', 'PingFang SC']
+    const hit = []
+    for (const f of named) {
+      try {
+        if (document.fonts.check('13.5px "' + f + '"', '国赛建模')) hit.push(f)
+      } catch (e) {
+        /* 单个族名查询失败当作不可用，继续问下一个 */
+      }
+    }
+    const s = document.createElement('span')
+    s.style.cssText = 'position:absolute;left:-9999px;top:0;font-family:var(--font-cjk);font-size:13.5px'
+    s.textContent = '国赛建模'
+    document.body.appendChild(s)
+    const width = s.getBoundingClientRect().width
+    s.remove()
+    return { hit, width }
+  })()`)
+  record(
+    'G7-5 至少一个中文字体族可用',
+    Array.isArray(fontProbe.hit) && fontProbe.hit.length > 0,
+    `命中 ${JSON.stringify(fontProbe.hit)}（一个都没有时中文会整片渲染成豆腐块，而像素断言看不出来）`
+  )
+  record('G7-5 中文探针有实际占位', fontProbe.width > 40, `「国赛建模」13.5px 宽 ${fontProbe.width}`)
 
   // 结论落盘：CI 的通过与否由 scripts/check-window-smoke.mjs 读这份 JSON 判定，
   // 不依赖 Electron 的退出码管道——上一版就是 app.exit(1) 被生产入口的
