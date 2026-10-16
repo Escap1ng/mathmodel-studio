@@ -81,7 +81,8 @@ Every gate ships with negative coverage — a checker that only ever returns zer
 | G6 desktop scaffold | typecheck + build + the bundle must actually contain this project's CJK copy and design-token names | any failed assertion exits 1 |
 | G7 real launch | under xvfb: title and 1440x900 content size, non-white pixel ratio >= 1% computed from BGRA, IPC round-trip writes the app version into the status bar, 7 phase rows / 6 tabs / send button disabled as a matter of fact, and clicking a swatch really swaps `--accent` | a blank screenshot cannot clear the pixel threshold; runs as an independent job (`tests/window-smoke.cjs`) |
 
-G7 must run with `--no-sandbox` inside the container, so it **does not cover** the production window's `sandbox: true` or the CSP — those exist only as static configuration, and manual verification of sandbox behaviour has not been done.
+G7 repairs Electron's SUID sandbox helper first and then launches under `sandbox: true`, so the preload and the IPC round-trip are verified *inside* the sandbox rather than bypassed with `--no-sandbox`.
+**Still uncovered**: the window options and navigation guards in `src/main/index.ts` itself — the smoke script builds its own window around the built output, and that path needs a real-launch test once M2 gives the runtime a handshake to wait on. The CSP also remains static configuration only.
 
 CLI flags, exit codes, registry fields and artifact paths are **Stable**; `--json` field order and error wording are **Experimental**; geometry constants inside scripts are **Internal**.
 

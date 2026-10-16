@@ -92,6 +92,15 @@ jobs:
       - name: 构建
         run: npm run build
 
+      - name: 修好 Electron 的 SUID 沙箱助手
+        # 不改就会 FATAL:setuid_sandbox_host（chrome-sandbox 需 root:4755）而进程在断言前就死。
+        # 用 --no-sandbox 绕过也能跑，但那等于把生产窗口的 sandbox: true 排除在验证之外，
+        # 所以这里选择把沙箱修好：preload 能在 sandbox 下工作，本身就是被 G7-3 的 IPC 断言验过的。
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+          ls -l node_modules/electron/dist/chrome-sandbox
+
       - name: 准备 Xvfb
         run: sudo apt-get update -q && sudo apt-get install -yq xvfb
 

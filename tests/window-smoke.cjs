@@ -8,8 +8,11 @@
  *   3 preload + IPC 端到端通了（状态栏文本由主进程应答渲染出来）
  *   4 阶段轨道与工作台标签数量对得上，输入区按事实禁用，点色块真的换掉 --accent
  *
- * 已知覆盖差异：CI 容器无用户命名空间，必须 --no-sandbox，因此本脚本的 webPreferences.sandbox
- * 与生产窗口（true）不同；它验的是「画面对不对」，不验沙箱开关。沙箱与 CSP 的人工验证见 README。
+ * 沙箱与生产一致：CI 里先把 chrome-sandbox 助手改成 root:4755（workflow 的那一步），
+ * 这样窗口仍然跑在 sandbox: true 下，冒烟验的是生产那套 webPreferences，
+ * 而不是靠 --no-sandbox 绕过——绕过就等于没验。
+ * 仍未覆盖的一块：本脚本自己建窗口，走的是构建产物 out/renderer + out/preload，
+ * 不执行 src/main/index.ts 的窗口配置与导航守卫；那条路要等 M2 有 runtime 可握手时再补真启动测试。
  *
  * 退出码：0 全部通过 / 1 任一断言失败 / 2 环境错误（没构建产物）
  */
@@ -25,7 +28,6 @@ const results = []
 const record = (name, ok, detail) => results.push({ name, ok, detail })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-app.commandLine.appendSwitch('no-sandbox')
 app.commandLine.appendSwitch('disable-dev-shm-usage')
 app.disableHardwareAcceleration()
 
@@ -47,7 +49,7 @@ async function main() {
       preload: join(__dirname, '..', 'out', 'preload', 'index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   })
 

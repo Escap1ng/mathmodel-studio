@@ -42,6 +42,7 @@ M0 脚手架。目标是「新人照手册能起一个空窗口，并且本地�
 - 类型检查首轮失败：TypeScript 7 以 `TS2882` 拦下 `import './styles/tokens.css'` 这类副作用导入。补 `src/renderer/src/env.d.ts`（`/// <reference types="vite/client" />`）声明资源模块。
 - 顺带把 G6 的色值断言换成设计令牌名断言，避免 minifier 改写颜色造成的假红。
 - **第二轮全绿**：类型检查、`electron-vite build` 与 G6 产物冒烟在 ubuntu 和 windows 上都通过，于是 Electron 44.8.0 + electron-vite 6.0.0 + Vite 8.3.4 + TypeScript 7.0.2 这组版本算经过了真构建验证，不再是「装得上但没编过」。
+- **G7 首跑失败**：Linux 上 `node_modules/electron/dist/chrome-sandbox` 不是 root:4755，Chromium 在任何断言执行之前就 `FATAL:setuid_sandbox_host` 退出（信号 SIGTRAP）。没有用 `--no-sandbox` 绕过——那样等于把生产窗口的 `sandbox: true` 排除在验证之外；改为在 workflow 里把沙箱助手权限修好，于是 G7-3 的 IPC 断言实际是在沙箱内验 preload。
 
 ### 已知风险
 
