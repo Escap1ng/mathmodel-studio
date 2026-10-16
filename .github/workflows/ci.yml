@@ -70,3 +70,38 @@ jobs:
 
       - name: G6 产物冒烟
         run: node scripts/smoke-dist.mjs
+
+  # M0 的判据是「照手册装完能起一个空窗」。这条 job 真下载 Electron、真启动、真截图并按像素断言，
+  # 而不是停在「能构建」。gates 那条故意跳过二进制，所以这一段只能在这里补上。
+  window-smoke:
+    name: 真启动冒烟 · ubuntu
+    runs-on: ubuntu-latest
+    needs: []
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 安装 JS 依赖（含 Electron 二进制）
+        run: npm install --no-audit --no-fund
+
+      - name: 构建
+        run: npm run build
+
+      - name: 准备 Xvfb
+        run: sudo apt-get update -q && sudo apt-get install -yq xvfb
+
+      - name: G7 无头真启动与像素断言
+        run: xvfb-run -a --server-args="-screen 0 1440x900x24" npx electron tests/window-smoke.cjs
+
+      - name: 上传截图
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: window-smoke
+          path: screenshots/window-smoke.png
+          if-no-files-found: warn
