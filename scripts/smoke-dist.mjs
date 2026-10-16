@@ -53,6 +53,8 @@ record('D2 样式引用可解析', cssHref.length > 0 && cssHref.every(resolved)
 record('D3 CSP meta 仍在', /http-equiv=["']Content-Security-Policy["']/.test(html), /Content-Security-Policy/.test(html) ? 'ok' : '构建后 CSP meta 不见了')
 
 // D4 bundle 里确实含有本项目的内容（而不是一个空模板）
+// 注意：不要断言具体色值——CSS minifier 会把 #17494D 缩写、转色空间或改大小写，
+// 那是假红的来源。自定义属性名不会被改写，用它当锚点。
 const assets = existsSync(join(RENDERER, 'assets')) ? readdirSync(join(RENDERER, 'assets')) : []
 const js = assets.filter((a) => a.endsWith('.js')).map((a) => readFileSync(join(RENDERER, 'assets', a), 'utf8')).join('\n')
 const css = assets.filter((a) => a.endsWith('.css')).map((a) => readFileSync(join(RENDERER, 'assets', a), 'utf8')).join('\n')
@@ -60,10 +62,10 @@ const needles = [
   ['阶段文案「环境预检」', js.includes('环境预检')],
   ['卡点文案「等你确认」', js.includes('等你确认')],
   ['工作台文案「评分」', js.includes('评分')],
-  ['A 案强调色 #17494d', css.includes('#17494d')],
-  ['B 案强调色 #2b4c7e', css.includes('#2b4c7e')],
-  ['C 案强调色 #b03a2e', css.includes('#b03a2e')],
-  ['主色白 #ffffff', css.includes('#ffffff')]
+  ['令牌文件里的 --rail-w', css.includes('--rail-w')],
+  ['三案强调色用的 --accent', css.includes('--accent')],
+  ['等宽字体令牌 --font-mono', css.includes('--font-mono')],
+  ['过渡时长令牌 --t（动效预算落在这里）', css.includes('--t:')]
 ]
 for (const [label, ok] of needles) {
   record(`D4 ${label}`, ok, ok ? '在 bundle 内' : `未打进产物（js ${js.length} B / css ${css.length} B）`)
