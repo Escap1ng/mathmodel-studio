@@ -40,7 +40,7 @@ npm run verify:window  # 独立读 JSON 并复算读数
 一把梭：`npm run gate`（顺序见 `package.json` 的 scripts）。
 
 CI：<https://github.com/Escap1ng/mathmodel-studio/actions> —— 三 job：`门禁 · ubuntu-latest`、`门禁 · windows-latest`、
-`真启动冒烟 · ubuntu`。取回截图看：
+`真启动冒烟 · ubuntu`。M1 首轮 run `39398588127` 三 job 全绿。取回截图看：
 
 ```bash
 gh run download <run-id> -n window-smoke --dir screenshots
@@ -51,9 +51,10 @@ gh run download <run-id> -n window-smoke --dir screenshots
 | 结论 | 证据来源 | 强度 |
 | --- | --- | --- |
 | 注册表契约跨平台自洽 | 本机 + CI ubuntu + CI windows | 强 |
+| M1 全门禁与真启动在 CI 通过 | run `39398588127` 三 job 全绿；G3 真渲在 ubuntu/windows 各跑一次 | 强 |
 | 七个技能与上游 v2.0.1 逐字节一致 | 复制后逐文件 sha256 与上游 tarball 比对 | 强（本机） |
-| `SKILL.md` 仍是合法 Agent Skills 入口 | G8 6 项检查 + 6 种破坏全部被拒 | 强（本机） |
-| `mms invoke figure` 真出三件产物 | 本机 Windows 真渲 + 独立核验文件非空 | 强（本机，仅 figure） |
+| `SKILL.md` 仍是合法 Agent Skills 入口 | G8 6 项检查 + 6 种破坏全部被拒；CI 双平台同跑 | 强（本机 + CI） |
+| `mms invoke figure` 真出三件产物 | 本机 Windows 真渲 + CI ubuntu/windows 的 S10 真渲，均核验文件非空 | 强（仅 figure） |
 | 渲染器「退出 0 但没写产物」会被判 1 | selfcheck S13 用假渲染器反向覆盖 | 强（本机） |
 | Electron 44.8.0 + electron-vite 6 + Vite 8 + TS 7 能装能编 | 本机 `npm install` + CI 双平台构建 | 强 |
 | 照手册 `npm i` 起空窗（本机路径） | 本机已跑通 `npm install`（81 包，走 npmmirror） | 强（安装本身） |

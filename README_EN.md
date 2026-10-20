@@ -97,7 +97,7 @@ Why a separate auditor exists: CI once printed "10/12 passed" while the job stay
 
 CLI flags, exit codes, registry fields and artifact paths are **Stable**; `--json` field order and error wording are **Experimental**; geometry constants inside scripts are **Internal**.
 
-**Execution state, stated plainly**: for M1, G1 (9 negative controls), G8 (6 negative controls), G2 (both modes), G3 (13 assertions including a real render and the "fake success" control), the G6b selftest, typecheck, build and the G6 dist smoke all pass locally in `npm run gate`. CI on the ubuntu + windows matrix is reported by the Actions run; the earlier rounds of G7, including what they got wrong, are kept in `CHANGELOG.md` rather than deleted.
+**Execution state, stated plainly**: for M1, G1 (9 negative controls), G8 (6 negative controls), G2 (both modes), G3 (13 assertions including a real render and the "fake success" control), the G6b selftest, typecheck, build and the G6 dist smoke all pass locally in `npm run gate`. CI on the same commit (run `39398588127`) is green in all three jobs: both gate jobs run the G3 real render on ubuntu and windows, and the window smoke passes 15/15 on ubuntu with an independent audit (non-white pixels 2.79%). Windows still does not launch a window, so that claim is outside CI. The earlier rounds of G7, including what they got wrong, are kept in `CHANGELOG.md` rather than deleted.
 
 ## Dependencies
 
