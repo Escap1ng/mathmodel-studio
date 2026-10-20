@@ -30,6 +30,12 @@ M1 技能落地。目标是不接模型也能「列模板、渲一张图、跑�
 - 本机首次跑通 `npm install`（81 个包，54 s，走 npmmirror）；M0 时只在 CI 装过。
 - 本机 Python 3.14.5 + matplotlib 3.10.9 能跑上游 v2.0.1 模板；`requirements.txt` 仍按上游下限声明，不锁版本。
 
+### 验证（CI 首轮，run 39398588127）
+
+- ubuntu 与 windows 两个门禁 job 全绿：G1 8/8、G8 6/6 与反向 7/7、G2 9/9、G3 13/13（S10 在两个平台都真渲出 PNG/PDF/SVG）、G6 14/14。
+- `真启动冒烟 · ubuntu` 15/15；G6b 独立核验通过，内容尺寸 1440x900，非白像素 2.79%。取回的截图与 M0 一致（M1 未改界面）。
+- Windows job 仍只跑门禁，不起窗口；「Windows 上真起窗」依旧是未证项。
+
 ### 尚未做
 
 - `invoke` 只接通 figure；diagram 的渲染入口与其余技能的命令行入口留到 M2/M4。

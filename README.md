@@ -108,7 +108,7 @@ G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
 **执行状态要说清**：M1 的 G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言，含真渲染与「假成功」反向覆盖）、G6b 自测，以及类型检查、构建、G6 产物冒烟，都在本机 `npm run gate` 里跑绿。
-CI 的 ubuntu + windows 双矩阵结果以 Actions 页面为准；G7 先前那几轮的经过与踩坑记录在 `CHANGELOG.md`，没有删。
+CI 同一版本（run `39398588127`）三 job 全绿：两个门禁 job 在 ubuntu 与 windows 上都跑过 G3 真渲，窗口冒烟在 ubuntu 上 15/15、独立核验通过（非白像素 2.79%）；Windows 仍不真起窗，那条结论不在 CI 覆盖内。G7 先前那几轮的经过与踩坑记录在 `CHANGELOG.md`，没有删。
 
 ## 依赖
 
