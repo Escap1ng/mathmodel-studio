@@ -25,7 +25,8 @@
 > **能交给机器校验的，交给门禁；该由人判断的，留给人，并且把判断点做成界面。**
 > 本项目把 [mathmodel-kit](https://github.com/Escap1ng/mathmodel-kit) 的契约化技能集（出版级图表、排版规范、降 AI 检查、结构自检与评分）落到一个本地桌面程序里：模型自带、数据不外传、过程可审计。
 
-**当前状态：M0 脚手架**。三栏界面骨架、技能注册表与契约、四道门禁（G1 注册表一致 · G2 契约与版本同源 · G3 CLI 退出码 · G6 产物冒烟，每道都带反向覆盖）已就位；
+**当前状态：M1 技能落地**。七个技能已从上游 v2.0.1 原样 vendor（来源版本与 commit 记在 [`skills/VENDOR.md`](skills/VENDOR.md)），注册表全部翻为 `vendored`；
+不接模型也能列模板、真渲一张图：`npm run mms -- templates`、`npm run mms -- invoke figure paired-raincloud`。
 **还不能建模**——LLM 接入在 M2，选模卡与解释抽屉在 M3，论文编译链路在 M5。里程碑见 [PLAN.md](PLAN.md) §7。
 要接手或复核，先读 [docs/HANDOFF.md](docs/HANDOFF.md)：哪些结论已被证明、哪些还没有、以及这一轮踩过的坑。
 
@@ -34,11 +35,16 @@
 ```bash
 # 装依赖（大陆网络请先看 docs/env-setup.md：npm 直连与 github.com 都不稳）
 npm install
+python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/
 
 # 起空窗口看骨架
 npm run dev
 
-# 跑全部本地门禁：注册表一致性 + 反向覆盖 + 类型检查 + 构建 + 产物冒烟 + 契约 + CLI 退出码
+# 不接模型也能验运行时：列 25 个模板，真渲一张图（PNG/PDF/SVG）
+npm run mms -- templates
+npm run mms -- invoke figure paired-raincloud
+
+# 跑全部本地门禁：注册表一致性 + 技能规范 + 反向覆盖 + 类型检查 + 构建 + 产物冒烟 + 契约 + CLI
 npm run gate
 ```
 
@@ -65,17 +71,17 @@ npm run gate
 ## 技能
 
 单一事实源是 [`skills/manifest.json`](skills/manifest.json)；下表的行数与上面的徽章计数由 CI 强校验一致。
-状态 `planned` 表示已登记并占位、内容尚未在 M1 vendor 进本仓库。
+状态 `vendored` 表示技能内容已原样引入本仓库，来源版本与 commit 记在 [`skills/VENDOR.md`](skills/VENDOR.md)。
 
 | 技能 | 职责 | 状态 |
 | --- | --- | --- |
-| [`mathmodel-core`](skills/mathmodel-core/) | 主技能：阶段零至阶段六编排与路由 | planned |
-| [`mathmodel-methods`](skills/mathmodel-methods/) | 建模方法库与选型：问题族索引、选型依据、验证方式 | planned |
-| [`mathmodel-paper`](skills/mathmodel-paper/) | 论文写作与排版：写作规范、LaTeX 骨架、Word 输出、参考文献 | planned |
-| [`mathmodel-figure`](skills/mathmodel-figure/) | 数据图表：matplotlib 模板库 + Nature 出图标准 | planned |
-| [`mathmodel-diagram`](skills/mathmodel-diagram/) | 学术示意图：JSON 驱动版式模板 + 高保真复刻 | planned |
-| [`mathmodel-deai`](skills/mathmodel-deai/) | 降 AI 与交付核查：词表级、结构级、字符级三道门禁 | planned |
-| [`mathmodel-score`](skills/mathmodel-score/) | 结构自检与评分：章节门槛 + 百分制五维评分卡 | planned |
+| [`mathmodel-core`](skills/mathmodel-core/) | 主技能：阶段零至阶段六编排与路由 | vendored |
+| [`mathmodel-methods`](skills/mathmodel-methods/) | 建模方法库与选型：问题族索引、选型依据、验证方式 | vendored |
+| [`mathmodel-paper`](skills/mathmodel-paper/) | 论文写作与排版：写作规范、LaTeX 骨架、Word 输出、参考文献 | vendored |
+| [`mathmodel-figure`](skills/mathmodel-figure/) | 数据图表：matplotlib 模板库 + Nature 出图标准 | vendored |
+| [`mathmodel-diagram`](skills/mathmodel-diagram/) | 学术示意图：JSON 驱动版式模板 + 高保真复刻 | vendored |
+| [`mathmodel-deai`](skills/mathmodel-deai/) | 降 AI 与交付核查：词表级、结构级、字符级三道门禁 | vendored |
+| [`mathmodel-score`](skills/mathmodel-score/) | 结构自检与评分：章节门槛 + 百分制五维评分卡 | vendored |
 
 技能内容来自 [mathmodel-kit](https://github.com/Escap1ng/mathmodel-kit) v2.0.1（Apache-2.0），引入规则与 re-sync 记录见 [`skills/VENDOR.md`](skills/VENDOR.md)。运行时**只用 subprocess 调用技能脚本并按退出码判定**，所以每个技能仍能被 Claude Code 等宿主单独装载、单独使用。
 
@@ -86,9 +92,10 @@ npm run gate
 | 门禁 | 判据 | 反向覆盖 |
 | --- | --- | --- |
 | G1 注册表一致 | `skills/manifest.json` ↔ `skills/` 目录 ↔ 契约词表 ↔ 两份 README 技能表与徽章计数 | 8 种破坏逐个植入，每种必须变红（`npm run check:registry:negative`） |
+| G8 技能规范 | 每个 vendored 技能的 `SKILL.md` 仍是合法 Agent Skills 入口：frontmatter 可解析、`name` 与目录同名、`description` 非空且在 1024 字内、无本仓库私有字段；目录无占位文件、层级不超过上游的 3 层 | 用真实 `SKILL.md` 造 6 种破坏（删入口、改名、空描述、塞 `ui` 字段、残留占位、超深目录），每种必须变红（`npm run check:skills:negative`） |
 | G2 契约校验 | 注册表按 JSON Schema Draft 2020-12 校验；`jsonschema` 缺席时降级并说明 | 构造两份非法注册表，必须被拒（`scripts/validate_contracts.py` C3） |
 | G2b 版本同源 | `VERSION` / `package.json` / `pyproject.toml` / `mms/__init__.py` 四处一致 | 任一缺项即失败 |
-| G3 CLI 契约 | 退出码 `0 成功 / 1 校验失败 / 2 用法或环境错误` 三码各自可达 | 词表外取值→1、非法 JSON→1、`MMS_HOME` 指向空目录→2、未知子命令→2（`runtime/selfcheck.py`） |
+| G3 CLI 契约 | 退出码 `0 成功 / 1 校验失败 / 2 用法或环境错误` 三码各自可达；M1 起真调上游渲染器出一张图，并独立核验 PNG/PDF/SVG 三件产物非空 | 词表外取值→1、非法 JSON→1、空 `MMS_HOME`→2、未知子命令/未知模板→2、渲染器假成功（退出 0 但没写产物）→1（`runtime/selfcheck.py`） |
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
 | G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗（窗口配置、preload、IPC 注册、导航守卫都用它那一份），再断言：加载的是构建产物、内容尺寸 1440×900、按 BGRA 统计非白像素 ≥1%、状态栏版本号来自主进程应答、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent`、中文按真字形渲染（用「国」与空心框「□」的墨量比值区分） | 空白截图过不了像素阈值；自建窗口的假版本暴露过一次（`app:meta` 报 No handler），豆腐块截图也暴露过一次（`tests/window-smoke.cjs`） |
 
@@ -100,8 +107,8 @@ G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
-**执行状态要说清**：G1（含 9 条反向覆盖）、G2（完整与降级两种模式）、G3、G6b 自测在本机跑绿；G1、G2、G3、G6 已在 CI 的 ubuntu + windows 双矩阵跑绿。
-G7 与 G6b 对当前这版代码的结果以 Actions 页面为准——G7 先前那几轮的经过与踩坑记录在 `CHANGELOG.md`，没有删。
+**执行状态要说清**：M1 的 G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言，含真渲染与「假成功」反向覆盖）、G6b 自测，以及类型检查、构建、G6 产物冒烟，都在本机 `npm run gate` 里跑绿。
+CI 的 ubuntu + windows 双矩阵结果以 Actions 页面为准；G7 先前那几轮的经过与踩坑记录在 `CHANGELOG.md`，没有删。
 
 ## 依赖
 
@@ -110,7 +117,7 @@ G7 与 G6b 对当前这版代码的结果以 Actions 页面为准——G7 先前
 | 桌面壳 | Electron、electron-vite、React、TypeScript | 见 `package.json` |
 | 运行时 | Python 3.12+（标准库即可跑 M0 门禁） | `jsonschema>=4.20` 可选，缺席时契约校验降级 |
 | 排版（M5） | xelatex（TeX Live 或 MiKTeX）、pandoc | 系统级安装，不由 pip 提供，缺件时阶段零只给指引 |
-| 出图（M1） | matplotlib、numpy、seaborn | 随技能 vendor 时补齐 requirements |
+| 出图（M1） | matplotlib、numpy、seaborn | 已随技能 vendor；版本下限写在 `requirements.txt`，安装走镜像 |
 
 打包形态已定：**内置便携 Python 运行时**（bundled `uv` + python-build-standalone），用户不需要装 Python；TeX 与 pandoc 的处理在 M5 决定。
 

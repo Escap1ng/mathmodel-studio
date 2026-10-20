@@ -62,12 +62,15 @@ curl -s https://registry.npmmirror.com/electron | python -c "import sys,json;pri
 
 ## 4 Python
 
-M0 的门禁**只用标准库**，`python scripts/validate_contracts.py` 和 `python runtime/selfcheck.py` 现在就能跑。
-契约校验用到 `jsonschema`（可选，缺席时降级并在输出里说明）：
+G1 与 CLI 的注册表部分**只用标准库**；M1 起 `runtime/selfcheck.py` 会真渲染一张图，需要科学计算依赖。
+版本下限统一写在仓库根的 `requirements.txt`（与上游技能 v2.0.1 一致），安装走镜像：
 
 ```bash
-python -m pip install "jsonschema>=4.20" -i https://registry.npmmirror.com/pypi/simple/
+python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/
 ```
+
+`jsonschema` 也在其中；缺它时契约校验仍会降级并在输出里说明，但 CI 必须装齐。TUNA 镜像在本机实测会超时，
+npmmirror 可用——镜像本身也会挂，超时不等于配置错了。
 
 **为什么运行时钉 3.12 而不是本机已有的 3.14**：M5 要随包分发一个可安装 matplotlib / seaborn / PyMuPDF 的解释器，
 科学计算 wheel 在 3.12 这一档覆盖面最全。参考实现是 Cherry Studio 的

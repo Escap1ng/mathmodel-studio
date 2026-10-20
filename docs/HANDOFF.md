@@ -1,31 +1,38 @@
-# 交接 · M0 完成时的状态
+# 交接 · M1 完成时的状态
 
-给接手的人（或下一轮会话的我）。日期 2026-10-16，本文件写作时 HEAD 是 `cd78cc4`，本地与远端一致、工作树干净。
-提交数与文件数不要信我抄在这里的数字，跑 `git rev-list --count HEAD` 和 `git ls-files | wc -l` 自己取。
+给接手的人（或下一轮会话的我）。日期 2026-10-20。
+提交数与文件数不要信我抄在这里的数字，跑 `git rev-list --count HEAD` 和 `git ls-files | wc -l` 自己取；HEAD 以 `git log -1` 为准。
 
 ## 0 一句话现状
 
-M0 脚手架交付完：白底三栏骨架能真起窗，技能注册表与契约就位，每条门禁**都被证明会失败**。
-**还不能建模**——没有 LLM 接入、没有 runtime、技能内容是占位。里程碑见 [../PLAN.md](../PLAN.md) §7。
+M1 技能落地：七个技能从上游 v2.0.1 原样 vendor 进仓库，注册表全部翻为 `vendored`；不接模型也能 `mms templates` 列 25 个模板、`mms invoke figure <id>` 真出 PNG/PDF/SVG。
+**还不能建模**——没有 LLM 接入、没有编排、没有通道。里程碑见 [../PLAN.md](../PLAN.md) §7。
 
-仓库当前是 **private**。转公开需要维护者点头（`gh repo edit --visibility public`）。
+仓库当前是 **private**。转公开需要维护者点头（`gh repo edit --visibility public`）；转公开之前先读 §3 的拓扑计划。
 
 ## 1 怎么验（命令 → 期望）
+
+需要先装两侧依赖：`npm install`（可加 `ELECTRON_SKIP_BINARY_DOWNLOAD=1`，CI 不启动窗口时用）与
+`python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/`。
 
 不需要网络、不需要显示器的部分：
 
 ```bash
-node scripts/check-registry.mjs              # 8/8 项通过，技能 7 个        → exit 0
-node scripts/check-registry.negative.mjs     # 9/9 条破坏被门禁抓到          → exit 0
-node scripts/check-window-smoke.mjs --selftest  # 9/9 条核验自测            → exit 0
-python scripts/validate_contracts.py         # 9/9 项通过（判据来源 jsonschema）→ exit 0
-python runtime/selfcheck.py                  # 8/8 条 CLI 契约断言通过       → exit 0
+node scripts/check-registry.mjs                 # 8/8 项通过，技能 7 个            → exit 0
+node scripts/check-registry.negative.mjs        # 9/9 条破坏被门禁抓到（含基线自证）→ exit 0
+node scripts/check-skills.mjs                   # 6/6 项通过，技能 7 个            → exit 0
+node scripts/check-skills.mjs --self            # 7/7 条自检通过（含基线自证）     → exit 0
+node scripts/check-window-smoke.mjs --selftest  # 9/9 条核验自测                   → exit 0
+python scripts/validate_contracts.py            # 9/9 项通过（jsonschema）         → exit 0
+python runtime/selfcheck.py                     # 13/13 条 CLI 断言，含真渲一张图  → exit 0
 ```
 
-需要 `npm install` 的部分（本机没跑过，见 §2）：
+`check-cli` 会真的调 matplotlib 渲染 `paired-raincloud`（约十几秒），所以它需要 `requirements.txt` 里的包；
+只跑注册表部分时不需要。
+
+需要显示器的部分：
 
 ```bash
-npm install && npm run typecheck && npm run build && node scripts/smoke-dist.mjs
 npm run smoke:window   # 真起窗口，写 screenshots/window-smoke.{png,json}
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
@@ -44,20 +51,24 @@ gh run download <run-id> -n window-smoke --dir screenshots
 | 结论 | 证据来源 | 强度 |
 | --- | --- | --- |
 | 注册表契约跨平台自洽 | 本机 + CI ubuntu + CI windows | 强 |
-| 七道门禁都会失败 | 每道都跑过负向用例，输出在 CI 日志里 | 强 |
-| Electron 44.8.0 + electron-vite 6 + Vite 8 + TS 7 能装能编 | CI 双平台真构建 | 强 |
+| 七个技能与上游 v2.0.1 逐字节一致 | 复制后逐文件 sha256 与上游 tarball 比对 | 强（本机） |
+| `SKILL.md` 仍是合法 Agent Skills 入口 | G8 6 项检查 + 6 种破坏全部被拒 | 强（本机） |
+| `mms invoke figure` 真出三件产物 | 本机 Windows 真渲 + 独立核验文件非空 | 强（本机，仅 figure） |
+| 渲染器「退出 0 但没写产物」会被判 1 | selfcheck S13 用假渲染器反向覆盖 | 强（本机） |
+| Electron 44.8.0 + electron-vite 6 + Vite 8 + TS 7 能装能编 | 本机 `npm install` + CI 双平台构建 | 强 |
+| 照手册 `npm i` 起空窗（本机路径） | 本机已跑通 `npm install`（81 包，走 npmmirror） | 强（安装本身） |
 | 生产入口能起窗并画出中文界面 | CI ubuntu 真启动，15/15 断言 + 人看图 | 中——**只有 Linux** |
 | Windows 上真起窗 | 无 | **未证**：Windows job 不下载 Electron 二进制、不起窗 |
-| 照手册 `npm i` 起空窗（本机路径） | 无 | **未证**：本机没跑过 `npm install`，联网动作归维护者 |
 | 沙箱与 CSP 在生产配置下有效 | G7 在 `sandbox: true` 下跑通 IPC | 中：CSP 违规场景没主动探 |
+| `diagram` / `deai` / `score` / `paper` 能从 runtime 调起 | 无 | **未证**：M1 只接通了 figure |
 
-## 3 待维护者定的三项
+## 3 待维护者定的项
 
-1. **仓库名**：现在是暂定名 `mathmodel-studio`，撞了 `yan315598-design/mathmodel-studio`（★47），但带命名空间仍唯一。改名成本随提交数上升，越早越好。
-2. **UI 取向**：我按「手写 CSS 令牌 + 不引 Tailwind」先落地了（`src/renderer/src/styles/tokens.css`）。要换 Tailwind 就趁 M2 之前，越晚越贵。
-3. **排版引擎优先级**：xelatex（接上游现状）/ Typst（MathModelAgent 靠 17 套 Typst 模板赢在观感）/ 双支持。影响 M5 与 skills 层是否扩。
+1. **收尾时的仓库拓扑**（已定方向，待择时）：两仓独立 → kit 冻结 → studio 完工后把 studio 历史合并进 kit（`--allow-unrelated-histories`，保留两个来源的提交与 `VENDOR.md` 里的出处哈希）→ 先把现有私有 studio 仓改名腾位、再把 kit 改名为 `mathmodel-studio`。star 跟随被改名的 kit；`mathmodel-kit` 这个名字此后不要复用。**不要 force-push 覆盖**，否则技能出处哈希变成孤悬对象。合并必须在 M1 vendor 之后进行。
+2. **UI 取向**：现在「手写 CSS 令牌 + 不引 Tailwind」。要换就趁 M2 之前。
+3. **排版引擎优先级**：xelatex（接上游现状）/ Typst（MathModelAgent 靠 17 套模板赢在观感）/ 双支持。影响 M5 与 skills 层是否扩。
 
-另外**已替你做过、可以推翻**的假设：技能内容 vendor 进本仓库并保留出处（`skills/VENDOR.md`）；桌面壳放 `src/` 而非 `desktop/`（electron-vite 默认约定）；强调色默认 A 墨青（状态栏可切三案）。
+另外**已替你做过、可以推翻**的假设：技能内容 vendor 进本仓库并保留出处；桌面壳放 `src/` 而非 `desktop/`；强调色默认 A 墨青（状态栏可切三案）。
 
 ## 4 界面待判的观感问题（我只报，没改）
 
@@ -69,48 +80,68 @@ gh run download <run-id> -n window-smoke --dir screenshots
 - 发送按钮禁用态是灰底灰字，对比度目测不达 WCAG AA。
 - 状态栏右侧三枚色块与「墨青」挤在一起，间距 5px 偏小。
 
-## 5 M1 要做的具体动作
+M1 没有改这些，留到界面真正开始有内容的 M2/M3。
 
-1. 从 `Escap1ng/mathmodel-kit` v2.0.1 把 7 个技能目录的内容复制进 `skills/<name>/`（`SKILL.md`、`docs/`、`code/`、`templates/`、`themes/`），层级最深 2 层。
-2. 每个技能在 `skills/manifest.json` 里把 `status` 从 `planned` 改成 `vendored`。
-   **注意 G1 的 R4 会立刻开始要求 `entry` 文件真实存在**，且 `planned` 目录里不许有 `SKILL.md`——半 vendor 会被拦。
-3. 删掉各目录的 `PLACEHOLDER.md`，在 `skills/VENDOR.md` 的 re-sync 表填上游版本号与 commit。
-4. 补 `requirements.txt`（上游是 matplotlib/numpy/seaborn/python-docx/PyMuPDF/jsonschema 六项）+ 装依赖的镜像说明。
-5. 让 runtime 真 subprocess 调技能脚本：`mms invoke figure <id>` 出 PNG/PDF/SVG 并按 `0/1/2` 退出；把这三码的可达性加进 `runtime/selfcheck.py`。
-6. 上游 `SKILL.md` 的 frontmatter 要继续保持 Agent Skills 规范合法，**本仓库的 UI 字段只写在 manifest.json 里，不要塞进 SKILL.md**（见 `skills/VENDOR.md` 第 5 条）。
-7. 欠的文档债：`docs/env-setup.md` 英文版。
+## 5 M1 做完的与仍欠的
+
+已完成：
+
+1. 七个技能目录整目录原样复制（含 `README.md` 与 `examples/`），逐文件 sha256 与上游一致。
+2. 注册表 7 个 `status` 翻为 `vendored`；G1 的 R4 开始要求入口真实存在。
+3. 占位文件删除；`VENDOR.md` 填上 v2.0.1 与 commit `5ec0e464da0ae415d3db87cf53fb66eb6e2dff24`。
+4. 根 `requirements.txt` 六项 + 镜像说明。
+5. `mms templates` / `mms invoke figure <id>`；`selfcheck.py` 13 条，含真渲染与「假成功」反向覆盖。
+6. G8 技能规范门禁 + 6 条负向对照，接入 `npm run gate` 与 CI。
+
+仍欠：
+
+- `docs/env-setup.md` 英文版（M0 就欠着，M1 仍未补）。
+- `diagram` 的 runtime 入口；其余技能的命令行入口（M2/M4 按需接）。
+- 便携 Python 运行时的下载与内置（M5/M6）。
 
 ## 6 这一轮踩过的坑（别再踩）
 
-**网络**：`registry.npmjs.org` 直连超时，`registry.npmmirror.com` 可用；`github.com:443` 会随机拒绝连接而 `api.github.com` 照常工作——`git push` 失败先有界重试再换手段，别立刻报做不到。`.npmrc` 里钉了 Electron 二进制镜像，信任边界写在 `docs/env-setup.md`。
+**上游源码怎么取**：本机没有 kit 检出；`github.com:443` 仍然连不上（`git ls-remote` 21 秒后失败），但 `api.github.com` 正常。
+`gh api repos/Escap1ng/mathmodel-kit/tarball/v2.0.1` 一次成功（14.5 MB），tarball 顶层目录名带短 SHA `5ec0e46`，与 tag 指向的完整提交一致。
+**取上游别死磕 git 通道。**
 
-**Electron 在 CI（Linux）**：
-- `chrome-sandbox` 必须 root:4755，否则 `FATAL:setuid_sandbox_host` 在任何断言前就退出。**修权限，不要用 `--no-sandbox` 绕**——绕了就没在验生产的 `sandbox: true`。
-- 二进制在 `npm install` 后可能还没落地，要显式 `node node_modules/electron/install.js`；而且**任何 `npx electron` 的调用都得排在 chmod 之后**。
-- xvfb 屏幕要大于窗口含边框的尺寸；正好 1440×900 会把内容区钳成 1439x899。
-- runner 默认没有中文字体，界面会整片豆腐。装 `fonts-noto-cjk`。
+**VENDOR.md 的旧规则是错的**：M0 写的「层级最深 2 层（与上游一致）」与上游不符——`mathmodel-figure/code/style/`、
+`mathmodel-diagram/code/templates/schema/` 都在第 3 层。照旧规则 vendor 会漏掉样式模块与 schema，模板直接跑不起来。
+已改成「最深 3 层」。**写「与上游一致」之前先去上游数一遍。**
 
-**量具自己会造假**（四种，全部实际发生并已被堵）：
-1. `app.exit(1)` 被生产入口的 `window-all-closed → app.quit()` 顶掉 → 日志写着 10/12 通过、job 却是绿的。收法：结论落盘 JSON，由另一个进程核验（`scripts/check-window-smoke.mjs`）。
-2. 冒烟自建 `BrowserWindow` → `ipcMain.handle` 从没注册过，`app:meta` 报 No handler。收法：`require` 生产入口。
-3. `document.fonts.check('13.5px "Microsoft YaHei"', '国赛')` 对没装的字体也返回 true。收法：比「国」与「□」的 canvas 墨量（实测 2.75 vs 阈值 1.5）。
-4. 「非白像素 ≥1%」分不清字与空心方框。收法：**把 CI 产物取回来看一眼**，这一步发现了上面第 3、4 两件事。
+**全部翻成 vendored 之后，G1 的两条测试同时失效**：
+- 反向用例 M2 原本是「把 planned 改成 vendored 但不放入口」，基线全 vendored 后它变成空操作；
+- 夹具还在拷贝已删除的 `PLACEHOLDER.md`，直接 `ENOENT`。
+收法：M2 改为「把 entry 指向不存在的文件」，夹具复制真实 `SKILL.md`。**改状态位这类全局变更，先看哪些测试靠旧状态成立。**
 
-**Windows 本机**：控制台默认 GBK，Python 脚本 print 中文会崩——`mms` CLI 与两个门禁脚本都已显式 `reconfigure(encoding='utf-8')`；`pandoc` 本机没装；PowerShell 5.1 读含中文的 `.ps1` 要 UTF-8 BOM（见 `docs/env-setup.md` §6）。
+**Windows 上把带中文输出的命令接 `| head` 会假失败**：`npm run mms -- templates | head -3` 报
+`Exception ignored while flushing sys.stdout: OSError: [Errno 22] Invalid argument` 且没有输出——`head` 提前关管道，
+Python 退出时 flush 失败。命令本身是好的，重定向到文件再读即可。**别把它当成 CLI 坏了。**
 
-**TypeScript 7**：CSS 副作用导入报 `TS2882`，需要 `/// <reference types="vite/client" />`（`src/renderer/src/env.d.ts`）。
+**依赖版本**：本机 Python 3.14.5 + matplotlib 3.10.9 + numpy 2.4.4 + seaborn 0.13.2 能原样跑上游 v2.0.1 模板，
+渲出的 `paired-raincloud` 与上游 `examples/previews/` 里的同名图一致。`requirements.txt` 仍按上游下限声明，不锁版本。
+CI 的 gates job 已改为安装整份 `requirements.txt`，因为 G3 现在真的要 matplotlib。
+
+**npm 依赖**：本机此前没装过（M0 只在 CI 装）。这轮用 `--registry=https://registry.npmmirror.com` +
+`ELECTRON_SKIP_BINARY_DOWNLOAD=1` 装了 81 个包（54 s）。`.npmrc` 里的 `electron_mirror` 会让 npm 打 Unknown config 警告，不影响安装。
+
+**上一轮的坑仍然有效**：`chrome-sandbox` 要 root:4755（别用 `--no-sandbox` 绕）；Electron 二进制懒下载；
+xvfb 屏幕要大于窗口含边框尺寸；runner 缺中文字体会整片豆腐；`app.exit(1)` 会被生产入口的 `app.quit()` 顶掉（所以结论落盘、独立核验）；
+`document.fonts.check` 对没装的字体也返回 true；非白像素比分不清字形与方框。
+**Windows 本机**：控制台 GBK；`pandoc` 没装；PS 5.1 读含中文的 `.ps1` 要 BOM。**TypeScript 7**：CSS 副作用导入需要 `vite/client` 引用。
 
 ## 7 结构速查
 
 ```
-skills/manifest.json      单一事实源：7 个技能 + UI 契约（phases/artifacts/hitl）
-schemas/                  Draft 2020-12 契约；枚举与 manifest 词表由 G1 交叉校验
-runtime/src/mms/          registry.py（定位仓库根、降级校验）+ cli.py（0/1/2 三码）
-src/main/                 窗口与 IPC：useContentSize、sandbox、CSP、导航守卫
-src/renderer/src/         App + PhaseRail + ChatPane + WorkspacePane + lib/phases.ts + styles/
-scripts/                  四个门禁 + 反向覆盖 + 结果核验
-tests/window-smoke.cjs    真启动断言（15 条），结论写 screenshots/window-smoke.json
-.github/workflows/ci.yml  gates（ubuntu+windows）与 window-smoke（ubuntu）
+skills/                  7 个 vendor 进来的技能（原样）+ manifest.json（本仓库唯一事实源）+ VENDOR.md
+schemas/                 Draft 2020-12 契约；枚举与 manifest 词表由 G1 交叉校验
+runtime/src/mms/         registry.py（仓库根定位、降级校验）+ invoke.py（subprocess 调模板、核验产物）+ cli.py
+runtime/cli.py           开发期入口：python runtime/cli.py（npm run mms）
+src/main/                窗口与 IPC：useContentSize、sandbox、CSP、导航守卫
+src/renderer/src/        App + PhaseRail + ChatPane + WorkspacePane + lib/phases.ts + styles/
+scripts/                 G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
+tests/window-smoke.cjs   真启动断言（15 条），结论写 screenshots/window-smoke.json
+.github/workflows/ci.yml gates（ubuntu+windows，含 Python 依赖）与 window-smoke（ubuntu）
 ```
 
 一处刻意的设计：`runtime` 只用 subprocess 调技能脚本、按退出码判定，不 import 技能内部函数——这样 `skills/` 仍可被 Claude Code 等宿主单独装载。改这条要先想清楚代价。

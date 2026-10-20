@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .invoke import FIGURE_SKILL, invoke, list_templates
 from .registry import (
     EXIT_OK,
     EXIT_USAGE_OR_ENV,
@@ -82,6 +83,44 @@ def cmd_skills(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_templates(args: argparse.Namespace) -> int:
+    rows = list_templates()
+    if args.json:
+        print(json.dumps({"ok": True, "total": len(rows), "templates": rows}, ensure_ascii=False, indent=2))
+        return EXIT_OK
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["skill"]] = counts.get(row["skill"], 0) + 1
+    summary = " + ".join(f"{name} {n}" for name, n in counts.items())
+    print(f"模板 {len(rows)} 个（{summary}）")
+    for row in rows:
+        print(f"  {row['skill']:<20} {row['id']:<28} {row['title']}")
+    return EXIT_OK
+
+
+def cmd_invoke(args: argparse.Namespace) -> int:
+    code, result = invoke(
+        args.skill,
+        args.template,
+        Path(args.out) if args.out else None,
+        args.theme,
+    )
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return code
+    if code == EXIT_OK:
+        if result["stdout"].strip():
+            print(result["stdout"].rstrip())
+        print(f"\n产物目录: {result['out']}")
+        for kind, path in result["outputs"].items():
+            print(f"  {kind.upper():<4} {path}")
+    else:
+        print(f"渲染失败: {result.get('error')}", file=sys.stderr)
+        if result.get("stdout", "").strip():
+            print(result["stdout"].rstrip(), file=sys.stderr)
+    return code
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="mms", description="mathmodel-studio 运行时入口")
     parser.add_argument("--version", action="version", version=f"mms {__version__}")
@@ -92,6 +131,18 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--check", action="store_true", help="按契约校验注册表（退出码 0/1）")
     mode.add_argument("--json", action="store_true", help="输出整份注册表，供程序读取")
     p_skills.set_defaults(func=cmd_skills)
+
+    p_templates = sub.add_parser("templates", help="列举技能内置模板（figure + diagram）")
+    p_templates.add_argument("--json", action="store_true", help="输出机器可读清单")
+    p_templates.set_defaults(func=cmd_templates)
+
+    p_invoke = sub.add_parser("invoke", help="调用技能模板（subprocess，按退出码判定）")
+    p_invoke.add_argument("skill", help=f"技能名，M1 支持 figure（{FIGURE_SKILL}）")
+    p_invoke.add_argument("template", help="模板 id / 别名 / 中文图题片段")
+    p_invoke.add_argument("--out", default=None, help="工作目录（默认系统临时目录下的 mms-invoke/）")
+    p_invoke.add_argument("--theme", default=None, help="主题名或 .theme.json 路径")
+    p_invoke.add_argument("--json", action="store_true", help="输出机器可读结果")
+    p_invoke.set_defaults(func=cmd_invoke)
     return parser
 
 

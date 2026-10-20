@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """G3 · CLI 契约自检：把 mms 的 0/1/2 三个退出码各自跑到可达。
 
+除注册表命令外，也真调一次上游图表模板（subprocess）并核验三件产物；
+S13 是反向覆盖——渲染器假成功时必须判 1，而不是相信退出码。
+
 一个只会返回 0 的检查器没有价值，所以这里既跑「正常应当 0」，
 也跑「坏了必须 1」和「环境缺失必须 2」，并与注册表实数对照。
 
@@ -34,7 +37,9 @@ for _stream in (sys.stdout, sys.stderr):
 rows: list[tuple[str, bool, str]] = []
 
 
-def run(args: list[str], env_extra: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+def run(
+    args: list[str], env_extra: dict[str, str] | None = None, timeout: float | None = None
+) -> subprocess.CompletedProcess:
     env = dict(os.environ)
     env["PYTHONPATH"] = str(PKG_SRC) + os.pathsep + env.get("PYTHONPATH", "")
     env.pop("MMS_HOME", None)
@@ -50,6 +55,7 @@ def run(args: list[str], env_extra: dict[str, str] | None = None) -> subprocess.
             errors="replace",
             cwd=td,
             env=env,
+            timeout=timeout,
         )
 
 
@@ -136,6 +142,84 @@ finally:
 # S8 未知子命令必须 2
 r = run(["nope"])
 record("S8 未知子命令退出 2", r.returncode == 2, f"exit {r.returncode}")
+
+# S9 模板清单：20 张图 + 5 张示意图。上游增删模板时这条要跟着改（re-sync 记录里留痕）。
+r = run(["templates", "--json"])
+try:
+    listing = json.loads(r.stdout)
+    counts: dict[str, int] = {}
+    for item in listing["templates"]:
+        counts[item["skill"]] = counts.get(item["skill"], 0) + 1
+    ok9 = (
+        r.returncode == 0
+        and listing["total"] == 25
+        and counts.get("mathmodel-figure") == 20
+        and counts.get("mathmodel-diagram") == 5
+    )
+    detail9 = (
+        f"exit {r.returncode} · {listing['total']} 个"
+        f"（figure {counts.get('mathmodel-figure')} / diagram {counts.get('mathmodel-diagram')}）"
+    )
+except (json.JSONDecodeError, KeyError) as exc:
+    ok9, detail9 = False, f"exit {r.returncode} · JSON 解析失败 {exc}"
+record("S9 templates --json 列出 20 图 + 5 示意图", ok9, detail9)
+
+# S10 真渲染一张：退出 0 且 PNG/PDF/SVG 三件产物都非空
+render_out = tempfile.mkdtemp(prefix="mms-render-")
+try:
+    r = run(
+        ["invoke", "figure", "paired-raincloud", "--out", render_out, "--json"],
+        timeout=300,
+    )
+    try:
+        rendered = json.loads(r.stdout)
+        outs = rendered.get("outputs") or {}
+        sizes = {k: Path(v).stat().st_size for k, v in outs.items() if Path(v).is_file()}
+        ok10 = (
+            r.returncode == 0
+            and rendered.get("ok") is True
+            and set(sizes) == {"png", "pdf", "svg"}
+            and all(s > 0 for s in sizes.values())
+        )
+        detail10 = f"exit {r.returncode} · 产物 {sizes}"
+    except (json.JSONDecodeError, OSError) as exc:
+        ok10, detail10 = False, f"exit {r.returncode} · 结果解析失败 {exc} · {r.stderr.strip()[:200]}"
+finally:
+    shutil.rmtree(render_out, ignore_errors=True)
+record("S10 invoke figure 真出 PNG/PDF/SVG", ok10, detail10)
+
+# S11 未接通的技能必须 2（用法错误，不是渲染失败）
+r = run(["invoke", "paper", "x"])
+record("S11 invoke 未接通技能退出 2", r.returncode == 2, f"exit {r.returncode} · {r.stderr.strip()[:120]}")
+
+# S12 不存在的模板由上游渲染器报用法错误 2，我们原样透传
+bad_out = tempfile.mkdtemp(prefix="mms-render-bad-")
+try:
+    r = run(["invoke", "figure", "no-such-template", "--out", bad_out], timeout=120)
+finally:
+    shutil.rmtree(bad_out, ignore_errors=True)
+record("S12 未知模板退出 2", r.returncode == 2, f"exit {r.returncode}")
+
+# S13 反向覆盖：渲染器退出 0 但没写产物，必须判 1（不信退出码）
+def fake_renderer(home: Path) -> None:
+    tool = home / "skills" / "mathmodel-figure" / "code" / "tools"
+    tool.mkdir(parents=True, exist_ok=True)
+    (tool / "render_template.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+
+
+home13 = fixture_home(fake_renderer)
+empty_out = tempfile.mkdtemp(prefix="mms-render-empty-")
+try:
+    r = run(
+        ["invoke", "figure", "paired-raincloud", "--out", empty_out],
+        {"MMS_HOME": home13},
+    )
+    ok13 = r.returncode == 1 and "缺少产物" in r.stderr
+    detail13 = f"exit {r.returncode} · {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else ''}"
+finally:
+    shutil.rmtree(home13, ignore_errors=True)
+    shutil.rmtree(empty_out, ignore_errors=True)
+record("S13 渲染器假成功（退出 0 无产物）被判 1", ok13, detail13)
 
 for name, ok, detail in rows:
     print(f"{'PASS' if ok else 'FAIL'} {name}")
