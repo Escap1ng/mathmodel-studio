@@ -52,8 +52,15 @@ function buildFixture() {
   cpSync(join(ROOT, 'README.md'), fx.readme)
   cpSync(join(ROOT, 'README_EN.md'), fx.readmeEn)
   for (const d of SKILL_DIRS) {
+    // 夹具只复制入口文件：R4 判的就是「vendored 时 entry 是否存在」。
+    // 整目录复制会让 9 个用例各拷 16MB，且与判据无关。
+    const src = join(ROOT, `skills/${d}/SKILL.md`)
+    if (!existsSync(src)) {
+      process.stderr.write(`夹具错误: ${src} 不存在——技能未 vendor 或目录已改名\n`)
+      process.exit(2)
+    }
     mkdirSync(join(fx.skills, d), { recursive: true })
-    cpSync(join(ROOT, `skills/${d}/PLACEHOLDER.md`), join(fx.skills, d, 'PLACEHOLDER.md'))
+    cpSync(src, join(fx.skills, d, 'SKILL.md'))
   }
   return fx
 }
@@ -111,8 +118,8 @@ const cases = [
   {
     id: 'M2',
     expect: 'R4',
-    label: '把一个技能标成 vendored 但不放入口文件 → 半 vendor 状态被拦下',
-    apply: (fx) => patchJson(fx.manifest, (m) => (m.skills[3].status = 'vendored'))
+    label: '把 vendored 技能的入口指向不存在的文件 → 入口缺失被拦下',
+    apply: (fx) => patchJson(fx.manifest, (m) => (m.skills[3].entry = 'MISSING.md'))
   },
   {
     id: 'M3',

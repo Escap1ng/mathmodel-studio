@@ -4,4 +4,4 @@
 由 scripts/validate_contracts.py 在 CI 里钉一致，改一处不改其余就会红。
 """
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"

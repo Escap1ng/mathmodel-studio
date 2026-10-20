@@ -1,0 +1,13 @@
+# mathmodel-studio 的 Python 依赖
+#
+# 版本下限与上游技能 v2.0.1 的 requirements.txt 一致（见 skills/VENDOR.md），
+# 只给下限、不锁死；需要完全可复现的环境时在此基础上自行 pip freeze。
+# 安装（大陆镜像）：
+#   python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/
+
+matplotlib>=3.7          # 数据图表与学术示意图
+numpy>=1.24              # 同上
+seaborn>=0.12            # plot_style.py 与热图模板
+python-docx>=1.1         # mathmodel-paper：Word 版式微调
+PyMuPDF>=1.23            # mathmodel-deai：PDF 不可见字符清理
+jsonschema>=4.20         # 契约校验；缺席时降级

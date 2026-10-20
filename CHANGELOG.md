@@ -1,7 +1,41 @@
 # Changelog
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
-`0.0.x` 阶段一切皆可能变动；`0.1.0` 起把 CLI 参数、退出码、注册表字段与产物路径锁为 Stable。
+从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
+
+## 0.1.0 - 2026-10-20
+
+M1 技能落地。目标是不接模型也能「列模板、渲一张图、跑一次门禁」。
+
+### 新增
+
+- **七个技能 vendor 进仓库**：从 `mathmodel-kit` v2.0.1（commit `5ec0e464da0ae415d3db87cf53fb66eb6e2dff24`）原样复制 `SKILL.md` / `README.md` / `docs/` / `code/` / `themes/` / `examples/`；逐文件 sha256 与上游 tarball 一致，目录内没有本仓库新增文件。来源与 re-sync 表见 `skills/VENDOR.md`。
+- **G8 技能规范门禁** `scripts/check-skills.mjs`：frontmatter 可解析、`name` 与目录同名、`description` 非空且在 1024 字内、不含本仓库私有字段、无占位文件、目录层级不超过上游的 3 层。`--self` 用真实 `SKILL.md` 造 6 种破坏（删入口、改名、空描述、塞 `ui` 字段、残留占位、超深目录），含基线自证共 7/7 通过。
+- **runtime 接通技能**：`mms templates` 列出 20 张图 + 5 张示意图；`mms invoke figure <id>` 以 subprocess 调上游 `render_template.py`，按 `0/1/2` 透传退出码，并独立核验 PNG/PDF/SVG 三件产物非空。`runtime/selfcheck.py` 从 8 条扩到 13 条；新增 S13 反向覆盖：渲染器退出 0 却没写产物，必须判 1。
+- **开发期入口** `python runtime/cli.py`（或 `npm run mms -- ...`）：不必先 `pip install -e`，也不必在 bash 与 PowerShell 之间换 `PYTHONPATH` 写法。
+- **`requirements.txt`** 与 `docs/env-setup.md` 的镜像安装说明（六个包，版本下限与上游一致）。
+
+### 变更
+
+- 注册表 7 个技能 `status: planned → vendored`；两份 README 技能表同步。
+- 版本 `0.0.1 → 0.1.0`。
+- **修正 `skills/VENDOR.md` 的一条错规则**：M0 写的「层级最深 2 层（与上游一致）」是错的——上游 figure 的 `code/style/`、diagram 的 `code/templates/schema/` 都在第 3 层。按旧规则 vendor 会漏掉样式模块与 schema，现在按实际写成「最深 3 层」。
+- G1 反向覆盖的 M2 改为「入口指向不存在的文件」：原先依赖 `planned` 状态，全部翻成 `vendored` 后那条破坏不再成立。夹具改为复制真实 `SKILL.md`，不再依赖已删除的 `PLACEHOLDER.md`。
+- CI 的 gates job 改为安装 `requirements.txt`（G3 现在真的要 matplotlib）。
+
+### 验证（本机，2026-10-20）
+
+- `npm run gate` 全绿：G1 8/8、G1 反向 9/9、G8 6/6、G8 反向 7/7、G6b 自测 9/9、G2 9/9、G3 13/13，类型检查、构建、G6 产物冒烟通过。
+- 真渲 `paired-raincloud`：PNG 439181 B / PDF 63764 B / SVG 102321 B；产物与上游 `examples/previews/` 里的同名预览目视一致。
+- 本机首次跑通 `npm install`（81 个包，54 s，走 npmmirror）；M0 时只在 CI 装过。
+- 本机 Python 3.14.5 + matplotlib 3.10.9 能跑上游 v2.0.1 模板；`requirements.txt` 仍按上游下限声明，不锁版本。
+
+### 尚未做
+
+- `invoke` 只接通 figure；diagram 的渲染入口与其余技能的命令行入口留到 M2/M4。
+- G8 的 S4 只拦「私有字段/规范外字段」，不做完整 YAML 校验——用不到的 YAML 特性宁可报错，也不静默猜。
+- 便携 Python 仍未实现（M5/M6）；`docs/env-setup.md` 仍无英文版。
+- 技能内容原样引入，M1 没有改写任何条文；上游模板自身的版式问题（例如 `paired-raincloud` 的图例贴边）不在这轮修。
 
 ## 0.0.1 - 2026-10-16
 

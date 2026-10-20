@@ -53,7 +53,7 @@
       "role": "主技能：阶段零至阶段六编排 + 路由到各专项技能",
       "entry": "SKILL.md",
       "contribution": "maintainer",
-      "status": "planned",
+      "status": "vendored",
       "ui": {
         "phases": [0, 1, 2, 3, 4, 5, 6],
         "artifacts": ["workspace", "report"],
@@ -66,7 +66,7 @@
       "role": "建模方法库与选型：问题族索引、选型依据、实现范式与验证方式",
       "entry": "SKILL.md",
       "contribution": "open",
-      "status": "planned",
+      "status": "vendored",
       "ui": {
         "phases": [3],
         "artifacts": ["table"],
@@ -79,7 +79,7 @@
       "role": "论文写作与排版：写作规范、LaTeX 骨架、pandoc/Word 输出、参考文献规范",
       "entry": "SKILL.md",
       "contribution": "open",
-      "status": "planned",
+      "status": "vendored",
       "ui": {
         "phases": [5],
         "artifacts": ["tex", "pdf", "docx"],
@@ -92,7 +92,7 @@
       "role": "数据图表：matplotlib 模板库 + 模板库外的 Nature 出图标准",
       "entry": "SKILL.md",
       "contribution": "open",
-      "status": "planned",
+      "status": "vendored",
       "ui": {
         "phases": [4],
         "artifacts": ["png", "pdf", "svg"],
@@ -105,7 +105,7 @@
       "role": "学术示意图：JSON 驱动版式模板 + 手写与高保真复刻",
       "entry": "SKILL.md",
       "contribution": "open",
-      "status": "planned",
+      "status": "vendored",
       "ui": {
         "phases": [1, 4],
         "artifacts": ["png", "pdf", "json"],
@@ -118,7 +118,7 @@
       "role": "降 AI 与交付核查：词表级 + 结构级表述检查、零宽/不可见字符清理",
       "entry": "SKILL.md",
       "contribution": "open",
-      "status": "planned",
+      "status": "vendored",
       "ui": {
         "phases": [5],
         "artifacts": ["report"],
@@ -131,7 +131,7 @@
       "role": "结构自检与评分：章节结构契约 + 百分制五维评分卡",
       "entry": "SKILL.md",
       "contribution": "open",
-      "status": "planned",
+      "status": "vendored",
       "ui": {
         "phases": [6],
         "artifacts": ["json", "report"],
