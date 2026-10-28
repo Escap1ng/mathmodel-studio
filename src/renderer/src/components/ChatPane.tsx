@@ -1,33 +1,233 @@
+import { useEffect, useRef, useState } from 'react'
+import type { ProviderView, RuntimeStatus } from '../../../shared/api'
+import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
+
 interface Props {
-  runtimeConnected: boolean
+  runtime: RuntimeStatus
+  provider?: ProviderView
+  entries: ChatEntry[]
+  streaming: boolean
+  canSend: boolean
+  notice: string | null
+  onSend: (text: string) => void
+  onStop: () => void
+  onOpenSettings: () => void
+  onRestart: () => void
 }
 
-export default function ChatPane({ runtimeConnected }: Props) {
+const TOOL_LABELS: Record<string, string> = {
+  list_templates: '模板清单'
+}
+
+function formatArgs(args: unknown): string {
+  if (args === undefined || args === null) return '{}'
+  if (typeof args === 'string') return args
+  try {
+    return JSON.stringify(args)
+  } catch {
+    return String(args)
+  }
+}
+
+function describeTool(tool: ToolCard): string | null {
+  if (tool.status === 'running' || tool.status === 'error') return null
+  const result = tool.result
+  if (isRecordData(result)) {
+    if (result.ok === false && typeof result.error === 'string') return result.error
+    if (typeof result.total === 'number' && isRecordData(result.by_skill)) {
+      return `载入 ${result.total} 个模板，覆盖 ${Object.keys(result.by_skill).length} 个技能`
+    }
+  }
+  return '完成'
+}
+
+function ToolCardView({ tool }: { tool: ToolCard }) {
+  const summary = describeTool(tool)
+  const state = tool.status === 'running' ? '调用中' : tool.status === 'ok' ? '完成' : '失败'
+  return (
+    <div className="tool-card" data-status={tool.status} data-tool={tool.name}>
+      <div className="tool-card__head">
+        <span className="tool-card__dot" aria-hidden="true" />
+        <span className="tool-card__name">{TOOL_LABELS[tool.name] ?? tool.name}</span>
+        <code className="tool-card__id">{tool.name}</code>
+        <span className="tool-card__meta">
+          {state}
+          {typeof tool.durationMs === 'number' ? ` · ${tool.durationMs}ms` : ''}
+        </span>
+      </div>
+      <div className="tool-card__body">
+        <div className="tool-card__line">
+          <span className="tool-card__key">参数</span>
+          <code>{formatArgs(tool.args)}</code>
+        </div>
+        {summary ? (
+          <div className="tool-card__line">
+            <span className="tool-card__key">结果</span>
+            <span>{summary}</span>
+          </div>
+        ) : null}
+        {tool.status === 'error' && tool.error ? (
+          <div className="tool-card__line tool-card__line--error">{tool.error}</div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function EntryView({ entry }: { entry: ChatEntry }) {
+  if (entry.role === 'user') {
+    return (
+      <article className="msg msg--user">
+        <div className="msg__text">{entry.parts.map((p) => (p.kind === 'text' ? p.text : '')).join('')}</div>
+      </article>
+    )
+  }
+
+  const hasBody = entry.parts.length > 0 || entry.reasoning.length > 0
+  const last = entry.parts[entry.parts.length - 1]
+
+  return (
+    <article className="msg msg--assistant">
+      <div className="msg__role">助手</div>
+      {entry.reasoning ? (
+        <details className="think">
+          <summary>思考过程</summary>
+          <div className="think__text">{entry.reasoning}</div>
+        </details>
+      ) : null}
+      {!hasBody && entry.streaming ? <div className="msg__pending">正在生成…</div> : null}
+      {entry.parts.map((part, index) =>
+        part.kind === 'text' ? (
+          <div className="msg__text" key={`t-${index}`}>
+            {part.text}
+            {entry.streaming && index === entry.parts.length - 1 ? (
+              <span className="cursor" aria-hidden="true" />
+            ) : null}
+          </div>
+        ) : (
+          <ToolCardView key={`k-${part.tool.id}-${index}`} tool={part.tool} />
+        )
+      )}
+      {entry.streaming && entry.parts.length > 0 && last?.kind === 'tool' ? (
+        <span className="cursor cursor--block" aria-hidden="true" />
+      ) : null}
+      {entry.error ? <div className="msg__error">{entry.error}</div> : null}
+      {entry.doneReason === 'cancelled' ? <div className="msg__note">已停止</div> : null}
+      {entry.doneReason === 'max_tool_rounds' ? (
+        <div className="msg__note">工具调用轮数已用尽，这一轮先停在这里。</div>
+      ) : null}
+    </article>
+  )
+}
+
+export default function ChatPane({
+  runtime,
+  provider,
+  entries,
+  streaming,
+  canSend,
+  notice,
+  onSend,
+  onStop,
+  onOpenSettings,
+  onRestart
+}: Props) {
+  const [draft, setDraft] = useState('')
+  const streamRef = useRef<HTMLDivElement>(null)
+  const ready = runtime.state === 'ready'
+
+  useEffect(() => {
+    const el = streamRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [entries])
+
+  const submit = (): void => {
+    const text = draft.trim()
+    if (!text || !canSend || streaming) return
+    setDraft('')
+    onSend(text)
+  }
+
+  const placeholder = !ready
+    ? runtime.state === 'starting'
+      ? '正在启动本地 runtime…'
+      : '运行时未连接'
+    : !provider
+      ? '先在模型设置里选择一个服务商'
+      : !canSend
+        ? '这个服务商还没有保存 API Key'
+        : '描述这道题，或粘贴题目正文'
+
   return (
     <section className="chat" aria-label="对话">
-      <div className="chat__stream">
+      <div className="chat__stream" ref={streamRef}>
         <div className="chat__column">
-          <p className="chat__lead">把赛题丢进来，或者粘贴题目正文。</p>
-          <p>
-            对话流、选模卡、门禁结果与评分明细都会出现在这一列；右侧工作台放图、论文、代码与日志。
-          </p>
+          {entries.length === 0 ? (
+            <div className="chat__empty">
+              <p className="chat__lead">把赛题丢进来，或者粘贴题目正文。</p>
+              <p>
+                对话流、选模卡、门禁结果与评分明细都会出现在这一列；右侧工作台放图、论文、代码与日志。
+              </p>
+            </div>
+          ) : (
+            <div className="messages" aria-live="polite">
+              {entries.map((entry) => (
+                <EntryView key={entry.id} entry={entry} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      {runtime.state === 'error' ? (
+        <div className="chat__banner" role="alert">
+          <span>{runtime.message ?? '本地 runtime 启动失败'}</span>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={onRestart}>
+            重试
+          </button>
+        </div>
+      ) : null}
+      {notice ? (
+        <div className="chat__banner" role="alert">
+          <span>{notice}</span>
+        </div>
+      ) : null}
+
       <div className="chat__composer">
         <div className="composer">
           <textarea
             className="composer__input"
-            placeholder={runtimeConnected ? '描述这道题，或上传附件' : '运行时未连接'}
-            disabled={!runtimeConnected}
+            placeholder={placeholder}
+            value={draft}
+            disabled={!ready}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                submit()
+              }
+            }}
           />
           <div className="composer__bar">
-            <span className="pill" title="M2 接入 provider 注册表后可选">
-              未选择模型
-            </span>
-            <span className="pill">阶段零 · 待开始</span>
-            <button className="pill pill--send" disabled={!runtimeConnected} title="M2 起接 runtime">
-              发送
+            <button
+              type="button"
+              className="pill pill--button pill--model"
+              onClick={onOpenSettings}
+              disabled={!provider}
+              title="模型与 API Key 设置"
+            >
+              {provider ? `${provider.display} · ${provider.model}` : '未选择模型'}
             </button>
+            <span className="pill">阶段零 · 待开始</span>
+            {streaming ? (
+              <button type="button" className="pill pill--send pill--stop" onClick={onStop}>
+                停止
+              </button>
+            ) : (
+              <button type="button" className="pill pill--send" disabled={!canSend} onClick={submit}>
+                发送
+              </button>
+            )}
           </div>
         </div>
       </div>

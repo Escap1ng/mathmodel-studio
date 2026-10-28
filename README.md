@@ -25,9 +25,9 @@
 > **能交给机器校验的，交给门禁；该由人判断的，留给人，并且把判断点做成界面。**
 > 本项目把 [mathmodel-kit](https://github.com/Escap1ng/mathmodel-kit) 的契约化技能集（出版级图表、排版规范、降 AI 检查、结构自检与评分）落到一个本地桌面程序里：模型自带、数据不外传、过程可审计。
 
-**当前状态：M1 技能落地**。七个技能已从上游 v2.0.1 原样 vendor（来源版本与 commit 记在 [`skills/VENDOR.md`](skills/VENDOR.md)），注册表全部翻为 `vendored`；
-不接模型也能列模板、真渲一张图：`npm run mms -- templates`、`npm run mms -- invoke figure paired-raincloud`。
-**还不能建模**——LLM 接入在 M2，选模卡与解释抽屉在 M3，论文编译链路在 M5。里程碑见 [PLAN.md](PLAN.md) §7。
+**当前状态：M2 通道闭环**。本机 Python 子进程在启动时完成握手，渲染层经主进程打开本机 SSE 流：选一个服务商、发一句话，助手文字逐块出现，`list_templates` 工具卡从「调用中」走到「完成」。
+DeepSeek / Kimi / 自定义 OpenAI 兼容端点都可选；Key 只交给主进程并用系统 `safeStorage` 加密落盘，界面不回显。没有 Key 也能开 `MMS_FAKE_PROVIDER=1` 的离线演示，见 [docs/providers.md](docs/providers.md)。
+**还不能建模**——选模卡与就地解释在 M3，论文编译链路在 M5。里程碑见 [PLAN.md](PLAN.md) §7。
 要接手或复核，先读 [docs/HANDOFF.md](docs/HANDOFF.md)：哪些结论已被证明、哪些还没有、以及这一轮踩过的坑。
 
 ## 快速开始
@@ -37,14 +37,14 @@
 npm install
 python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/
 
-# 起空窗口看骨架
+# 起窗口。没有 Key 时加一行环境变量走离线演示：MMS_FAKE_PROVIDER=1 npm run dev
 npm run dev
 
 # 不接模型也能验运行时：列 25 个模板，真渲一张图（PNG/PDF/SVG）
 npm run mms -- templates
 npm run mms -- invoke figure paired-raincloud
 
-# 跑全部本地门禁：注册表一致性 + 技能规范 + 反向覆盖 + 类型检查 + 构建 + 产物冒烟 + 契约 + CLI
+# 跑全部本地门禁：注册表 + 技能规范 + 反向覆盖 + 类型检查 + 构建 + 产物冒烟 + 契约 + CLI + 通道 + 离线 provider
 npm run gate
 ```
 
@@ -96,26 +96,28 @@ npm run gate
 | G2 契约校验 | 注册表按 JSON Schema Draft 2020-12 校验；`jsonschema` 缺席时降级并说明 | 构造两份非法注册表，必须被拒（`scripts/validate_contracts.py` C3） |
 | G2b 版本同源 | `VERSION` / `package.json` / `pyproject.toml` / `mms/__init__.py` 四处一致 | 任一缺项即失败 |
 | G3 CLI 契约 | 退出码 `0 成功 / 1 校验失败 / 2 用法或环境错误` 三码各自可达；M1 起真调上游渲染器出一张图，并独立核验 PNG/PDF/SVG 三件产物非空 | 词表外取值→1、非法 JSON→1、空 `MMS_HOME`→2、未知子命令/未知模板→2、渲染器假成功（退出 0 但没写产物）→1（`runtime/selfcheck.py`） |
+| G4 事件流 | 握手一行 JSON；Bearer token 与 Host/Origin 回环白名单；SSE 八类事件按契约校验；`Last-Event-ID` 续传；取消后必须收到 `done.reason=cancelled` | 7 种坏事件逐个必须被拒；无 token / 错 Host 被拒（`python runtime/selfcheck_channel.py --selftest`） |
+| G5 provider 离线契约 | 本地假 OpenAI 端点跑 429 退避、`reasoning_content` 与正文分离、分片 `tool_calls` 拼装、历史剥离 reasoning、Key 只出现在 Authorization | Key 哨兵不得出现在事件流与 stderr；未开 `MMS_FAKE_PROVIDER` 时必须拒绝假 provider（同上） |
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
-| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗（窗口配置、preload、IPC 注册、导航守卫都用它那一份），再断言：加载的是构建产物、内容尺寸 1440×900、按 BGRA 统计非白像素 ≥1%、状态栏版本号来自主进程应答、阶段轨道 7 节 / 标签 6 个 / 发送按钮按事实禁用、点色块真的换掉 `--accent`、中文按真字形渲染（用「国」与空心框「□」的墨量比值区分） | 空白截图过不了像素阈值；自建窗口的假版本暴露过一次（`app:meta` 报 No handler），豆腐块截图也暴露过一次（`tests/window-smoke.cjs`） |
-
-| G6b 结果核验 | 读 `screenshots/window-smoke.json` 并**复算读数**：内容尺寸、非白像素比、断言条数下限、自述计数与明细一致 | 带 `--selftest`，8 份合成结果证明「ok=true 但读数不对」照样被拒（`scripts/check-window-smoke.mjs`） |
+| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗（窗口配置、preload、IPC、runtime 子进程都用它那一份），再断言：加载的是构建产物、内容尺寸 1440×900、按 BGRA 统计非白像素 ≥1%、状态栏版本号来自主进程应答、runtime 握手后输入区可用、设置页不回显 Key 且哨兵 Key 落盘只有密文、离线 provider 的文字真的流进气泡、工具卡走到完成、中文按真字形渲染（「国」与空心框「□」的墨量比值） | 空白截图过不了像素阈值；自建窗口的假版本暴露过一次（`app:meta` 报 No handler），豆腐块截图也暴露过一次（`tests/window-smoke.cjs`） |
+| G6b 结果核验 | 读 `screenshots/window-smoke.json` 并**复算读数**：内容尺寸、非白像素比、断言条数下限、关键断言是否还在、自述计数与明细一致 | 带 `--selftest`，10 份合成结果证明「ok=true 但读数不对」「删掉关键断言再补满条数」照样被拒（`scripts/check-window-smoke.mjs`） |
 
 G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动，所以 preload 与 IPC 是在生产那套 `sandbox: true` 下验的，不是靠 `--no-sandbox` 绕过。
 为什么要有 G6b 这道独立核验：CI 里曾经出现过冒烟打印「10/12 项通过」但 job 是绿的——`app.exit(1)` 被生产入口的 `window-all-closed → app.quit()` 抢先顶掉了。通过与否从此不吊在 Electron 的退出码管道上。
-**仍未覆盖**：需要 runtime 握手的行为（M2 之后才有东西可握）、以及 CSP 违规场景的主动探测。
+**仍未覆盖**：真实 DeepSeek/Kimi 的联网对话（本仓库没有 Key，也不该有）、CI 的 Windows 真起窗、CSP 违规场景的主动探测。
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
-**执行状态要说清**：M1 的 G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言，含真渲染与「假成功」反向覆盖）、G6b 自测，以及类型检查、构建、G6 产物冒烟，都在本机 `npm run gate` 里跑绿。
-CI 同一版本（run `39398588127`）三 job 全绿：两个门禁 job 在 ubuntu 与 windows 上都跑过 G3 真渲，窗口冒烟在 ubuntu 上 15/15、独立核验通过（非白像素 2.79%）；Windows 仍不真起窗，那条结论不在 CI 覆盖内。G7 先前那几轮的经过与踩坑记录在 `CHANGELOG.md`，没有删。
+**执行状态要说清**：M2 的本机 `npm run gate` 全绿——G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言）、G4（32 条通道断言）、G5 反向覆盖（7/7）、G6b 自测（11/11）、类型检查、构建与 G6 产物冒烟。G7 在本机 Windows 上 27/27，独立核验通过（内容尺寸 1440x900，非白像素 2.90%），截图见 `screenshots/`。
+CI 结果以本轮推送后的 run 为准；M1 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
 
 ## 依赖
 
 | 用途 | 依赖 | 说明 |
 | --- | --- | --- |
 | 桌面壳 | Electron、electron-vite、React、TypeScript | 见 `package.json` |
-| 运行时 | Python 3.12+（标准库即可跑 M0 门禁） | `jsonschema>=4.20` 可选，缺席时契约校验降级 |
+| 运行时 | Python 3.12+（通道服务器、SSE、provider 客户端只用标准库） | `jsonschema>=4.20` 可选，缺席时契约校验降级 |
+| 模型接入 | DeepSeek / Kimi / 任意 OpenAI 兼容端点（BYOK） | 见 [docs/providers.md](docs/providers.md)；Key 只经主进程 `safeStorage` 加密落盘 |
 | 排版（M5） | xelatex（TeX Live 或 MiKTeX）、pandoc | 系统级安装，不由 pip 提供，缺件时阶段零只给指引 |
 | 出图（M1） | matplotlib、numpy、seaborn | 已随技能 vendor；版本下限写在 `requirements.txt`，安装走镜像 |
 

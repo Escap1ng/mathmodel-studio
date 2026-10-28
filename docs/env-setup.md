@@ -69,6 +69,10 @@ G1 与 CLI 的注册表部分**只用标准库**；M1 起 `runtime/selfcheck.py`
 python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/
 ```
 
+M2 起桌面端会自己拉起 `python runtime/cli.py serve`（Linux/macOS 用 `python3`），所以起窗口要求 Python 在 `PATH` 上；
+不在就用 `MMS_PYTHON` 指向解释器。通道服务器、SSE 与 provider 客户端只用标准库，不需要额外的 pip 包。
+没有 API Key 时用 `MMS_FAKE_PROVIDER=1` 走离线演示，细节见 [providers.md](providers.md)。
+
 `jsonschema` 也在其中；缺它时契约校验仍会降级并在输出里说明，但 CI 必须装齐。TUNA 镜像在本机实测会超时，
 npmmirror 可用——镜像本身也会挂，超时不等于配置错了。
 
@@ -102,10 +106,10 @@ npmmirror 可用——镜像本身也会挂，超时不等于配置错了。
 npm run gate
 ```
 
-全绿即脚手架自洽。其中只有 `typecheck`、`build`、`smoke:dist` 需要 `npm install` 成功，
-其余四项（`check:registry`、`check:registry:negative`、`check:contracts`、`check:cli`）只吃标准库，
-断网也能跑——这是刻意设计，方便你在任何机器上验证注册表没漂。
+全绿即脚手架自洽。其中只有 `typecheck`、`build`、`smoke:dist` 需要 `npm install` 成功；
+`check:registry`、`check:registry:negative`、`check:contracts`、`check:channel` 只吃标准库（契约校验缺 `jsonschema` 时降级）；
+`check:cli` 需要 `requirements.txt` 里的科学计算包。这是刻意设计，方便你在任何机器上验证注册表与通道没漂。
 
 想看界面就两条路：`npm run dev` 起开发窗口；或先 `npm run build` 再 `npm run smoke:window`，
-它会 `require` 生产入口真起一次窗口、按像素断言并把截图写到 `screenshots/window-smoke.png`。
-本机有显示器，不需要 xvfb；CI 那条 job 才需要，并且要先修好 Electron 的 SUID 沙箱助手（见 `ci.yml` 的注释）。
+它会 `require` 生产入口真起一次窗口、拉起 Python 通道、用离线 provider 发一句话，按像素与 DOM 断言（27 条），
+并把截图写到 `screenshots/`。本机有显示器，不需要 xvfb；CI 那条 job 才需要，并且要先修好 Electron 的 SUID 沙箱助手（见 `ci.yml` 的注释）。

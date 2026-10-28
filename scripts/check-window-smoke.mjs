@@ -20,9 +20,19 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 15
+const MIN_ASSERTIONS = 27
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
+// 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
+// 这里点名 M2 闭环最关键的几条，少一条就判失败。
+const REQUIRED_ASSERTIONS = [
+  'G7-3 runtime 通过握手就绪',
+  'G7-5 中文按真字形渲染（不是空心方框）',
+  'G7-5 工具卡完成并给出结构化结果',
+  'G7-5 回复文本含模板总数',
+  'G7-6 设置对话框打开并列出服务商',
+  'G7-6 Key 落盘只有密文或明确拒绝'
+]
 
 const problems = []
 const fail = (msg) => problems.push(msg)
@@ -74,6 +84,15 @@ export function judge(data) {
     if (countedFail !== data.failed) errs.push(`自述 failed=${data.failed} 与明细里的 ${countedFail} 条 FAIL 不一致`)
     const selfTotal = data.results.length
     if (selfTotal !== data.total) errs.push(`自述 total=${data.total} 与明细 ${selfTotal} 条不一致`)
+    const names = data.results.map((r) => (r && typeof r.name === 'string' ? r.name : ''))
+    const missing = REQUIRED_ASSERTIONS.filter((name) => !names.includes(name))
+    if (missing.length) errs.push(`缺少关键断言: ${missing.join('；')}`)
+    const dupes = [...new Set(names.filter((name, i) => name && names.indexOf(name) !== i))]
+    if (dupes.length) errs.push(`断言名重复: ${dupes.join('；')}（重复行可以凑条数）`)
+    const ready = data.results.find((r) => r && r.name === 'G7-3 runtime 通过握手就绪')
+    if (ready && !String(ready.detail).includes('离线演示')) {
+      errs.push('runtime 就绪那条没有证明是离线演示 provider 在跑')
+    }
   }
   return errs
 }
@@ -94,6 +113,15 @@ function runJudge(file) {
 
 function selftest() {
   const dir = mkdtempSync(join(tmpdir(), 'mms-wsmoke-'))
+  const requiredRows = REQUIRED_ASSERTIONS.map((name) => ({
+    name,
+    ok: true,
+    detail: name === 'G7-3 runtime 通过握手就绪' ? '状态栏: runtime 已连接 · 离线演示' : 'ok'
+  }))
+  const filler = Array.from(
+    { length: Math.max(0, MIN_ASSERTIONS - requiredRows.length) },
+    (_, i) => ({ name: `A${i}`, ok: true, detail: 'ok' })
+  )
   const good = {
     ok: true,
     total: MIN_ASSERTIONS,
@@ -102,7 +130,7 @@ function selftest() {
     inkRatio: 0.0211,
     minInkRatio: MIN_THRESHOLD_FLOOR,
     url: 'file:///abs/out/renderer/index.html',
-    results: Array.from({ length: MIN_ASSERTIONS }, (_, i) => ({ name: `A${i}`, ok: true, detail: 'ok' }))
+    results: [...requiredRows, ...filler]
   }
   const cases = [
     { name: '全绿夹具应通过', mutate: () => good, wantPass: true },
@@ -112,6 +140,22 @@ function selftest() {
     { name: 'ok=true 但阈值被调成 0', mutate: (d) => ((d.minInkRatio = 0), (d.inkRatio = 0)), wantPass: false },
     { name: '断言条数被删到下限以下', mutate: (d) => ((d.total = 3), (d.results = d.results.slice(0, 3))), wantPass: false },
     { name: '自述 failed 与明细不一致', mutate: (d) => (d.failed = 2), wantPass: false },
+    {
+      name: '删掉关键断言、用凑数行补满条数',
+      mutate: (d) => {
+        const idx = d.results.findIndex((r) => r.name === 'G7-5 工具卡完成并给出结构化结果')
+        d.results[idx] = { name: 'A-extra', ok: true, detail: 'ok' }
+      },
+      wantPass: false
+    },
+    {
+      name: '关键断言的 detail 不再证明离线演示',
+      mutate: (d) => {
+        const row = d.results.find((r) => r.name === 'G7-3 runtime 通过握手就绪')
+        row.detail = '状态栏: runtime 已连接'
+      },
+      wantPass: false
+    },
     { name: '结果文件不存在', mutate: null, wantPass: false }
   ]
 

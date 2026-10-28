@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "deepseek",
+      "display": "DeepSeek",
+      "base_url": "https://api.deepseek.com/v1",
+      "auth_style": "bearer",
+      "models": ["deepseek-chat", "deepseek-reasoner"],
+      "tool_calling": true,
+      "streaming_tools": true,
+      "reasoning_field": "reasoning_content",
+      "context_len": 131072,
+      "max_out": 8192,
+      "note": "deepseek-reasoner 的工具调用支持随上游变化，默认用 deepseek-chat。"
+    },
+    {
+      "id": "kimi",
+      "display": "Kimi",
+      "base_url": "https://api.moonshot.cn/v1",
+      "auth_style": "bearer",
+      "models": ["kimi-k2-0905-preview", "moonshot-v1-8k"],
+      "tool_calling": true,
+      "streaming_tools": true,
+      "reasoning_field": "reasoning_content",
+      "context_len": 131072,
+      "max_out": 8192,
+      "note": "Kimi 的模型名会随开放平台更新；不在此列表时可在自定义端点里手填。"
+    },
+    {
+      "id": "custom",
+      "display": "自定义 OpenAI 兼容端点",
+      "base_url": "",
+      "auth_style": "bearer",
+      "models": [],
+      "tool_calling": true,
+      "streaming_tools": true,
+      "reasoning_field": "reasoning_content",
+      "context_len": 131072,
+      "max_out": 8192,
+      "custom": true,
+      "note": "填到 /v1 为止；公网地址必须是 https，http 只接受本机回环地址。"
+    }
+  ]
+}
