@@ -27,12 +27,23 @@ M2 通道与壳。目标是「选一家 provider，在界面里流式对话并�
 - G7 在测试进程里设置 `MMS_FAKE_PROVIDER=1`，并把 Electron `userData` 指到临时目录：否则开发机上已保存的 provider 会改变默认选中项，测试结果不稳定。
 - 版本 `0.1.0 → 0.2.0`。
 
+### 修复
+
+- **Windows CI 的 cp1252 崩溃**：`selfcheck_channel.py` 打印中文前没有重配 stdout，windows-latest 直接 `UnicodeEncodeError` 退出 1。入口现在与 `selfcheck.py` 一样把 stdout/stderr 重配成 UTF-8（`e9f0be1`）。
+
 ### 验证（本机 Windows，2026-10-20）
 
 - `npm run gate` 全绿：G4 32/32、G5 反向 7/7、G6b 自测 11/11、G7 27/27（内容尺寸 1440x900，非白像素 2.90%，对话截图 4.49%）。
 - 对话链路真跑过：用户消息 → reasoning → `list_templates` running/ok → 「共 25 个模板」正文 → done；按钮从「停止」回到「发送」。
 - 设置页在离线演示下列出四个条目（含 DeepSeek/Kimi/自定义），切到 DeepSeek 时 Key 输入框为空且 placeholder 不含密钥样式字符串。
-- 哨兵 Key 经 UI 保存后：`settings.json` 存在、含 `key` 密文字段、不含哨兵明文；随后切回离线演示，没有带着这个假 Key 发请求。安全存储不可用的分支写成了「明确拒绝且不落盘」，但本机 Windows 只跑到可用分支。
+- 哨兵 Key 经 UI 保存后：`settings.json` 存在、含 `key` 密文字段、不含哨兵明文；随后切回离线演示，没有带着这个假 Key 发请求。安全存储不可用的分支写成了「明确拒绝且不落盘」，本机 Windows 只跑到可用分支；拒绝分支由 CI 的 Linux runner 覆盖（见下）。
+
+### 验证（CI，run 40658227855）
+
+- 三 job 全绿：`门禁 · ubuntu-latest`、`门禁 · windows-latest`、`真启动冒烟 · ubuntu`。
+- ubuntu 真启动冒烟 27/27，内容尺寸 1440x900，非白像素 3.02%；G7-5 中文墨量比 2.75，截图里中文是真字形。
+- Linux runner 没有 Secret Service：`safeStorage 可用=false`、文件不存在、保存被明确拒绝——拒绝分支第一次由 CI 证据覆盖。
+- 首轮 run `40657478165` 的 G4 在 Windows 上因 cp1252 崩溃；修复后本 run 才全绿。
 
 ### 尚未做
 
