@@ -20,6 +20,14 @@ import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+# 同 selfcheck.py：CI 的 Windows 控制台是 cp1252，不重配会在打印中文时崩
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = ROOT / "schemas" / "chat-events.schema.json"
 SENTINEL = "sk-test-SENTINEL-DO-NOT-LEAK"
