@@ -98,7 +98,7 @@ Why a separate auditor exists: CI once printed "10/12 passed" while the job stay
 
 CLI flags, exit codes, registry fields and artifact paths are **Stable**; `--json` field order and error wording are **Experimental**; geometry constants inside scripts are **Internal**.
 
-**Execution state, stated plainly**: for M2, the local `npm run gate` is green — G1 (9 negative controls), G8 (6 negative controls), G2 (both modes), G3 (13 assertions), G4 (32 channel assertions), G5 negative coverage (7/7), the G6b selftest (11/11), typecheck, build and the G6 dist smoke. G7 passes 27/27 on local Windows with an independent audit (content size 1440x900, non-white pixels 2.90%); screenshots are in `screenshots/`. CI results will be recorded for the run produced by this push; the M1 history and its traps remain in `CHANGELOG.md`.
+**Execution state, stated plainly**: for M2, the local `npm run gate` is green — G1 (9 negative controls), G8 (6 negative controls), G2 (both modes), G3 (13 assertions), G4 (32 channel assertions), G5 negative coverage (7/7), the G6b selftest (11/11), typecheck, build and the G6 dist smoke. G7 passes 27/27 on local Windows with an independent audit (content size 1440x900, non-white pixels 2.90%); screenshots are in `screenshots/`. CI run `40658227855` is green in all three jobs: G4/G5 on both ubuntu and windows, and the ubuntu window smoke at 27/27 (3.02% non-white). That runner has no Secret Service, so the key-at-rest test exercised the refusal branch (`safeStorage available=false`, nothing written). The first run `40657478165` died because the Windows runner's cp1252 console could not print Chinese; fixed in `e9f0be1`. The M1 history and its traps remain in `CHANGELOG.md`.
 
 ## Dependencies
 

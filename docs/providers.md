@@ -62,14 +62,15 @@ G7 真启动冒烟会在自己的进程里打开这个开关，并把 `userData`
 
 - 握手、Bearer 鉴权、回环 Host/Origin 白名单、SSE 续传与取消（G4，32 条）。
 - OpenAI 兼容协议本身：429 退避、`reasoning_content` 与正文分离、分片 `tool_calls` 拼装、历史剥离 reasoning、Key 只出现在 Authorization（G5，用本地假端点，不联网）。
-- 界面端到端：设置页打开/关闭、不回显 Key、哨兵 Key 经 UI 保存后磁盘上只有密文（G7，27 条，本机 Windows 真启动）。
+- 界面端到端：设置页打开/关闭、不回显 Key、哨兵 Key 经 UI 保存后磁盘上只有密文（G7，27 条，本机 Windows 真启动；CI 的 ubuntu 也跑同一组）。
 - 离线 provider 的文字真的流进气泡，`list_templates` 工具卡从 running 走到 ok，结束后按钮回到「发送」（G7 同一轮）。
+- 安全存储不可用时明确拒绝且不落盘：CI run `40658227855` 的 Linux runner 没有 Secret Service，G7 实得 `可用=false、文件存在=false、明确拒绝=true`。
 
 **未验证**：
 
 - 真实 DeepSeek / Kimi 的联网对话。本仓库不内置任何 Key，CI 也不调用真实服务；这条只能由你填自己的 Key 验证。
 - 自定义端点的兼容性差异（有的实现不发 `reasoning_content`，有的分片 `tool_calls` 字段不全）。这些情况会以错误文本呈现，但尚未逐个建 fixture。
-- Linux 桌面上的 `safeStorage` 可用性取决于 Secret Service，本仓库没有在桌面 Linux 上验过保存 Key。
+- Linux 桌面上 Secret Service 可用时的加密保存；CI 只跑到不可用分支，桌面分支没有环境可验。
 
 ## 7 故障排查
 

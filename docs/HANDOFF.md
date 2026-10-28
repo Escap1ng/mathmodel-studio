@@ -49,7 +49,7 @@ npm run verify:window  # 独立读 JSON 并复算读数
 一把梭：`npm run gate`（顺序见 `package.json` 的 scripts；G7 不在 gate 里，因为它要显示器和 Electron 二进制）。
 
 CI：<https://github.com/Escap1ng/mathmodel-studio/actions> —— 三 job：`门禁 · ubuntu-latest`、`门禁 · windows-latest`、`真启动冒烟 · ubuntu`。
-M2 的 CI 结果以本轮推送后的 run 为准；取回截图：
+M2 的 run `40658227855` 三 job 全绿；ubuntu 真启动 27/27、非白像素 3.02%。取回截图：
 
 ```bash
 gh run download <run-id> -n window-smoke --dir screenshots-m2-ci
@@ -63,10 +63,10 @@ gh run download <run-id> -n window-smoke --dir screenshots-m2-ci
 | 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消 | `selfcheck_channel.py` 32/32（本机 Windows） | 强（本机） |
 | OpenAI 兼容协议：429 退避、reasoning 分离、分片 tool_calls、历史剥离、Key 不外泄 | 同上的本地假端点，3 次真实 HTTP 请求 | 强（协议层，非真实厂商） |
 | 界面端到端：流式文字、工具卡、设置页、按钮复位 | G7 27/27，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
-| Key 落盘：Windows 上只有 `safeStorage` 密文，无明文 | G7 写入哨兵 Key 后读 `settings.json`，只输出布尔值 | 强（仅 Windows 可用分支） |
-| 安全存储不可用时拒绝保存 | 代码路径 + G7 的分支断言；本机 Windows 走不到拒绝分支 | **未证**（未在无 Secret Service 的 Linux 桌面跑过） |
+| Key 落盘：Windows 上只有 `safeStorage` 密文，无明文 | G7 写入哨兵 Key 后读 `settings.json`，只输出布尔值 | 强（Windows 可用分支） |
+| 安全存储不可用时拒绝保存且不落盘 | CI run `40658227855` 的 Linux runner 无 Secret Service，G7 实得 `可用=false、文件存在=false、明确拒绝=true` | 强（拒绝分支）；Linux 桌面 Secret Service 可用分支仍未证 |
 | 真实 DeepSeek / Kimi 联网对话 | 无 Key，未跑 | **未证** |
-| Linux 上真起窗与整条 M2 链路 | CI 会跑，本轮结果待补 | 待 CI |
+| Linux 上真起窗与整条 M2 链路 | CI run `40658227855`，27/27 + 独立核验（1440x900，非白像素 3.02%） | 强 |
 | Windows CI 真起窗 | 无 | **未证**；M2 的 Windows 证据来自本机 |
 | `interrupt` / `gate` / `artifact` 能渲染成卡片 | 只有契约与转发，没有 UI | **未证**（M3） |
 | 工具不只 `list_templates` | 无 | **未证**；M2 只接了一个只读工具 |
@@ -126,9 +126,11 @@ M2 新增：
 
 **G6b 只数条数不够**：删掉一条关键断言、拿凑数的 `A` 行补齐，条数照样够。现在点名六条关键断言，并拒绝重复断言名。反向覆盖也补了这两种坏结果。
 
-**safeStorage 的“不可用”是正常分支**：代码里拒绝保存、不退回明文；G7 写成双分支断言。本机 Windows 只跑到“可用”那一支，所以 Linux 桌面仍是未证项。
+**safeStorage 的“不可用”是正常分支**：代码里拒绝保存、不退回明文；G7 写成双分支断言。本机 Windows 跑到“可用”支，CI 的 Linux runner 跑到“拒绝”支（不建文件、无明文），只剩 Linux 桌面的可用支未证。
 
-**本机控制台是 GBK**：跑 `selfcheck_channel.py` 时中文在终端里显示成乱码，但断言与退出码正常。不要把乱码当成失败，也不要把 Python 的非 ASCII 输出直接塞进 Windows 的 `.ps1`。
+**本机控制台是 GBK，Windows CI 的 stdout 是 cp1252**：本机 `selfcheck_channel.py` 的中文显示成乱码但退出码正常；到了 windows-latest，控制台编码更窄，第一条中文断言打印就 `UnicodeEncodeError` 退出 1（run `40657478165`）。所有新加的 Python 入口都要像 `selfcheck.py` 那样把 stdout/stderr reconfigure 成 UTF-8。**乱码不等于失败，崩溃才是。**
+
+**git 通道会瞬时断**：本轮推送时 `github.com:443` 连续 4 次 reset/超时，而 `api.github.com` 全程正常；几分钟后同一条命令成功。先重试并探本机代理端口，不要改 remote，也不要怀疑权限。
 
 **`app.exit(1)` 仍会被生产入口的 `app.quit()` 顶掉**：结论继续落 JSON、由 G6b 独立判，别改回退出码管道。
 
