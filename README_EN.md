@@ -25,9 +25,9 @@
 > **Anything a machine can verify goes to a gate. Anything that needs judgement goes to a human — with the decision point rendered as UI.**
 > `mathmodel-studio` takes the contract-driven skill set of [mathmodel-kit](https://github.com/Escap1ng/mathmodel-kit) (publication-grade figures, typesetting rules, de-AI checks, structure audit and scoring) and puts it inside a local desktop program: bring your own model, keep your data on your machine, audit every step.
 
-**Status: M1 skills landed.** All seven skills are vendored verbatim from upstream v2.0.1 (version and commit recorded in [`skills/VENDOR.md`](skills/VENDOR.md)), and every registry entry is now `vendored`.
-Without any model access you can list the templates and render a real figure: `npm run mms -- templates`, `npm run mms -- invoke figure paired-raincloud`.
-**It cannot model yet** — LLM access lands at M2, the model-choice card and the explain drawer at M3, the full typesetting chain at M5. Milestones: [PLAN.md](PLAN.md) §7.
+**Status: M2 channel loop.** The local Python child completes a handshake at startup, and the renderer opens a loopback SSE stream through the main process: pick a provider, send one message, and assistant text arrives token by token while the `list_templates` tool card moves from running to done.
+DeepSeek, Kimi and any OpenAI-compatible endpoint are supported; the key is handed only to the main process and encrypted with the OS `safeStorage`, never echoed back to the UI. Without a key, run the offline demo with `MMS_FAKE_PROVIDER=1` — see [docs/providers.md](docs/providers.md).
+**It still cannot model** — the model-choice card and explain drawer land at M3, the full typesetting chain at M5. Milestones: [PLAN.md](PLAN.md) §7.
 Picking this up or auditing it? Start with [docs/HANDOFF.md](docs/HANDOFF.md): which claims are proven, which are not, and the traps this round already paid for.
 
 ## Quick start
@@ -37,14 +37,14 @@ Picking this up or auditing it? Start with [docs/HANDOFF.md](docs/HANDOFF.md): w
 npm install
 python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/
 
-# Open the skeleton window
+# Open the window. Without a key, prefix MMS_FAKE_PROVIDER=1 for the offline demo.
 npm run dev
 
 # No model needed: list the 25 templates and render one figure (PNG/PDF/SVG)
 npm run mms -- templates
 npm run mms -- invoke figure paired-raincloud
 
-# Run every local gate: registry + skills spec + negative coverage + typecheck + build + dist smoke + contracts + CLI
+# Run every local gate: registry + skills spec + negative coverage + typecheck + build + dist smoke + contracts + CLI + channel + offline provider
 npm run gate
 ```
 
@@ -86,25 +86,27 @@ Every gate ships with negative coverage — a checker that only ever returns zer
 | G2 contract validation | registry validated against JSON Schema Draft 2020-12; degrades with a printed note when `jsonschema` is absent | two deliberately invalid registries must be rejected |
 | G2b version parity | `VERSION` / `package.json` / `pyproject.toml` / `mms/__init__.py` must agree | any missing or differing value fails |
 | G3 CLI contract | exit codes `0 ok / 1 validation failed / 2 usage or environment` each reachable; since M1 it really calls the upstream renderer and independently verifies that PNG/PDF/SVG all exist and are non-empty | out-of-vocabulary value → 1, invalid JSON → 1, empty `MMS_HOME` → 2, unknown subcommand/template → 2, renderer "success" with no artifacts → 1 |
+| G4 event stream | one-line JSON handshake; Bearer token plus a loopback Host/Origin allow-list; eight SSE event types validated against a contract; `Last-Event-ID` replay; cancellation must end with `done.reason=cancelled` | seven malformed events must each be rejected; missing token or wrong Host is refused (`python runtime/selfcheck_channel.py --selftest`) |
+| G5 provider offline contract | a local fake OpenAI endpoint exercises 429 backoff, `reasoning_content` separation, split `tool_calls` assembly, reasoning stripped from history, and keys only in the Authorization header | a key sentinel must never appear in the event stream or stderr; the fake provider must be refused when `MMS_FAKE_PROVIDER` is off |
 | G6 desktop scaffold | typecheck + build + the bundle must actually contain this project's CJK copy and design-token names | any failed assertion exits 1 |
-| G7 real launch | `require`s the production entry `out/main/index.js` so window options, preload, IPC registration and navigation guards all come from that file, then asserts: built artifact loaded, content size 1440x900, non-white pixel ratio >= 1% from BGRA, status-bar version served by the main process, 7 phase rows / 6 tabs / send button disabled as a matter of fact, and clicking a swatch really swaps `--accent`, and CJK text renders as real glyphs rather than tofu (ink-density of 国 versus an empty box □) | a blank screenshot cannot clear the pixel threshold; the earlier self-built-window version was caught faking it (`app:meta` → No handler), and so was a screenshot made entirely of tofu boxes |
-
-| G6b result audit | Reads `screenshots/window-smoke.json` and **recomputes the readings** rather than trusting the flag: content size, non-white pixel ratio, an assertion-count floor, and self-reported counts versus the detail list | ships `--selftest` with 8 synthetic results, proving "ok=true but the reading is wrong" is still rejected (`scripts/check-window-smoke.mjs`) |
+| G7 real launch | `require`s the production entry `out/main/index.js` so window options, preload, IPC and the runtime child all come from that file, then asserts: built artifact loaded, content size 1440x900, non-white pixels >= 1% from BGRA, status-bar version served by the main process, composer enabled after the runtime handshake, settings never echo the key and the sentinel key is stored only as ciphertext, offline-provider text really streams into the bubble, the tool card reaches done, and CJK renders as real glyphs (ink of 国 versus an empty box □) | a blank screenshot cannot clear the pixel threshold; the earlier self-built-window version was caught faking it, and so was a screenshot made entirely of tofu boxes |
+| G6b result audit | reads `screenshots/window-smoke.json` and **recomputes the readings**: content size, non-white pixel ratio, assertion floor, presence of key assertions, and self-reported counts versus the detail list | ships `--selftest` with 10 synthetic results, proving "ok=true but the reading is wrong" and "delete a key assertion, pad the count" are still rejected |
 
 CI repairs Electron's SUID sandbox helper (root:4755) before launching, so preload and IPC are verified under the production `sandbox: true` rather than bypassed with `--no-sandbox`.
 Why a separate auditor exists: CI once printed "10/12 passed" while the job stayed green — `app.exit(1)` was preempted by the production entry's `window-all-closed → app.quit()`. The verdict no longer hangs on Electron's exit-code plumbing.
-**Still uncovered**: anything needing a runtime handshake (only possible from M2 onward) and active probing of CSP violations.
+**Still uncovered**: a real networked DeepSeek/Kimi conversation (this repository has no key and should not), launching a window on Windows in CI, and active probing of CSP violations.
 
 CLI flags, exit codes, registry fields and artifact paths are **Stable**; `--json` field order and error wording are **Experimental**; geometry constants inside scripts are **Internal**.
 
-**Execution state, stated plainly**: for M1, G1 (9 negative controls), G8 (6 negative controls), G2 (both modes), G3 (13 assertions including a real render and the "fake success" control), the G6b selftest, typecheck, build and the G6 dist smoke all pass locally in `npm run gate`. CI on the same commit (run `39398588127`) is green in all three jobs: both gate jobs run the G3 real render on ubuntu and windows, and the window smoke passes 15/15 on ubuntu with an independent audit (non-white pixels 2.79%). Windows still does not launch a window, so that claim is outside CI. The earlier rounds of G7, including what they got wrong, are kept in `CHANGELOG.md` rather than deleted.
+**Execution state, stated plainly**: for M2, the local `npm run gate` is green — G1 (9 negative controls), G8 (6 negative controls), G2 (both modes), G3 (13 assertions), G4 (32 channel assertions), G5 negative coverage (7/7), the G6b selftest (11/11), typecheck, build and the G6 dist smoke. G7 passes 27/27 on local Windows with an independent audit (content size 1440x900, non-white pixels 2.90%); screenshots are in `screenshots/`. CI results will be recorded for the run produced by this push; the M1 history and its traps remain in `CHANGELOG.md`.
 
 ## Dependencies
 
 | Purpose | Requirement | Note |
 | --- | --- | --- |
 | Shell | Electron, electron-vite, React, TypeScript | see `package.json` |
-| Runtime | Python 3.12+ (registry gates run on the standard library alone) | `jsonschema>=4.20` optional; validation degrades without it |
+| Runtime | Python 3.12+ (the channel server, SSE and provider client are standard-library only) | `jsonschema>=4.20` optional; validation degrades without it |
+| Models | DeepSeek / Kimi / any OpenAI-compatible endpoint (BYOK) | see [docs/providers.md](docs/providers.md); keys are encrypted by the main process via `safeStorage` |
 | Typesetting (M5) | xelatex (TeX Live or MiKTeX), pandoc | system-level installs, not pip; the preflight phase only gives guidance |
 | Figures (M1) | matplotlib, numpy, seaborn | vendored with the skills; lower bounds live in `requirements.txt`, installed via a mirror |
 

@@ -121,6 +121,13 @@ def cmd_invoke(args: argparse.Namespace) -> int:
     return code
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    # 内部命令：stdout 第一行是给父进程的握手 JSON，之后只走本机 HTTP。
+    from .server import serve
+
+    return serve(args.port)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="mms", description="mathmodel-studio 运行时入口")
     parser.add_argument("--version", action="version", version=f"mms {__version__}")
@@ -143,6 +150,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_invoke.add_argument("--theme", default=None, help="主题名或 .theme.json 路径")
     p_invoke.add_argument("--json", action="store_true", help="输出机器可读结果")
     p_invoke.set_defaults(func=cmd_invoke)
+
+    p_serve = sub.add_parser("serve", help="启动本机通道服务器（供桌面壳握手，不面向日常使用）")
+    p_serve.add_argument("--port", type=int, default=0, help="0 表示让系统分配；只绑 127.0.0.1")
+    p_serve.set_defaults(func=cmd_serve)
     return parser
 
 

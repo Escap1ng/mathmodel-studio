@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mathmodel-studio.local/schemas/chat-events.schema.json",
+  "title": "mms channel chat event",
+  "description": "Python 通道发往 Electron 的 SSE 事件信封。id 单调递增，按 Last-Event-ID 续传。",
+  "type": "object",
+  "required": ["id", "event", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+    "event": {
+      "enum": ["token", "reasoning", "tool_call", "artifact", "interrupt", "gate", "error", "done"]
+    },
+    "data": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event": { "const": "token" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["text"],
+            "additionalProperties": false,
+            "properties": { "text": { "type": "string" } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "reasoning" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["text"],
+            "additionalProperties": false,
+            "properties": { "text": { "type": "string" } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "tool_call" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["id", "name", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "status": { "enum": ["running", "ok", "error"] },
+              "args": { "type": ["object", "string", "null"] },
+              "result": { "type": "object" },
+              "error": { "type": "string" },
+              "duration_ms": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "artifact" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["kind", "path"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string" },
+              "path": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "interrupt" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["card", "payload"],
+            "additionalProperties": false,
+            "properties": {
+              "card": { "type": "string" },
+              "payload": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "gate" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["skill", "ok", "exit"],
+            "additionalProperties": false,
+            "properties": {
+              "skill": { "type": "string" },
+              "ok": { "type": "boolean" },
+              "exit": { "type": "integer" },
+              "summary": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "error" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["message"],
+            "additionalProperties": false,
+            "properties": { "message": { "type": "string" } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "done" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["reason"],
+            "additionalProperties": false,
+            "properties": {
+              "reason": { "enum": ["stop", "error", "cancelled", "max_tool_rounds"] },
+              "usage": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

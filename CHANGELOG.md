@@ -3,6 +3,45 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
 
+## 0.2.0 - 2026-10-20
+
+M2 通道与壳。目标是「选一家 provider，在界面里流式对话并看到工具卡」——不接真实 Key 也能用离线演示跑通同一条链路。
+
+### 新增
+
+- **本机通道服务器** `runtime/cli.py serve --port 0`：stdout 只打印一行握手 JSON（`port` / `token` / 子进程 `pid` / `fake` / `version`），之后监听 `127.0.0.1`。Bearer 校验用 `hmac.compare_digest`，Host 与可选 Origin 只接受回环；请求体、消息条数与总长度都有上限。
+- **SSE 事件契约** `schemas/chat-events.schema.json`：`token` / `reasoning` / `tool_call` / `artifact` / `interrupt` / `gate` / `error` / `done` 八类，事件 id 单调递增；支持 `Last-Event-ID` 续传；取消后必须收到 `done.reason=cancelled`。流结束时显式 `Connection: close`——上一版不关连接，客户端的读循环会永远等下一块数据。
+- **provider 层** `runtime/src/mms/provider.py` + `providers.json`：DeepSeek、Kimi、自定义 OpenAI 兼容端点三个预设；流式解析 `content` 与 `reasoning_content`；分片 `tool_calls` 拼装；429/5xx 按 `Retry-After` 有界重试；回放历史时剥离 reasoning。自定义端点公网必须 https，http 只接受回环。
+- **工具调用**：M2 只有只读的 `list_templates`。工具卡依次收到 running 与 ok/error，带上参数、结果与耗时；做完后把 assistant `tool_calls` 与 tool 消息写回历史。
+- **G4/G5 自检** `runtime/selfcheck_channel.py`：32 条断言覆盖握手、鉴权、Host 白名单、事件 schema、id 单调、工具卡两态、续传、取消、未知 provider、缺 Key、公网 http、stdout 只有握手、stderr 无 Key、假 provider 开关、429 重试、reasoning 分离、分片工具拼装、历史剥离，以及 Key 只出现在 Authorization。`--selftest` 用 7 种坏事件证明判据本身会拒绝。
+- **Electron 主进程**：拉起 Python 子进程并校验握手；15 秒超时、退出上报、重启；`safeStorage` 加密保存 Key（不可用时拒绝保存，不退回明文）；IPC 只暴露窄接口，runtime 端口与 token 不下发渲染层；把 SSE 帧转成 `chat:event`。
+- **渲染层**：文字按 token 落进气泡；reasoning 收进默认折叠的「思考过程」；文字与工具卡按发生顺序排列；生成中显示静态光标与「停止」，结束后回到「发送」；设置页可选服务商/模型/自定义端点、保存或清除 Key，已保存的 Key 不回显。
+- **G7 M2 端到端**：真启动生产入口，等 runtime 握手，打开设置页验证 Key 不回显，再写入一个哨兵 Key 并核对磁盘上只有 `safeStorage` 密文、没有明文（安全存储不可用的平台则必须明确拒绝且不落盘），最后发一句话，断言文字含模板总数、工具卡状态走到 ok、流结束后按钮复位；对话截图单独落盘 `screenshots/conversation.png`。G7 的 27 条断言在本机 Windows 上全过。
+- **G6b 收紧**：断言下限抬到 27，并点名六条关键断言（runtime 就绪、中文真字形、工具卡完成、回复含模板总数、设置页打开、Key 落盘策略）；重复断言名也判失败。自测从 9 条扩到 11 条，新增「删掉关键断言再补满条数」与「detail 不再证明离线演示」两种坏结果。
+- **CI**：gates job 增加 G4 正反两条；window-smoke job 增加 `setup-python`（通道只用标准库，不装 matplotlib）。
+- **文档** `docs/providers.md`：预设与模型名、Key 的落盘位置与边界、自定义端点规则、离线演示开关、已验证/未验证清单、故障排查。
+
+### 变更
+
+- 发送按钮的 G7 判据从「按事实禁用」改为「runtime 就绪后可用」——M0/M1 没有子进程，禁用是对的；M2 起必须证明它真的能用。
+- G7 在测试进程里设置 `MMS_FAKE_PROVIDER=1`，并把 Electron `userData` 指到临时目录：否则开发机上已保存的 provider 会改变默认选中项，测试结果不稳定。
+- 版本 `0.1.0 → 0.2.0`。
+
+### 验证（本机 Windows，2026-10-20）
+
+- `npm run gate` 全绿：G4 32/32、G5 反向 7/7、G6b 自测 11/11、G7 27/27（内容尺寸 1440x900，非白像素 2.90%，对话截图 4.49%）。
+- 对话链路真跑过：用户消息 → reasoning → `list_templates` running/ok → 「共 25 个模板」正文 → done；按钮从「停止」回到「发送」。
+- 设置页在离线演示下列出四个条目（含 DeepSeek/Kimi/自定义），切到 DeepSeek 时 Key 输入框为空且 placeholder 不含密钥样式字符串。
+- 哨兵 Key 经 UI 保存后：`settings.json` 存在、含 `key` 密文字段、不含哨兵明文；随后切回离线演示，没有带着这个假 Key 发请求。安全存储不可用的分支写成了「明确拒绝且不落盘」，但本机 Windows 只跑到可用分支。
+
+### 尚未做
+
+- **没有用真实 DeepSeek/Kimi Key 跑过联网对话**。本仓库不含 Key，CI 也不调真实服务；已验证的是 OpenAI 兼容协议与整条本机链路，不是两家服务的当下行为。
+- `interrupt` / `gate` / `artifact` 事件已有契约与转发，但还没有对应的界面卡片；选模卡在 M3。
+- 工具只有 `list_templates`；出图、论文等工具要到后续里程碑按需接。
+- Windows CI 仍不真起窗；M2 的 Windows 证据来自本机。
+- 便携 Python 与 `docs/env-setup.md` 英文版仍未做。
+
 ## 0.1.0 - 2026-10-20
 
 M1 技能落地。目标是不接模型也能「列模板、渲一张图、跑一次门禁」。

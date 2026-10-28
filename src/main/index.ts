@@ -1,8 +1,173 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
+import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
+import type { ChatStartInput, ProviderList, ProviderView } from '../shared/api'
+import {
+  activeProviderId,
+  apiKeyFor,
+  clearProviderKey,
+  publicProviders,
+  saveProvider,
+  type SaveProviderInput
+} from './settings'
 
 // 开发时 electron-vite 会注入 ELECTRON_RENDERER_URL；打包后走 out/renderer/index.html。
 const DEV_SERVER_URL = process.env['ELECTRON_RENDERER_URL']
+const ROOT = process.env['MMS_HOME'] || join(__dirname, '..', '..')
+const channel = new Channel(ROOT)
+const activeStreams = new Map<string, AbortController>()
+
+type ChatInput = ChatStartInput
+
+function broadcastStatus(status: RuntimeStatus): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('runtime:status', status)
+  }
+}
+
+channel.onStatus(broadcastStatus)
+
+async function providerViews(): Promise<ProviderList> {
+  const { providers, fake } = await channel.providers()
+  const saved = publicProviders()
+  const views: ProviderView[] = providers.map((row: ProviderRow) => {
+    const isFake = row.id === 'fake'
+    const stored = saved[row.id]
+    const models = row.models ?? []
+    return {
+      id: row.id,
+      display: row.display,
+      models,
+      model: stored?.model || models[0] || '',
+      baseUrl: stored?.baseUrl || row.base_url || '',
+      requiresKey: !isFake && row.requires_key !== false,
+      toolCalling: Boolean(row.tool_calling),
+      custom: Boolean(row.custom),
+      configured: isFake || Boolean(stored?.configured),
+      note: row.note
+    }
+  })
+  const preferred = activeProviderId()
+  const active =
+    views.find((v) => v.id === preferred) ??
+    views.find((v) => v.configured) ??
+    views.find((v) => v.id === 'fake') ??
+    views[0]
+  return { ok: true, providers: views, activeProvider: active?.id ?? '', fake }
+}
+
+function parseSaveInput(raw: unknown): SaveProviderInput {
+  if (!raw || typeof raw !== 'object') throw new Error('设置格式不对')
+  const obj = raw as Record<string, unknown>
+  const id = typeof obj.id === 'string' ? obj.id.trim() : ''
+  const model = typeof obj.model === 'string' ? obj.model.trim() : ''
+  if (!id) throw new Error('缺少 provider')
+  if (!model) throw new Error('缺少模型名')
+  return {
+    id,
+    model,
+    apiKey: typeof obj.apiKey === 'string' ? obj.apiKey : undefined,
+    baseUrl: typeof obj.baseUrl === 'string' ? obj.baseUrl : undefined
+  }
+}
+
+function parseChatInput(raw: unknown): ChatInput {
+  if (!raw || typeof raw !== 'object') throw new Error('对话请求格式不对')
+  const obj = raw as Record<string, unknown>
+  const providerId = typeof obj.providerId === 'string' ? obj.providerId : ''
+  const model = typeof obj.model === 'string' ? obj.model.trim() : ''
+  const list = obj.messages
+  if (!providerId) throw new Error('没有选择服务商')
+  if (!Array.isArray(list) || list.length === 0) throw new Error('消息为空')
+  if (list.length > 64) throw new Error('消息过多')
+  const messages: ChatInput['messages'] = []
+  let total = 0
+  for (const item of list) {
+    if (!item || typeof item !== 'object') throw new Error('消息格式不对')
+    const m = item as Record<string, unknown>
+    if (m.role !== 'user' && m.role !== 'assistant') throw new Error('消息角色不合法')
+    if (typeof m.content !== 'string') throw new Error('消息内容必须是文本')
+    total += m.content.length
+    if (total > 200_000) throw new Error('消息总长度超过上限')
+    messages.push({ role: m.role, content: m.content })
+  }
+  return { providerId, model, messages }
+}
+
+ipcMain.handle('app:meta', () => ({
+  version: app.getVersion(),
+  platform: process.platform,
+  Electron: process.versions.electron,
+  chrome: process.versions.chrome
+}))
+
+ipcMain.handle('runtime:status', () => channel.current())
+
+ipcMain.handle('runtime:restart', async () => {
+  await channel.restart()
+  return providerViews()
+})
+
+ipcMain.handle('providers:list', () => providerViews())
+
+ipcMain.handle('providers:save', async (_event, raw: unknown) => {
+  saveProvider(parseSaveInput(raw))
+  return providerViews()
+})
+
+ipcMain.handle('providers:clear', async (_event, raw: unknown) => {
+  const id = typeof raw === 'string' ? raw : ''
+  if (!id) throw new Error('缺少 provider')
+  clearProviderKey(id)
+  return providerViews()
+})
+
+ipcMain.handle('chat:start', async (event, raw: unknown) => {
+  const input = parseChatInput(raw)
+  const list = await providerViews()
+  const view = list.providers.find((p) => p.id === input.providerId)
+  if (!view) throw new Error('未知服务商')
+  if (view.custom && !view.baseUrl) throw new Error('自定义端点还没填 base URL')
+  const apiKey = view.id === 'fake' ? '' : apiKeyFor(view.id)
+  if (view.requiresKey && !apiKey) throw new Error('还没配置 API Key')
+
+  const chatId = await channel.startChat({
+    providerId: view.id,
+    model: input.model || view.model,
+    apiKey,
+    baseUrl: view.custom ? view.baseUrl : undefined,
+    messages: input.messages
+  })
+  const controller = new AbortController()
+  activeStreams.set(chatId, controller)
+  const sender = event.sender
+  void channel
+    .stream(
+      chatId,
+      (ev: ChatEventPayload) => {
+        if (!sender.isDestroyed()) sender.send('chat:event', { chatId, ...ev })
+      },
+      controller.signal
+    )
+    .catch((err: unknown) => {
+      if (controller.signal.aborted || sender.isDestroyed()) return
+      const message = err instanceof Error ? err.message : String(err)
+      sender.send('chat:event', { chatId, id: '0', event: 'error', data: { message } })
+      sender.send('chat:event', { chatId, id: '0', event: 'done', data: { reason: 'error' } })
+    })
+    .finally(() => activeStreams.delete(chatId))
+  return { ok: true, chatId }
+})
+
+ipcMain.handle('chat:cancel', async (_event, raw: unknown) => {
+  const chatId = typeof raw === 'string' ? raw : ''
+  if (!chatId) throw new Error('缺少 chatId')
+  await channel.cancel(chatId)
+  // provider 正在等下一块数据时，cancel 只能等它醒来；2 秒后断开本地流兜底。
+  const controller = activeStreams.get(chatId)
+  if (controller) setTimeout(() => controller.abort(), 2000)
+  return { ok: true }
+})
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -50,18 +215,20 @@ app.on('web-contents-created', (_event, contents) => {
   })
 })
 
-ipcMain.handle('app:meta', () => ({
-  version: app.getVersion(),
-  platform: process.platform,
-  Electron: process.versions.electron,
-  chrome: process.versions.chrome
-}))
-
 app.whenReady().then(() => {
+  void channel.start().catch((err: unknown) => {
+    console.error('[runtime] 启动失败:', err instanceof Error ? err.message : err)
+  })
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('will-quit', () => {
+  for (const controller of activeStreams.values()) controller.abort()
+  activeStreams.clear()
+  channel.stop()
 })
 
 app.on('window-all-closed', () => {

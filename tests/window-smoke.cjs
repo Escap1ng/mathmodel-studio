@@ -1,24 +1,29 @@
 /**
- * G7 · 真启动冒烟
+ * G7 · 真启动冒烟（M2：含离线 provider 的流式对话与工具卡）
  *
  * 关键取舍：本脚本不自己建窗口，而是 require 生产入口 out/main/index.js，
- * 让它按 src/main/index.ts 的窗口配置、preload 路径、IPC 注册与导航守卫起窗。
+ * 让它按 src/main/index.ts 的窗口配置、preload 路径、IPC 注册、runtime 子进程与导航守卫起窗。
  * 上一版自建窗口，结果 app:meta 报 No handler registered ——那验的是脚手架，不是产品。
  *
- * 断言五组互相独立的事：
+ * 断言七组互相独立的事：
  *   1 生产入口建出了窗口，且加载的是构建产物（file:// 下的 out/renderer/index.html）
  *   2 内容尺寸 = 设计基准 1440x900（useContentSize 让这条在各平台可比）
  *   3 画面真的画出来了：按 BGRA 统计非白像素 ≥1%——空白截图也算「窗口起来了」，那是假绿
- *   4 preload + IPC 端到端：状态栏文本由主进程应答渲染出来（在 sandbox: true 下）
- *   5 结构与交互：阶段轨道 7 节、工作台 6 标签、发送按钮按事实禁用、点色块真的换掉 --accent
+ *   4 preload + IPC 端到端：状态栏与 runtime 握手结果由主进程应答渲染出来（在 sandbox: true 下）
+ *   5 结构与交互：阶段轨道 7 节、工作台 6 标签、runtime 就绪后输入区可用、点色块换 --accent
  *   6 中文按真字形渲染——用「国」与空心框「□」的墨量比值区分；像素总量和
  *     document.fonts.check 都分不清字与方框，上一轮的豆腐块截图就是这么混过去的
+ *   7 M2 闭环：本机 SSE 事件真的把文字流进气泡、list_templates 工具卡走到完成、设置页不回显 Key
  *
- * 仍未覆盖：需要 LLM 与 runtime 的行为（M2 起）；沙箱之外的 CSP 违规场景。
+ * 假 provider 只在本脚本进程里打开（MMS_FAKE_PROVIDER=1），不联网、不需要 Key；
+ * 真实 DeepSeek/Kimi 需要用户自己的 Key，不能在这里代跑。
+ * userData 指到临时目录，避免开发机上已有的 settings.json 改变默认选中项。
+ *
  * 退出码：0 全部通过 / 1 任一断言失败 / 2 环境错误（没有构建产物或窗口没起来）
  */
-const { app, BrowserWindow } = require('electron')
-const { existsSync, mkdirSync, writeFileSync } = require('node:fs')
+const { app, BrowserWindow, safeStorage } = require('electron')
+const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
+const { tmpdir } = require('node:os')
 const { join } = require('node:path')
 
 const OUT_DIR = process.env.SMOKE_OUT || 'screenshots'
@@ -26,6 +31,13 @@ const MIN_INK_RATIO = 0.01
 const results = []
 const record = (name, ok, detail) => results.push({ name, ok, detail })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// 必须在 require 生产入口之前：主进程会在 whenReady 后按这份环境变量拉起 Python。
+process.env.MMS_FAKE_PROVIDER = '1'
+process.env.MMS_FAKE_DELAY_MS = process.env.MMS_FAKE_DELAY_MS || '20'
+
+const userDataDir = mkdtempSync(join(tmpdir(), 'mms-g7-userdata-'))
+app.setPath('userData', userDataDir)
 
 app.commandLine.appendSwitch('disable-dev-shm-usage')
 app.disableHardwareAcceleration()
@@ -55,11 +67,34 @@ async function waitLoaded(win, ms) {
   throw new Error(`${ms}ms 内页面没有加载完成`)
 }
 
+async function waitFor(win, expression, ms) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < ms) {
+    try {
+      if (await win.webContents.executeJavaScript(expression)) return true
+    } catch {
+      /* 页面还在加载 */
+    }
+    await sleep(100)
+  }
+  return false
+}
+
+function measureInk(image) {
+  const bmp = image.toBitmap() // BGRA
+  let ink = 0
+  for (let i = 0; i + 3 < bmp.length; i += 4) {
+    if (bmp[i + 2] < 250 || bmp[i + 1] < 250 || bmp[i] < 250) ink++
+  }
+  const total = Math.floor(bmp.length / 4)
+  return { ink, total, ratio: total > 0 ? ink / total : 0 }
+}
+
 async function main() {
   const distMain = join(__dirname, '..', 'out', 'main', 'index.js')
   if (!existsSync(distMain)) envFail('没有 out/main/index.js，先跑 npm run build')
 
-  // 直接加载生产入口：窗口配置、preload 路径、ipcMain.handle、导航守卫都走它那一份
+  // 直接加载生产入口：窗口配置、preload 路径、ipcMain.handle、runtime 子进程都走它那一份
   require(distMain)
 
   const win = await firstWindow(20000)
@@ -78,15 +113,13 @@ async function main() {
 
   const img = await win.webContents.capturePage()
   const { width: iw, height: ih } = img.getSize()
-  const bmp = img.toBitmap() // BGRA
-  let ink = 0
-  for (let i = 0; i + 3 < bmp.length; i += 4) {
-    if (bmp[i + 2] < 250 || bmp[i + 1] < 250 || bmp[i] < 250) ink++
-  }
-  const totalPx = Math.floor(bmp.length / 4)
-  const ratio = totalPx > 0 ? ink / totalPx : 0
-  record('G7-2 截图面非空', iw > 0 && ih > 0 && bmp.length >= iw * ih * 4, `捕获 ${iw}x${ih}，位图 ${bmp.length} B`)
-  record('G7-2 画面非空白', ratio >= MIN_INK_RATIO, `非白像素 ${ink} / ${totalPx} = ${(ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`)
+  const shot = measureInk(img)
+  record('G7-2 截图面非空', iw > 0 && ih > 0 && img.toBitmap().length >= iw * ih * 4, `捕获 ${iw}x${ih}`)
+  record(
+    'G7-2 画面非空白',
+    shot.ratio >= MIN_INK_RATIO,
+    `非白像素 ${shot.ink} / ${shot.total} = ${(shot.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
+  )
 
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
   const pngBuf = img.toPNG()
@@ -94,12 +127,22 @@ async function main() {
   writeFileSync(pngPath, pngBuf)
   console.log(`截图: ${pngPath} (${(pngBuf.length / 1024).toFixed(1)} KB)`)
 
+  // runtime 由主进程在 whenReady 里拉起，握手完成后状态栏才会变。等它，而不是固定睡一段时间。
+  const ready = await waitFor(
+    win,
+    `(document.querySelector('.statusbar')?.textContent || '').includes('runtime 已连接')`,
+    20000
+  )
+
   const dom = await win.webContents.executeJavaScript(`({
     statusbar: document.querySelector('.statusbar')?.textContent ?? '',
     phases: document.querySelectorAll('.phase').length,
     tabs: document.querySelectorAll('.tab').length,
     accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
     sendDisabled: document.querySelector('.pill--send')?.disabled ?? null,
+    sendText: document.querySelector('.pill--send')?.textContent?.trim() ?? '',
+    inputDisabled: document.querySelector('.composer__input')?.disabled ?? null,
+    modelPill: document.querySelector('.pill--model')?.textContent?.trim() ?? '',
     bg: getComputedStyle(document.body).backgroundColor
   })`)
 
@@ -110,14 +153,30 @@ async function main() {
     ipc && ipc.Electron === process.versions.electron && ipc.platform === process.platform,
     `页面收到 ${JSON.stringify(ipc)} / 主进程实际 electron ${process.versions.electron}、platform ${process.platform}`
   )
-  // 状态栏里的版本由主进程应答渲染出来；这里只校验形状：
-  // 用 `electron <脚本>` 启动时 app 清单是 Electron 自带的 default_app，app.getVersion() 返回的是 Electron 版本，
-  // 打包成安装版后它才会是我们 package.json 的 0.0.1，所以不能把断言写死成 v0.0.1。
   const shownVersion = String(dom.statusbar).match(/v(\d+\.\d+\.\d+)/)
-  record('G7-3 状态栏渲染出主进程版本号', shownVersion !== null, `状态栏: ${JSON.stringify(String(dom.statusbar).trim().slice(0, 64))}`)
+  record(
+    'G7-3 状态栏渲染出主进程版本号',
+    shownVersion !== null,
+    `状态栏: ${JSON.stringify(String(dom.statusbar).trim().slice(0, 80))}`
+  )
+  record(
+    'G7-3 runtime 通过握手就绪',
+    ready && String(dom.statusbar).includes('离线演示'),
+    `状态栏: ${JSON.stringify(String(dom.statusbar).trim().slice(0, 120))}`
+  )
+  record(
+    'G7-3 离线演示 provider 自动选中',
+    dom.modelPill.includes('离线演示') && dom.modelPill.includes('fake-stream'),
+    `模型条: ${JSON.stringify(dom.modelPill)}`
+  )
+
   record('G7-4 阶段轨道 7 节', dom.phases === 7, `实得 ${dom.phases}`)
   record('G7-4 工作台 6 个标签', dom.tabs === 6, `实得 ${dom.tabs}`)
-  record('G7-4 输入区按事实禁用', dom.sendDisabled === true, `发送按钮 disabled=${dom.sendDisabled}`)
+  record(
+    'G7-4 输入区在 runtime 就绪后可用',
+    ready && dom.sendDisabled === false && dom.inputDisabled === false,
+    `发送 disabled=${dom.sendDisabled}，输入 disabled=${dom.inputDisabled}`
+  )
   record('G7-4 底色为白', dom.bg === 'rgb(255, 255, 255)', `实得 ${dom.bg}`)
   record('G7-4 默认强调色 = A 墨青', dom.accent.toLowerCase() === '#17494d', `实得 ${dom.accent}`)
 
@@ -128,10 +187,9 @@ async function main() {
   )
   record('G7-4 切到 B 案靛蓝生效', accentB.toLowerCase() === '#2b4c7e', `实得 ${accentB}`)
 
-  // 中文字体可用性。上一版这里用 document.fonts.check(具名族)，实测五个族名全部「命中」，
-  // 包括 runner 上根本没装的 Microsoft YaHei 与 PingFang SC——Chromium 在有回退字体时对任何族名都返回 true，
-  // 那条断言是假保证。改成能双向区分的度量：把笔画复杂的「国」与空心框「□」画进 canvas 比墨量。
-  // 缺中文字体时「国」就渲染成方框，两者墨量接近、比值≈1；有中文字体时「国」的墨量远高于方框。
+  // 中文字体可用性。不能再用 document.fonts.check(具名族)：
+  // Chromium 在有回退字体时对任何族名都返回 true，包括根本没装的族。
+  // 改成能双向区分的度量：把笔画复杂的「国」与空心框「□」画进 canvas 比墨量。
   const glyph = await win.webContents.executeJavaScript(`(() => {
     const stack = getComputedStyle(document.documentElement).getPropertyValue('--font-cjk')
     const density = (ch) => {
@@ -167,6 +225,183 @@ async function main() {
   )
   record('G7-5 中文探针有实际占位', glyph.width > 40, `「国赛建模」13.5px 宽 ${glyph.width}`)
 
+  // —— M2：设置页不回显 Key ——
+  await win.webContents.executeJavaScript(`document.querySelector('.pill--model')?.click()`)
+  await sleep(250)
+  const settings = await win.webContents.executeJavaScript(`({
+    open: !!document.querySelector('.settings[role="dialog"]'),
+    chips: [...document.querySelectorAll('.provider-chip')].map((b) => b.textContent.trim()),
+    hasKeyField: !!document.querySelector('.settings input[type="password"]')
+  })`)
+  record(
+    'G7-6 设置对话框打开并列出服务商',
+    settings.open && settings.chips.length >= 4 && settings.chips.some((c) => c.includes('离线演示')),
+    `chips=${JSON.stringify(settings.chips)}`
+  )
+  writeFileSync(join(OUT_DIR, 'settings.png'), (await win.webContents.capturePage()).toPNG())
+
+  await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.provider-chip')].find((b) => b.textContent.includes('DeepSeek'))?.click()`
+  )
+  await sleep(150)
+  const keyEcho = await win.webContents.executeJavaScript(`(() => {
+    const input = document.querySelector('.settings input[type="password"]')
+    return input ? { present: true, value: input.value, placeholder: input.placeholder } : { present: false }
+  })()`)
+  record(
+    'G7-6 设置页不回显已保存的 Key',
+    keyEcho.present === true && keyEcho.value === '' && !/sk-|Bearer/.test(keyEcho.placeholder || ''),
+    `password input ${JSON.stringify(keyEcho)}`
+  )
+
+  // 真实走一遍 safeStorage：写一个哨兵 Key，再读回磁盘，只允许看到密文字段。
+  // 安全存储不可用的平台（无 Secret Service 的 Linux）必须明确拒绝，且不得落盘。
+  const sentinel = 'sk-g7-SENTINEL-NOT-A-REAL-KEY'
+  await win.webContents.executeJavaScript(`(() => {
+    const input = document.querySelector('.settings input[type="password"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    setter.call(input, ${JSON.stringify(sentinel)})
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return input.value.length
+  })()`)
+  await sleep(120)
+  await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.settings .btn')].find((b) => b.textContent.trim() === '保存')?.click()`
+  )
+  await sleep(400)
+
+  const encryptionAvailable = safeStorage.isEncryptionAvailable()
+  const settingsPath = join(userDataDir, 'settings.json')
+  let disk = { exists: false, hasPlain: false, hasKey: false }
+  try {
+    const raw = readFileSync(settingsPath, 'utf8')
+    disk = {
+      exists: true,
+      hasPlain: raw.includes(sentinel),
+      hasKey: /"key"\s*:\s*"[A-Za-z0-9+/=]{16,}"/.test(raw)
+    }
+  } catch {
+    /* 拒绝保存时文件可能根本不存在 */
+  }
+  let refused = false
+  if (!encryptionAvailable) {
+    const err = await win.webContents.executeJavaScript(
+      `document.querySelector('.settings__error')?.textContent ?? ''`
+    )
+    refused = err.includes('安全存储不可用') && !disk.hasKey
+    await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll('.settings .btn')].find((b) => b.textContent.trim() === '取消')?.click()`
+    )
+    await sleep(150)
+  }
+  record(
+    'G7-6 Key 落盘只有密文或明确拒绝',
+    encryptionAvailable
+      ? disk.exists && !disk.hasPlain && disk.hasKey
+      : refused && !disk.exists,
+    `safeStorage 可用=${encryptionAvailable}，文件存在=${disk.exists}，含明文=${disk.hasPlain}，含密文字段=${disk.hasKey}，明确拒绝=${refused}`
+  )
+
+  await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.settings .btn')].find((b) => b.textContent.trim() === '取消')?.click()`
+  )
+  await sleep(200)
+  const closed = await win.webContents.executeJavaScript(`!document.querySelector('.settings')`)
+  record('G7-6 设置对话框可以关闭', closed === true, `关闭后仍存在=${!closed}`)
+
+  // 切回离线演示再对话：上一步把 active provider 指到了 DeepSeek，这里不能带着假 Key 去联网。
+  await win.webContents.executeJavaScript(`document.querySelector('.pill--model')?.click()`)
+  await sleep(250)
+  await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.provider-chip')].find((b) => b.textContent.includes('离线演示'))?.click()`
+  )
+  await sleep(120)
+  await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.settings .btn')].find((b) => b.textContent.trim() === '保存')?.click()`
+  )
+  await sleep(300)
+  const backToFake = await waitFor(
+    win,
+    `!document.querySelector('.settings') && (document.querySelector('.pill--model')?.textContent || '').includes('离线演示')`,
+    5000
+  )
+  if (!backToFake) throw new Error('切回离线演示 provider 失败，拒绝继续以免带着假 Key 联网')
+
+  // —— M2：离线 provider 的流式回复 + 工具卡 ——
+  await win.webContents.executeJavaScript(`(() => {
+    const input = document.querySelector('.composer__input')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(input, '用一句话说明模板清单怎么用。')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return input.value
+  })()`)
+  await sleep(120)
+  await win.webContents.executeJavaScript(`document.querySelector('.pill--send')?.click()`)
+
+  const userVisible = await waitFor(
+    win,
+    `[...document.querySelectorAll('.msg--user')].some((m) => m.textContent.includes('模板清单怎么用'))`,
+    5000
+  )
+  record('G7-5 用户消息进入对话流', userVisible, `找到用户气泡=${userVisible}`)
+
+  const replied = await waitFor(
+    win,
+    `[...document.querySelectorAll('.msg--assistant .msg__text')].some((n) => n.textContent.includes('25 个模板'))`,
+    20000
+  )
+  const toolDone = await waitFor(
+    win,
+    `document.querySelector('.tool-card[data-status="ok"]')?.getAttribute('data-tool') === 'list_templates'`,
+    20000
+  )
+  const finished = await waitFor(win, `!document.querySelector('.pill--stop')`, 20000)
+
+  const chat = await win.webContents.executeJavaScript(`({
+    assistantText: [...document.querySelectorAll('.msg--assistant .msg__text')].map((n) => n.textContent).join('\\n'),
+    thinkOpen: document.querySelector('.think')?.open ?? null,
+    toolText: document.querySelector('.tool-card')?.textContent ?? '',
+    toolStatus: document.querySelector('.tool-card')?.getAttribute('data-status') ?? null,
+    toolName: document.querySelector('.tool-card')?.getAttribute('data-tool') ?? null,
+    cursor: !!document.querySelector('.cursor'),
+    sendText: document.querySelector('.pill--send')?.textContent?.trim() ?? '',
+    sendDisabled: document.querySelector('.pill--send')?.disabled ?? null
+  })`)
+
+  record(
+    'G7-5 思考过程默认折叠',
+    chat.thinkOpen === false,
+    `存在思考块=${chat.thinkOpen !== null}，默认展开=${chat.thinkOpen}`
+  )
+  record(
+    'G7-5 工具卡完成并给出结构化结果',
+    toolDone &&
+      chat.toolStatus === 'ok' &&
+      chat.toolName === 'list_templates' &&
+      chat.toolText.includes('模板清单') &&
+      chat.toolText.includes('25 个模板'),
+    `status=${chat.toolStatus}，卡片文本 ${JSON.stringify(chat.toolText.slice(0, 120))}`
+  )
+  record(
+    'G7-5 回复文本含模板总数',
+    replied && chat.assistantText.includes('25 个模板'),
+    `助手文本 ${JSON.stringify(chat.assistantText.slice(0, 160))}`
+  )
+  record(
+    'G7-5 流结束后回到可发送状态',
+    finished && !chat.cursor && chat.sendText === '发送' && chat.sendDisabled === false,
+    `结束=${finished}，光标=${chat.cursor}，按钮=${JSON.stringify(chat.sendText)} disabled=${chat.sendDisabled}`
+  )
+
+  const convo = await win.webContents.capturePage()
+  const convoShot = measureInk(convo)
+  writeFileSync(join(OUT_DIR, 'conversation.png'), convo.toPNG())
+  record(
+    'G7-5 对话截图非空',
+    convoShot.ratio >= MIN_INK_RATIO,
+    `非白像素 ${(convoShot.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
+  )
+
   // 结论落盘：CI 的通过与否由 scripts/check-window-smoke.mjs 读这份 JSON 判定，
   // 不依赖 Electron 的退出码管道——上一版就是 app.exit(1) 被生产入口的
   // window-all-closed → app.quit() 抢先，10/12 项通过却把 job 跑绿了。
@@ -175,7 +410,7 @@ async function main() {
     total: results.length,
     failed: results.filter((r) => !r.ok).length,
     contentSize: `${w}x${h}`,
-    inkRatio: Number(ratio.toFixed(4)),
+    inkRatio: Number(shot.ratio.toFixed(4)),
     minInkRatio: MIN_INK_RATIO,
     url,
     results: results.map((r) => ({ name: r.name, ok: r.ok, detail: r.detail }))
@@ -192,6 +427,11 @@ app
     console.log(`\n${results.length - failed.length}/${results.length} 项通过`)
     process.exitCode = failed.length === 0 ? 0 : 1
     await sleep(100)
+    try {
+      rmSync(userDataDir, { recursive: true, force: true })
+    } catch {
+      /* 临时目录删不掉不影响结论 */
+    }
     // 不关窗口：关掉会触发生产入口的 window-all-closed → app.quit()，把上面的退出码顶掉
     app.exit(failed.length === 0 ? 0 : 1)
   })
@@ -201,7 +441,16 @@ app
       mkdirSync(OUT_DIR, { recursive: true })
       writeFileSync(
         join(OUT_DIR, 'window-smoke.json'),
-        JSON.stringify({ ok: false, total: results.length, failed: results.length + 1, error: String(err && err.message ? err.message : err) }, null, 2) + '\n'
+        JSON.stringify(
+          {
+            ok: false,
+            total: results.length,
+            failed: results.length + 1,
+            error: String(err && err.message ? err.message : err)
+          },
+          null,
+          2
+        ) + '\n'
       )
     } catch {
       /* 落盘失败时仍然靠非零退出码变红 */

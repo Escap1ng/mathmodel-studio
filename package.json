@@ -1,6 +1,6 @@
 {
   "name": "mathmodel-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "数学建模竞赛桌面 Agent：白底三栏工作台，人在环的选模、解释、门禁与评分",
   "author": "Escap1ng",
@@ -17,12 +17,14 @@
     "check:skills:negative": "node scripts/check-skills.mjs --self",
     "check:contracts": "python scripts/validate_contracts.py",
     "check:cli": "python runtime/selfcheck.py",
+    "check:channel": "python runtime/selfcheck_channel.py",
+    "check:channel:negative": "python runtime/selfcheck_channel.py --selftest",
     "mms": "python runtime/cli.py",
     "smoke:dist": "node scripts/smoke-dist.mjs",
     "smoke:window": "electron tests/window-smoke.cjs",
     "verify:window": "node scripts/check-window-smoke.mjs",
     "verify:window:selftest": "node scripts/check-window-smoke.mjs --selftest",
-    "gate": "npm run check:registry && npm run check:registry:negative && npm run check:skills && npm run check:skills:negative && npm run verify:window:selftest && npm run typecheck && npm run build && npm run smoke:dist && npm run check:contracts && npm run check:cli"
+    "gate": "npm run check:registry && npm run check:registry:negative && npm run check:skills && npm run check:skills:negative && npm run verify:window:selftest && npm run typecheck && npm run build && npm run smoke:dist && npm run check:contracts && npm run check:cli && npm run check:channel && npm run check:channel:negative"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

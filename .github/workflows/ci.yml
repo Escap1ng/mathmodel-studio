@@ -64,8 +64,15 @@ jobs:
         run: node scripts/check-skills.mjs --self
 
       - name: G6b 真启动核验器自测
-        # 不需要真窗口：它自己造 8 份合成结果，验证「ok=true 但读数不对」也会被拒
+        # 不需要真窗口：它自己造 10 份合成结果，验证「ok=true 但读数不对」「关键断言被删」都会红
         run: npm run verify:window:selftest
+
+      - name: G4 通道自检（握手、鉴权、SSE、取消、续传）
+        # 起真 Python 子进程和本地假 OpenAI 端点；不需要窗口、不联网、不需要 Key
+        run: python runtime/selfcheck_channel.py
+
+      - name: G4/G5 反向覆盖（坏事件、Key 泄漏、假 provider 关闭）
+        run: python runtime/selfcheck_channel.py --selftest
 
       - name: G2 契约校验与版本同源
         run: python scripts/validate_contracts.py
@@ -94,6 +101,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: 准备 Python
+        # 主进程用 python3 拉起 runtime/cli.py serve；通道服务器只用标准库。
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: 准备 Node
         uses: actions/setup-node@v4
