@@ -34,6 +34,29 @@ const results = []
 const record = (name, ok, detail) => results.push({ name, ok, detail })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// 最小可用 PDF（含一行 Helvetica 文本），用来验证主进程的 pdfjs 抽取。
+// 交叉引用表按实际偏移生成，不依赖任何外部工具。
+function minimalPdf(text) {
+  const objs = {}
+  objs[1] = '<< /Type /Catalog /Pages 2 0 R >>'
+  objs[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>'
+  objs[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>'
+  objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  const stream = `BT /F1 12 Tf 20 100 Td (${text}) Tj ET`
+  objs[5] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`
+  let out = '%PDF-1.4\n'
+  const offsets = []
+  for (let i = 1; i <= 5; i++) {
+    offsets[i] = out.length
+    out += `${i} 0 obj\n${objs[i]}\nendobj\n`
+  }
+  const xref = out.length
+  out += 'xref\n0 6\n0000000000 65535 f \n'
+  for (let i = 1; i <= 5; i++) out += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`
+  out += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  return Buffer.from(out, 'latin1')
+}
+
 // 必须在 require 生产入口之前：主进程会在 whenReady 后按这份环境变量拉起 Python。
 process.env.MMS_FAKE_PROVIDER = '1'
 process.env.MMS_FAKE_DELAY_MS = process.env.MMS_FAKE_DELAY_MS || '20'
@@ -418,6 +441,45 @@ async function main() {
     `副本还在=${stagedFile ? existsSync(stagedFile.path) : '无副本'}，原文件还在=${existsSync(samplePath)}`
   )
 
+  // —— 附件正文抽取：PDF 走主进程里的 pdfjs，CSV 顺带算出总行数与列数 ——
+  const pdfSrc = join(userDataDir, 'probe.pdf')
+  writeFileSync(pdfSrc, minimalPdf('ATTACH-MARKER-2026'))
+  const csvSrc = join(userDataDir, 'probe.csv')
+  writeFileSync(csvSrc, 'month,sales\n2026-01,120\n2026-02,138\n', 'utf8')
+  const extract = await win.webContents.executeJavaScript(`(async () => {
+    const staged = await window.studio.files.stage([${JSON.stringify(pdfSrc)}, ${JSON.stringify(csvSrc)}])
+    const context = await window.studio.files.context(staged.files.map((f) => f.path))
+    await Promise.all(staged.files.map((f) => window.studio.files.discard(f.path)))
+    return context
+  })()`)
+  const pdfBlock = extract?.blocks?.find((block) => block.name === 'probe.pdf')
+  const csvBlock = extract?.blocks?.find((block) => block.name === 'probe.csv')
+  record(
+    'G7-4 附件正文抽取（PDF/CSV）',
+    Boolean(pdfBlock) &&
+      Boolean(csvBlock) &&
+      pdfBlock.text.includes('ATTACH-MARKER-2026') &&
+      String(pdfBlock.note).includes('1 页') &&
+      csvBlock.text.includes('2026-01,120') &&
+      String(csvBlock.note).includes('2 行 × 2 列'),
+    JSON.stringify({
+      pdf: { note: pdfBlock?.note, text: pdfBlock?.text?.slice(0, 40) },
+      csv: { note: csvBlock?.note, text: csvBlock?.text?.slice(0, 30) }
+    })
+  )
+
+  const outsidePath = join(userDataDir, 'outside.txt')
+  writeFileSync(outsidePath, 'outside workspace\n', 'utf8')
+  const guard = await win.webContents.executeJavaScript(`(async () => {
+    try {
+      await window.studio.files.context([${JSON.stringify(outsidePath)}])
+      return 'allowed'
+    } catch (err) {
+      return String(err && err.message ? err.message : err)
+    }
+  })()`)
+  record('G7-4 只读取工作区附件', String(guard).includes('工作区'), String(guard))
+
   // 中文字体可用性。不能再用 document.fonts.check(具名族)：
   // Chromium 在有回退字体时对任何族名都返回 true，包括根本没装的族。
   // 改成能双向区分的度量：把笔画复杂的「国」与空心框「□」画进 canvas 比墨量。
@@ -564,6 +626,30 @@ async function main() {
   )
   record('G7-7 默认进入建模模式', defaultMode === 'true', `aria-pressed=${defaultMode}`)
 
+  // 把一份 PDF 留在输入区，验证附件跟 K2 一起送给模型
+  const k2Pdf = join(userDataDir, 'k2-problem.pdf')
+  writeFileSync(k2Pdf, minimalPdf('K2-PDF-MARKER-88'))
+  try {
+    const dbg = win.webContents.debugger
+    if (!dbg.isAttached()) dbg.attach('1.3')
+    const point = await win.webContents.executeJavaScript(`(() => {
+      const b = document.querySelector('.dropzone')?.getBoundingClientRect()
+      return b ? { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) } : null
+    })()`)
+    const data = { items: [], files: [k2Pdf], dragOperationsMask: 1 }
+    for (const type of ['dragEnter', 'dragOver', 'drop']) {
+      await dbg.sendCommand('Input.dispatchDragEvent', { type, x: point.x, y: point.y, data })
+    }
+    await waitFor(
+      win,
+      `[...document.querySelectorAll('.file-chip__name')].some((n) => n.textContent === 'k2-problem.pdf')`,
+      6000
+    )
+    dbg.detach()
+  } catch (err) {
+    console.log(`[附件预置失败] ${err instanceof Error ? err.message : String(err)}`)
+  }
+
   const problem = '问题1 预测未来三个月的销量。\n问题2 给出补货建议。'
   await win.webContents.executeJavaScript(`(() => {
     const input = document.querySelector('.composer__input')
@@ -595,6 +681,45 @@ async function main() {
     'G7-7 阶段 1 停在等你确认',
     k2.phase1 === 'waiting',
     `阶段 1 状态=${k2.phase1}`
+  )
+
+  const k2Attach = await win.webContents.executeJavaScript(`({
+    chips: [...document.querySelectorAll('.msg--user .file-chip__name')].map((n) => n.textContent),
+    userText: document.querySelector('.msg--user .msg__text')?.textContent ?? '',
+    cardText: document.querySelector('.decision[data-card="problem-confirm"]')?.textContent ?? ''
+  })`)
+  const k2Stored = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  const storedProblem = String(k2Stored?.session?.problem ?? '')
+  const attachShot = await win.webContents.capturePage()
+  writeFileSync(join(OUT_DIR, 'attachments.png'), attachShot.toPNG())
+  record(
+    'G7-7 附件随消息送给模型',
+    k2Attach.chips.includes('k2-problem.pdf') &&
+      k2Attach.userText.includes('问题1 预测未来三个月的销量') &&
+      !k2Attach.userText.includes('K2-PDF-MARKER') &&
+      k2Attach.cardText.includes('附件：1 个') &&
+      storedProblem.includes('K2-PDF-MARKER-88'),
+    `chips=${JSON.stringify(k2Attach.chips)}，卡片含附件=${k2Attach.cardText.includes('附件：1 个')}，题面含正文=${storedProblem.includes('K2-PDF-MARKER-88')}`
+  )
+
+  // 刷新页面（等价关窗重开）后：附件胶囊要还原，正文不能铺进气泡。
+  await win.webContents.reload()
+  const restoredK2 = await waitFor(
+    win,
+    `!!document.querySelector('.decision[data-card="problem-confirm"]')`,
+    20000
+  )
+  const restoredMsg = await win.webContents.executeJavaScript(`({
+    chips: [...document.querySelectorAll('.msg--user .file-chip__name')].map((n) => n.textContent),
+    userText: document.querySelector('.msg--user .msg__text')?.textContent ?? ''
+  })`)
+  record(
+    'G7-7 重开后附件还原且不铺正文',
+    restoredK2 &&
+      restoredMsg.chips.includes('k2-problem.pdf') &&
+      restoredMsg.userText.includes('问题1 预测未来三个月的销量') &&
+      !restoredMsg.userText.includes('K2-PDF-MARKER'),
+    JSON.stringify(restoredMsg)
   )
   record(
     'G7-7 待决时建模发送禁用',

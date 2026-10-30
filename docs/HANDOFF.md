@@ -7,7 +7,7 @@
 
 M5 论文页：右栏「论文」能真跑 **xelatex 两遍 → pandoc 转 DOCX → Word 版式微调 → 去 AI 措辞 / 结构指标 / 章节结构三道门禁**，并用 pdf.js 做页级预览。本机演示稿真编 7 页（PDF 284 KB、DOCX 151 KB），三道门禁全绿；门禁条变成图表 / 评分 / 章节 / 论文排版四项。
 **论文构建是工作台动作，不是阶段机的第五阶段**：阶段五不会因构建成功自动标为已过，K1 环境预检卡也没接；编译的是仓库里的演示稿，不会替你写正文。里程碑见 [../PLAN.md](../PLAN.md) §7。
-**附件拖放只做暂存**：文件复制到工作区（默认桌面「赛题」），右栏「文件」页可查看与切换工作区；不解析、不随消息发送，解析留到下一步。
+**附件随消息送入模型**：文件复制到工作区（默认桌面「赛题」），发送前主进程抽正文（PDF 走 pdfjs、文本/CSV 直读并报行列），界面只显示胶囊；数据角色核对（目标列是否为空、行数、时间范围）仍未接入。
 
 三句必须保留的限制：
 
@@ -43,7 +43,7 @@ python runtime/selfcheck_paper.py               # 10/10 条论文断言（真编
 需要显示器的部分：
 
 ```bash
-npm run smoke:window   # 真起窗口，74/74，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png、figure.png、score.png、paper.png、dropzone.png、files.png
+npm run smoke:window   # 真起窗口，78/78，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png、figure.png、score.png、paper.png、dropzone.png、files.png、attachments.png
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
 
@@ -69,7 +69,7 @@ gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
 | 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消 | `selfcheck_channel.py` 46/46（本机 Windows） | 强（本机） |
 | 编排闭环：K2→K3→换一批→选择→阶段四 | 同上的 C12，事件与快照双向核对 | 强（本机） |
 | 跨进程恢复：换一个服务器进程仍停在 K2 | 同上的 C13 | 强（本机） |
-| 界面端到端：74 条，含论文构建、预览、可拖拽布局、附件拖放与工作区文件页 | G7 74/74，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
+| 界面端到端：78 条，含论文构建、预览、可拖拽布局、附件拖放与正文送入、工作区文件页 | G7 78/78，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
 | 图表工作台：真渲两版、换主题、并排 diff、回滚 | G9 W2–W4；G7 工作台段 | 强（本机） |
 | 评分卡：三轮、五维、扣分定位、熔断、一票否决 | G9 W6；G7 评分段；演示数据 | 强（演示数据，非真实论文） |
 | 论文排版：xelatex 两遍、pandoc DOCX、Word 后处理 | G10 P2/P3/P5；G7-9；本机真编 7 页 | 强（演示稿） |
@@ -128,7 +128,7 @@ M5 新增：
 3. 三道门禁按 JSON 解析成门禁条；缺件、坏稿、坏 TeX、缺稿件都有反向覆盖。
 4. 通道 `/workbench/paper/build`、`paper` 状态、门禁条第四项；主进程下发 PDF data URL，渲染层不碰路径。
 5. 论文页：构建按钮、步骤、门禁、日志、pdf.js 预览。
-6. G10 10 条、G7 74 条、G6b 下限 74 与 37 条关键断言；CI 装 TeX/pandoc。
+6. G10 10 条、G7 78 条、G6b 下限 78 与 41 条关键断言；CI 装 TeX/pandoc。
 7. 文档：README/README_EN、CHANGELOG 0.5.0、HANDOFF、env-setup。
 
 仍欠：
@@ -202,7 +202,7 @@ src/renderer/src/
   lib/phases.ts             阶段名与状态文案
   styles/workbench.css      M4 工作台与 M5 论文页样式
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
-tests/window-smoke.cjs      真启动断言（74 条）+ 截图与 JSON 结论
+tests/window-smoke.cjs      真启动断言（78 条）+ 截图与 JSON 结论
 .github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu，装图表与排版依赖）
 ```
 

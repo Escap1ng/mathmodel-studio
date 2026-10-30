@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 74
+const MIN_ASSERTIONS = 78
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -29,6 +29,8 @@ const REQUIRED_ASSERTIONS = [
   'G7-3 runtime 通过握手就绪',
   'G7-4 空状态大框与加号居中',
   'G7-4 拖入文件时大框高亮',
+  'G7-4 附件正文抽取（PDF/CSV）',
+  'G7-4 只读取工作区附件',
   'G7-4 附件暂存到工作区',
   'G7-4 真拖放走完暂存与移除',
   'G7-4 文件页列出工作区文件',
@@ -41,6 +43,8 @@ const REQUIRED_ASSERTIONS = [
   'G7-6 Key 落盘只有密文或明确拒绝',
   'G7-7 K2 卡切出两个子问题',
   'G7-7 解释抽屉打开不清除待选',
+  'G7-7 附件随消息送给模型',
+  'G7-7 重开后附件还原且不铺正文',
   'G7-7 runtime 重启后仍停在 K3',
   'G7-7 选择后阶段 4 进入且待决清空',
   'G7-8 工作台渲染出首版图表',

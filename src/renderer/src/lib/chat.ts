@@ -1,4 +1,5 @@
 import type { ChatEvent, InterruptCard } from '../../../shared/api'
+import type { AttachmentRef } from './attachments'
 
 // 一条助手回复由若干段组成：文字与工具卡按发生顺序排列，
 // 这样「先说一句 → 调工具 → 再总结」在界面上不会被打乱成两段。
@@ -25,6 +26,10 @@ export interface ChatEntry {
   error?: string
   doneReason?: string
   interrupt?: InterruptCard
+  /** 随这条消息发送的附件；只用于显示与恢复，不参与渲染正文。 */
+  attachments?: AttachmentRef[]
+  /** 送给模型的全文（含附件正文）；历史重放用它，不用界面上显示的那段。 */
+  context?: string
 }
 
 /** 送给模型的助手文本：只保留文字段，工具卡本身由 runtime 的历史负责。 */
