@@ -212,6 +212,7 @@ button {
 
 /* —— 中栏：对话流 —— */
 .chat {
+  position: relative;
   grid-row: 1;
   grid-column: 2;
   display: flex;
@@ -352,16 +353,23 @@ button {
 }
 
 .dropzone__files {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
   max-width: 100%;
   max-height: 128px;
   overflow: auto;
-  margin: 12px 0 0;
+  margin-top: 12px;
+}
+
+.file-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.dropzone__files .file-chips {
+  justify-content: center;
 }
 
 .dropzone > .dropzone__files,
@@ -508,6 +516,12 @@ button {
 .msg--user {
   align-self: flex-end;
   max-width: 84%;
+}
+
+.msg__files {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 
 .msg--user .msg__text {
@@ -700,6 +714,22 @@ button {
   font-size: 12.5px;
 }
 
+/* 已有对话时拖文件进来：整列铺一层虚线遮罩，松手即添加。 */
+.chat__droplayer {
+  position: absolute;
+  inset: 10px 14px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-cjk);
+  font-size: 14px;
+  pointer-events: none;
+}
+
 .chat__composer {
   position: relative;
   border-top: 1px solid var(--line);
@@ -729,6 +759,40 @@ button {
   padding: 12px 14px;
   display: grid;
   gap: 10px;
+}
+
+.composer__attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-height: 88px;
+  overflow: auto;
+}
+
+.composer__add {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-cjk);
+  font-size: 11.5px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: border-color var(--t), color var(--t);
+}
+
+.composer__add:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.composer__add:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .composer__input {

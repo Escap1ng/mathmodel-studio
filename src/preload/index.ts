@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import type {
+  AttachmentContext,
   ChatEvent,
   ChatStartInput,
   ChatStartResult,
@@ -56,6 +57,7 @@ const studioApi = {
     pick: (): Promise<StageResult | null> => ipcRenderer.invoke('files:pick'),
     stage: (paths: string[]): Promise<StageResult> => ipcRenderer.invoke('files:stage', paths),
     discard: (path: string): Promise<void> => ipcRenderer.invoke('files:discard', path),
+    context: (paths: string[]): Promise<AttachmentContext> => ipcRenderer.invoke('files:context', paths),
     reveal: (): Promise<void> => ipcRenderer.invoke('files:reveal'),
     // 沙箱渲染层拿不到 File.path，路径只能由 preload 里的 webUtils 换出来。
     pathFor: (file: File): string => webUtils.getPathForFile(file)

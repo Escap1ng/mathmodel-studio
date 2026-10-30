@@ -1,6 +1,6 @@
 {
   "name": "mathmodel-studio",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "数学建模竞赛桌面 Agent：白底三栏工作台，人在环的选模、解释、门禁与评分",
   "author": "Escap1ng",

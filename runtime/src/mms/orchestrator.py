@@ -299,6 +299,51 @@ def split_questions(problem: str) -> list[str]:
     return [p[:180] for p in parts[:6]]
 
 
+# 渲染层把附件正文包在这对标记里送进来；题目切分只用标记外的手打文字。
+ATTACH_START = "--- 附件（本机文件）---"
+ATTACH_END = "--- 附件结束 ---"
+
+
+def _attachment_region(problem: str) -> str:
+    start = problem.find(ATTACH_START)
+    if start < 0:
+        return ""
+    end = problem.find(ATTACH_END, start + len(ATTACH_START))
+    begin = start + len(ATTACH_START)
+    return problem[begin:] if end < 0 else problem[begin:end]
+
+
+def attachment_names(problem: str) -> list[str]:
+    names: list[str] = []
+    for line in _attachment_region(problem).splitlines():
+        line = line.strip()
+        if not line.startswith("### "):
+            continue
+        name = line[4:].split(" · ", 1)[0].strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def strip_attachments(problem: str) -> str:
+    start = problem.find(ATTACH_START)
+    if start < 0:
+        return problem.strip()
+    end = problem.find(ATTACH_END, start + len(ATTACH_START))
+    head = problem[:start].strip()
+    tail = "" if end < 0 else problem[end + len(ATTACH_END):].strip()
+    return (head + ("\n" + tail if tail else "")).strip()
+
+
+def question_source(problem: str) -> str:
+    # 只拖了文件、没手打题面时，题面就在附件正文里；此时用正文切子问题。
+    typed = strip_attachments(problem)
+    if typed:
+        return typed
+    body = _attachment_region(problem)
+    return "\n".join(line for line in body.splitlines() if not line.strip().startswith("### ")).strip()
+
+
 def phase_event(num: int, status: str, note: str = "") -> dict:
     data = {"phase": num, "status": status}
     if note:
@@ -326,17 +371,27 @@ def _resolve_interrupt(record: dict, label: str) -> None:
 
 
 def _problem_payload(problem: str) -> dict:
-    questions = split_questions(problem)
+    names = attachment_names(problem)
+    questions = split_questions(question_source(problem))
+    intro = (
+        f"按题面切出 {len(questions)} 个子问题，收到 {len(names)} 个附件；附件正文已并入题面。"
+        if names
+        else f"按题面切出 {len(questions)} 个子问题。附件核对需要真实文件，这一步先标出缺口。"
+    )
     return {
         "title": "赛题与附件确认",
-        "intro": f"按题面切出 {len(questions)} 个子问题。附件核对需要真实文件，这一步先标出缺口。",
+        "intro": intro,
         "questions": [
             {"id": f"q{i + 1}", "text": text, "data": "未附数据文件"}
             for i, text in enumerate(questions)
         ],
-        "attachments": [],
+        "attachments": [{"id": f"a{i + 1}", "name": name} for i, name in enumerate(names)],
         "dataRoles": [],
-        "warning": "尚未接入文件上传：没有附件可核对目标列是否为空。确认后按文字题面继续。",
+        "warning": (
+            "附件正文已随题面送入；数据角色核对（目标列是否为空、行数、时间范围）尚未接入。"
+            if names
+            else "未附数据文件：数据角色核对需要真实表格。确认后按文字题面继续。"
+        ),
     }
 
 

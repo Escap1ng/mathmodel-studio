@@ -318,6 +318,19 @@ export interface WorkspaceListing {
   truncated: boolean
 }
 
+export interface AttachmentBlock {
+  name: string
+  kind: StagedFile['kind']
+  text: string
+  note?: string
+}
+
+export interface AttachmentContext {
+  ok: true
+  blocks: AttachmentBlock[]
+  truncated: boolean
+}
+
 export interface ChatEvent {
   chatId: string
   id: string

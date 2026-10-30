@@ -15,6 +15,7 @@ import ExplainDrawer from './components/ExplainDrawer'
 import PhaseRail from './components/PhaseRail'
 import SettingsDialog from './components/SettingsDialog'
 import WorkspacePane from './components/WorkspacePane'
+import { splitContextContent, type SendExtras } from './lib/attachments'
 import { applyChatEvent, assistantText, type ChatEntry } from './lib/chat'
 import { PHASES, type PhaseState } from './lib/phases'
 
@@ -80,18 +81,27 @@ function phaseMap(snapshot: SessionSnapshot): Record<number, PhaseState> {
 }
 
 function entriesFromSnapshot(snapshot: SessionSnapshot): ChatEntry[] {
-  return snapshot.messages.map((message, index) => ({
-    id: `restored-${snapshot.id}-${index}`,
-    role: message.role,
-    reasoning: '',
-    parts: message.content ? [{ kind: 'text', text: message.content }] : [],
-    streaming: false,
-    interrupt: message.interrupt,
-    doneReason:
-      message.role === 'assistant' && message.interrupt && !message.interrupt.resolved
-        ? 'waiting'
-        : undefined
-  }))
+  return snapshot.messages.map((message, index) => {
+    // 用户消息里存的是「手打文字 + 附件正文」；显示时只取文字，并还原附件胶囊。
+    const parsed =
+      message.role === 'user'
+        ? splitContextContent(message.content)
+        : { display: message.content, attachments: [] }
+    return {
+      id: `restored-${snapshot.id}-${index}`,
+      role: message.role,
+      reasoning: '',
+      parts: parsed.display ? [{ kind: 'text' as const, text: parsed.display }] : [],
+      streaming: false,
+      interrupt: message.interrupt,
+      attachments: parsed.attachments.length > 0 ? parsed.attachments : undefined,
+      context: parsed.attachments.length > 0 ? message.content : undefined,
+      doneReason:
+        message.role === 'assistant' && message.interrupt && !message.interrupt.resolved
+          ? 'waiting'
+          : undefined
+    }
+  })
 }
 
 function currentPhaseOf(phases: Record<number, PhaseState>): number | undefined {
@@ -269,18 +279,21 @@ export default function App() {
     Boolean(provider) &&
     (!provider?.requiresKey || Boolean(provider?.configured))
 
-  const send = async (text: string): Promise<void> => {
+  const send = async (text: string, extras?: SendExtras): Promise<void> => {
     if (!provider || !canSend || streaming) return
+    const content = extras?.context ?? text
+    if (!content.trim()) return
 
     const baseEntries = mode === 'workflow' ? [] : entries
     const history: ChatMessageInput[] = []
     for (const entry of baseEntries) {
       if (entry.role === 'user') {
-        const content = userText(entry)
-        if (content) history.push({ role: 'user', content })
+        // 附件正文不进界面，但重放历史时要留给模型，所以优先进模型的全文。
+        const value = entry.context ?? userText(entry)
+        if (value) history.push({ role: 'user', content: value })
       } else {
-        const content = assistantText(entry)
-        if (content) history.push({ role: 'assistant', content })
+        const value = assistantText(entry)
+        if (value) history.push({ role: 'assistant', content: value })
       }
     }
 
@@ -289,8 +302,10 @@ export default function App() {
       id: nextId('u'),
       role: 'user',
       reasoning: '',
-      parts: [{ kind: 'text', text }],
-      streaming: false
+      parts: text ? [{ kind: 'text', text }] : [],
+      streaming: false,
+      attachments: extras?.attachments,
+      context: extras?.context
     }
     const assistant: ChatEntry = {
       id: assistantId,
@@ -314,7 +329,7 @@ export default function App() {
       providerId: provider.id,
       model: provider.model,
       mode,
-      messages: [...history, { role: 'user', content: text }]
+      messages: [...history, { role: 'user', content }]
     }
 
     try {
@@ -511,7 +526,7 @@ export default function App() {
         mode={mode}
         pending={pending}
         onModeChange={setMode}
-        onSend={(text) => void send(text)}
+        onSend={(text, extras) => void send(text, extras)}
         onStop={stop}
         onDecision={(action, choice) => void resume(action, choice)}
         onExplain={setExplain}

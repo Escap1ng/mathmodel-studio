@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from 'elec
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
+import { attachmentContext } from './extract'
 import { discardStaged, pickFiles, revealStaged, stageFiles } from './files'
 import {
   chooseWorkspace,
@@ -210,6 +211,8 @@ ipcMain.handle('files:pick', (event) => pickFiles(BrowserWindow.fromWebContents(
 ipcMain.handle('files:stage', (_event, raw: unknown) => stageFiles(raw))
 
 ipcMain.handle('files:discard', (_event, raw: unknown) => discardStaged(raw))
+
+ipcMain.handle('files:context', (_event, raw: unknown) => attachmentContext(raw))
 
 ipcMain.handle('files:reveal', () => revealStaged())
 

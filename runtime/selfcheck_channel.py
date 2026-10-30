@@ -531,7 +531,13 @@ def tests() -> None:
     try:
         wf = Channel(fake=True, env_extra={"MMS_DATA_DIR": workdir})
         try:
-            problem = "问题1 预测未来三个月的销量。\n问题2 给出补货建议。"
+            problem = (
+                "问题1 预测未来三个月的销量。\n问题2 给出补货建议。\n\n"
+                "--- 附件（本机文件）---\n\n"
+                "### sales.csv · 12 KB（120 行 × 3 列）\n"
+                "month,region,sales\n2026-01,华东,120\n2026-02,华南,138\n\n"
+                "--- 附件结束 ---"
+            )
             status, started = wf.start_chat(
                 {
                     "providerId": "fake",
@@ -556,13 +562,20 @@ def tests() -> None:
                 statuses.get(0) == "passed" and statuses.get(1) == "waiting",
                 f"阶段状态 {statuses}",
             )
+            attachments = card.get("payload", {}).get("attachments", [])
             check(
-                "C12 K2 卡带子问题与附件缺口",
+                "C12 K2 卡带子问题与附件清单",
                 card.get("card") == "problem-confirm"
                 and len(questions) >= 2
-                and isinstance(card.get("payload", {}).get("attachments"), list)
+                and len(attachments) == 1
+                and attachments[0].get("name") == "sales.csv"
                 and "附件" in card.get("payload", {}).get("warning", ""),
-                f"card={card.get('card')} questions={len(questions)}",
+                f"card={card.get('card')} questions={len(questions)} attachments={attachments}",
+            )
+            check(
+                "C12 附件正文不参与子问题切分",
+                all("month,region" not in str(q.get("text", "")) for q in questions),
+                f"子问题 {[q.get('text', '')[:24] for q in questions]}",
             )
             check("C12 K2 的 SSE 不含密钥", SENTINEL not in raw, "已扫描整条 SSE")
 

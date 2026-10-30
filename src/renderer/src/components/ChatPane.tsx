@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
   CSSProperties,
+  DragEvent,
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent
 } from 'react'
-import type { DecisionAction, ProviderView, RuntimeStatus } from '../../../shared/api'
+import type { DecisionAction, ProviderView, RuntimeStatus, StagedFile } from '../../../shared/api'
+import { buildContextText, type SendExtras } from '../lib/attachments'
 import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
 import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
 import DecisionCard, { type ModelCandidate } from './DecisionCard'
 import DropZone from './DropZone'
+import FileChips from './FileChips'
 
 const COMPOSER_MIN = 132
 const COMPOSER_STORAGE_KEY = 'mms.composerHeight'
@@ -31,6 +34,14 @@ function readComposerHeight(): number | null {
   }
 }
 
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
+function hasFiles(event: DragEvent<HTMLElement>): boolean {
+  return Array.from(event.dataTransfer.types).includes('Files')
+}
+
 interface Props {
   runtime: RuntimeStatus
   provider?: ProviderView
@@ -43,7 +54,7 @@ interface Props {
   mode: 'workflow' | 'chat'
   pending: boolean
   onModeChange: (mode: 'workflow' | 'chat') => void
-  onSend: (text: string) => void
+  onSend: (text: string, extras?: SendExtras) => void
   onStop: () => void
   onDecision: (action: DecisionAction, choice?: string) => void
   onExplain: (candidate: ModelCandidate) => void
@@ -120,9 +131,15 @@ function EntryView({
   onExplain: (candidate: ModelCandidate) => void
 }) {
   if (entry.role === 'user') {
+    const text = entry.parts.map((p) => (p.kind === 'text' ? p.text : '')).join('')
     return (
       <article className="msg msg--user">
-        <div className="msg__text">{entry.parts.map((p) => (p.kind === 'text' ? p.text : '')).join('')}</div>
+        {text ? <div className="msg__text">{text}</div> : null}
+        {entry.attachments?.length ? (
+          <div className="msg__files">
+            <FileChips items={entry.attachments} label="随消息发送的附件" />
+          </div>
+        ) : null}
       </article>
     )
   }
@@ -200,13 +217,20 @@ export default function ChatPane({
   const composerRef = useRef<HTMLDivElement>(null)
   const [composerHeight, setComposerHeight] = useState<number | null>(readComposerHeight)
   const [resizingComposer, setResizingComposer] = useState(false)
+  const [files, setFiles] = useState<StagedFile[]>([])
+  const [rejected, setRejected] = useState<string[]>([])
+  const [attachError, setAttachError] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [staging, setStaging] = useState(false)
+  const [attaching, setAttaching] = useState(false)
+  const stageLock = useRef(false)
   const ready = runtime.state === 'ready'
   const phaseDef = PHASES.find((p) => p.num === currentPhase)
   const phaseText = phaseDef
     ? `阶段${phaseDef.label} · ${STATE_TEXT[phases[phaseDef.num] ?? 'idle']}`
     : '阶段零 · 待开始'
   const blocked = mode === 'workflow' && pending
-  const sendDisabled = !canSend || blocked
+  const sendDisabled = !canSend || blocked || attaching
 
   useEffect(() => {
     const el = streamRef.current
@@ -273,11 +297,128 @@ export default function ChatPane({
     }
   }
 
-  const submit = (): void => {
+  const merge = (result: {
+    files: StagedFile[]
+    rejected: { name: string; reason: string }[]
+  }): void => {
+    if (result.files.length > 0) {
+      setFiles((prev) => {
+        const seen = new Set(prev.map((file) => file.path))
+        return [...prev, ...result.files.filter((file) => !seen.has(file.path))]
+      })
+      window.dispatchEvent(new Event('mms:workspace-changed'))
+    }
+    setRejected(result.rejected.map((item) => `${item.name}：${item.reason}`))
+    setAttachError(null)
+  }
+
+  const addPaths = async (paths: string[]): Promise<void> => {
+    if (paths.length === 0 || stageLock.current) return
+    stageLock.current = true
+    setStaging(true)
+    try {
+      merge(await window.studio.files.stage(paths))
+    } catch (err) {
+      setAttachError(errorText(err))
+    } finally {
+      stageLock.current = false
+      setStaging(false)
+    }
+  }
+
+  const pick = async (): Promise<void> => {
+    if (stageLock.current) return
+    try {
+      const result = await window.studio.files.pick()
+      if (result) merge(result)
+    } catch (err) {
+      setAttachError(errorText(err))
+    }
+  }
+
+  const remove = (file: StagedFile): void => {
+    setFiles((prev) => prev.filter((item) => item.id !== file.id))
+    void window.studio.files.discard(file.path).then(
+      () => window.dispatchEvent(new Event('mms:workspace-changed')),
+      () => undefined
+    )
+  }
+
+  const reveal = (): void => {
+    void window.studio.files.reveal().catch((err: unknown) => setAttachError(errorText(err)))
+  }
+
+  const onDragEnter = (event: DragEvent<HTMLElement>): void => {
+    if (!hasFiles(event)) return
+    event.preventDefault()
+    setDragging(true)
+  }
+
+  const onDragOver = (event: DragEvent<HTMLElement>): void => {
+    if (!hasFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setDragging(true)
+  }
+
+  const onDragLeave = (event: DragEvent<HTMLElement>): void => {
+    if (!hasFiles(event)) return
+    const next = event.relatedTarget as Node | null
+    if (next && event.currentTarget.contains(next)) return
+    setDragging(false)
+  }
+
+  const onDrop = (event: DragEvent<HTMLElement>): void => {
+    if (!hasFiles(event)) return
+    event.preventDefault()
+    setDragging(false)
+    const dropped = Array.from(event.dataTransfer.files)
+    const paths: string[] = []
+    const names: string[] = []
+    for (const file of dropped) {
+      let path = ''
+      try {
+        path = window.studio.files.pathFor(file)
+      } catch {
+        path = ''
+      }
+      if (path) paths.push(path)
+      else names.push(`${file.name}：读不到本地路径`)
+    }
+    if (names.length > 0) {
+      setRejected(names)
+      setAttachError(null)
+    }
+    void addPaths(paths)
+  }
+
+  const submit = async (): Promise<void> => {
     const text = draft.trim()
-    if (!text || !canSend || streaming || blocked) return
+    if (!canSend || streaming || blocked || attaching) return
+    if (!text && files.length === 0) return
+
+    let extras: SendExtras | undefined
+    if (files.length > 0) {
+      setAttaching(true)
+      setAttachError(null)
+      try {
+        const result = await window.studio.files.context(files.map((file) => file.path))
+        extras = {
+          context: buildContextText(text, result.blocks, files),
+          attachments: files.map((file) => ({ name: file.name, kind: file.kind, size: file.size }))
+        }
+      } catch (err) {
+        setAttachError(`附件读取失败：${errorText(err)}`)
+        setAttaching(false)
+        return
+      }
+      setAttaching(false)
+    }
+
     setDraft('')
-    onSend(text)
+    setFiles([])
+    setRejected([])
+    onSend(text, extras)
   }
 
   const placeholder = !ready
@@ -290,16 +431,38 @@ export default function ChatPane({
         ? '这个服务商还没有保存 API Key'
         : blocked
           ? '上面的决策卡还在等你的选择'
-          : mode === 'workflow'
-            ? '粘贴赛题正文，先确认题面与附件'
-            : '描述这道题，或粘贴题目正文'
+          : files.length > 0
+            ? '可以只发附件，也可以补充说明'
+            : mode === 'workflow'
+              ? '粘贴赛题正文，先确认题面与附件'
+              : '描述这道题，或粘贴题目正文'
+
+  const attachNotice = attachError ?? (rejected.length > 0 ? rejected.join('；') : null)
 
   return (
-    <section className="chat" aria-label="对话" ref={chatRef}>
+    <section
+      className="chat"
+      aria-label="对话"
+      ref={chatRef}
+      data-drag={dragging ? 'true' : undefined}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <div className="chat__stream" ref={streamRef}>
         <div className="chat__column">
           {entries.length === 0 ? (
-            <DropZone />
+            <DropZone
+              files={files}
+              rejected={rejected}
+              failure={attachError}
+              dragging={dragging}
+              busy={staging}
+              onPick={() => void pick()}
+              onRemove={remove}
+              onReveal={reveal}
+            />
           ) : (
             <div className="messages" aria-live="polite">
               {entries.map((entry) => (
@@ -315,6 +478,12 @@ export default function ChatPane({
         </div>
       </div>
 
+      {dragging && entries.length > 0 ? (
+        <div className="chat__droplayer" aria-hidden="true">
+          <span>松手添加附件</span>
+        </div>
+      ) : null}
+
       {runtime.state === 'error' ? (
         <div className="chat__banner" role="alert">
           <span>{runtime.message ?? '本地运行时启动失败'}</span>
@@ -326,6 +495,11 @@ export default function ChatPane({
       {notice ? (
         <div className="chat__banner" role="alert">
           <span>{notice}</span>
+        </div>
+      ) : null}
+      {entries.length > 0 && attachNotice ? (
+        <div className="chat__banner" role="alert">
+          <span>{attachNotice}</span>
         </div>
       ) : null}
 
@@ -353,6 +527,24 @@ export default function ChatPane({
           onKeyDown={onComposerKey}
         />
         <div className="composer">
+          {entries.length > 0 ? (
+            <div className="composer__attach">
+              <FileChips
+                items={files}
+                onRemove={(index) => remove(files[index])}
+                label="待发送的附件"
+              />
+              <button
+                type="button"
+                className="composer__add"
+                onClick={() => void pick()}
+                disabled={!ready}
+                title="添加附件"
+              >
+                ＋ 附件
+              </button>
+            </div>
+          ) : null}
           <textarea
             className="composer__input"
             placeholder={placeholder}
@@ -411,9 +603,9 @@ export default function ChatPane({
                 className="pill pill--send"
                 data-mode={mode}
                 disabled={sendDisabled}
-                onClick={submit}
+                onClick={() => void submit()}
               >
-                {mode === 'workflow' ? '开始建模' : '发送'}
+                {attaching ? '读取附件…' : mode === 'workflow' ? '开始建模' : '发送'}
               </button>
             )}
           </div>
