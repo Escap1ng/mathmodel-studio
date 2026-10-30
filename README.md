@@ -111,7 +111,7 @@ G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
 **执行状态要说清**：M4 的本机 `npm run gate` 全绿——G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言）、G4（46 条通道断言，含跨进程恢复）、事件判据自测（10/10）、G9（13 条工作台断言）、G6b 自测（12/12）、类型检查、构建与 G6 产物冒烟。G7 在本机 Windows 上 53/53，独立核验通过；选模卡、图表工作台与评分卡截图在 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`。
-M4 的 CI 结果以本轮推送后的 run 为准；0.3.0/0.3.1 的 run `40982728779`、`41000678500` 均为三 job 全绿。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
+M4 的 CI（run `41008695577`）三 job 全绿：ubuntu 真启动 53/53、内容尺寸 1440x900、非白像素 3.98%，G6b 独立核验一致，G9 13/13、G6 14/14；Linux 上 `safeStorage` 不可用分支仍被覆盖。0.3.0/0.3.1 的 run `40982728779`、`41000678500` 同样三 job 全绿。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
 
 ## 依赖
 
