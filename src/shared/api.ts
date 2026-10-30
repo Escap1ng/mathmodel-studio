@@ -285,6 +285,12 @@ export interface StageRejection {
   reason: string
 }
 
+// 截图 / 剪贴板文件没有本地路径，字节直接交给主进程写进暂存区。
+export interface StagedBlob {
+  name: string
+  data: ArrayBuffer
+}
+
 export interface StageResult {
   ok: true
   files: StagedFile[]

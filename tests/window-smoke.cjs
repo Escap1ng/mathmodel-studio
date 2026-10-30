@@ -441,6 +441,44 @@ async function main() {
     `副本还在=${stagedFile ? existsSync(stagedFile.path) : '无副本'}，原文件还在=${existsSync(samplePath)}`
   )
 
+  // —— 截图与剪贴板：输入区不再常驻附件按钮，粘贴的字节由主进程写进暂存区 ——
+  const pasteProbe = await win.webContents.executeJavaScript(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const area = document.querySelector('.composer__input')
+    if (!area) return { ok: false, reason: '没有输入框' }
+    const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'image.png', { type: 'image/png' })
+    const transfer = new DataTransfer()
+    transfer.items.add(file)
+    area.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }))
+    for (let i = 0; i < 60; i++) {
+      await wait(100)
+      if (document.querySelectorAll('.composer__attach .file-chip').length > 0) break
+    }
+    const chips = Array.from(document.querySelectorAll('.composer__attach .file-chip__name')).map((el) => el.textContent)
+    const listing = await window.studio.workspace.get()
+    const landed = listing.entries.filter((entry) => entry.kind === 'image' && entry.name.startsWith('截图'))
+    const addButton = Boolean(document.querySelector('.composer__add'))
+    document.querySelector('.composer__attach .file-chip__remove')?.click()
+    await wait(400)
+    const afterRemove = document.querySelectorAll('.composer__attach .file-chip').length
+    return { chips, landed: landed.map((entry) => entry.name), addButton, afterRemove }
+  })()`)
+  record(
+    'G7-4 粘贴截图进输入区并落盘',
+    Boolean(pasteProbe) &&
+      pasteProbe.chips?.length === 1 &&
+      /^截图-\d{8}-\d{6}\.png$/.test(pasteProbe.chips[0]) &&
+      pasteProbe.landed?.length === 1 &&
+      pasteProbe.afterRemove === 0,
+    JSON.stringify(pasteProbe)
+  )
+  record(
+    'G7-4 输入区不常驻附件按钮',
+    pasteProbe?.addButton === false,
+    `composer__add=${pasteProbe?.addButton}`
+  )
+
   // —— 附件正文抽取：PDF 走主进程里的 pdfjs，CSV 顺带算出总行数与列数 ——
   const pdfSrc = join(userDataDir, 'probe.pdf')
   writeFileSync(pdfSrc, minimalPdf('ATTACH-MARKER-2026'))
@@ -1294,15 +1332,26 @@ async function main() {
   const composerBefore = await win.webContents.executeJavaScript(
     `Math.round(document.querySelector('.chat__composer').getBoundingClientRect().height)`
   )
+  const barBefore = await win.webContents.executeJavaScript(
+    `Math.round(document.querySelector('.composer__bar').getBoundingClientRect().top)`
+  )
   await dragSplitter('[data-splitter="composer"]', 0, -90)
   await sleep(300)
   const composerAfter = await win.webContents.executeJavaScript(
     `Math.round(document.querySelector('.chat__composer').getBoundingClientRect().height)`
   )
+  const barAfter = await win.webContents.executeJavaScript(
+    `Math.round(document.querySelector('.composer__bar').getBoundingClientRect().top)`
+  )
   record(
     'G7-10 输入框上沿可拖拽',
     composerAfter - composerBefore >= 60,
     `${composerBefore} → ${composerAfter}`
+  )
+  record(
+    'G7-10 按钮行不随输入框拉伸移动',
+    Math.abs(barAfter - barBefore) <= 1,
+    `${barBefore} → ${barAfter}`
   )
 
   const composerGrip = await win.webContents.executeJavaScript(`(() => {
@@ -1329,6 +1378,29 @@ async function main() {
       composerGrip.background === composerGrip.shellBg &&
       Math.abs(composerGrip.centerY - composerGrip.cardTop) <= 1,
     JSON.stringify(composerGrip)
+  )
+
+  const barGap = await win.webContents.executeJavaScript(`(() => {
+    const card = document.querySelector('.composer')
+    const bar = document.querySelector('.composer__bar')
+    if (!card || !bar) return null
+    const c = card.getBoundingClientRect()
+    const b = bar.getBoundingClientRect()
+    return {
+      gap: Math.round(b.top - c.bottom),
+      inCard: card.contains(bar),
+      sameLeft: Math.round(b.left) === Math.round(c.left),
+      sameWidth: Math.round(b.width) === Math.round(c.width)
+    }
+  })()`)
+  record(
+    'G7-10 按钮行在输入框卡片外且同宽',
+    barGap != null &&
+      !barGap.inCard &&
+      barGap.gap >= 4 &&
+      barGap.sameLeft &&
+      barGap.sameWidth,
+    JSON.stringify(barGap)
   )
 
   // 双击恢复默认，再把窗口还原，避免影响后续人工看图

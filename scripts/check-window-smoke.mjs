@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 78
+const MIN_ASSERTIONS = 82
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -36,6 +36,8 @@ const REQUIRED_ASSERTIONS = [
   'G7-4 文件页列出工作区文件',
   'G7-4 默认工作区在桌面「赛题」',
   'G7-4 移除只删暂存副本',
+  'G7-4 粘贴截图进输入区并落盘',
+  'G7-4 输入区不常驻附件按钮',
   'G7-5 中文按真字形渲染（不是空心方框）',
   'G7-5 工具卡完成并给出结构化结果',
   'G7-5 回复文本含模板总数',
@@ -66,7 +68,9 @@ const REQUIRED_ASSERTIONS = [
   'G7-10 中/右分隔条可拖拽',
   'G7-10 离开分隔条后握把保持在指针处',
   'G7-10 输入框上沿可拖拽',
-  'G7-10 输入框上沿空心长条居中骑在框线'
+  'G7-10 输入框上沿空心长条居中骑在框线',
+  'G7-10 按钮行在输入框卡片外且同宽',
+  'G7-10 按钮行不随输入框拉伸移动'
 ]
 
 const problems = []
