@@ -80,6 +80,9 @@ jobs:
       - name: G3 CLI 退出码契约
         run: python runtime/selfcheck.py
 
+      - name: G9 工作台（真渲两版、回滚、评分）
+        run: python runtime/selfcheck_workbench.py
+
       - name: 运行时语法检查
         run: python -m compileall -q runtime
 
@@ -103,10 +106,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 准备 Python
-        # 主进程用 python3 拉起 runtime/cli.py serve；通道服务器只用标准库。
+        # 主进程用 python3 拉起 runtime/cli.py serve；M4 工作台要真渲图，下面会装 requirements。
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: 装图表依赖（工作台要真渲一张样例图）
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
 
       - name: 准备 Node
         uses: actions/setup-node@v4

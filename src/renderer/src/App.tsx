@@ -404,7 +404,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onRestart={() => void restart()}
       />
-      <WorkspacePane />
+      <WorkspacePane runtimeReady={runtime.state === 'ready'} />
       {explain ? <ExplainDrawer candidate={explain} onClose={() => setExplain(null)} /> : null}
       <footer className="statusbar">
         <span>{meta ? `v${meta.version}` : '主进程未响应'}</span>

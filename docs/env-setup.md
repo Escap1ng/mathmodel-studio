@@ -108,9 +108,9 @@ npm run gate
 
 全绿即脚手架自洽。其中只有 `typecheck`、`build`、`smoke:dist` 需要 `npm install` 成功；
 `check:registry`、`check:registry:negative`、`check:contracts`、`check:channel` 只吃标准库（契约校验缺 `jsonschema` 时降级）；
-`check:cli` 需要 `requirements.txt` 里的科学计算包。这是刻意设计，方便你在任何机器上验证注册表与通道没漂。
+`check:cli` 与 `check:workbench` 需要 `requirements.txt` 里的科学计算包。这是刻意设计，方便你在任何机器上验证注册表与通道没漂。
 
 想看界面就两条路：`npm run dev` 起开发窗口；或先 `npm run build` 再 `npm run smoke:window`，
-它会 `require` 生产入口真起一次窗口、拉起 Python 通道、用离线 provider 走完 K2→K3→解释→换一批→选择，再重启 runtime 确认待选卡还在（43 条），
-截图写到 `screenshots/`（`decision.png`、`drawer.png` 是 M3 新增）。本机有显示器，不需要 xvfb；CI 那条 job 才需要，并且要先修好 Electron 的 SUID 沙箱助手（见 `ci.yml` 的注释）。
-会话状态默认写在 Electron `userData/sessions.db`（开发期也可用 `MMS_DATA_DIR` 指到别处），不存 Key。
+它会 `require` 生产入口真起一次窗口、拉起 Python 通道、用离线 provider 走完 K2→K3→解释→换一批→选择，再重启 runtime 确认待选卡还在；接着真渲一张图、换主题重渲、并排 diff、回滚，再看评分五维/扣分定位/熔断与一票否决（53 条），
+截图写到 `screenshots/`（`decision.png`、`drawer.png` 是 M3 新增，`figure.png`、`score.png` 是 M4）。本机有显示器，不需要 xvfb；CI 那条 job 才需要，并且要先修好 Electron 的 SUID 沙箱助手（见 `ci.yml` 的注释）。
+会话状态默认写在 Electron `userData/sessions.db`，图表版本在 `userData/workbench/figure/`（开发期可用 `MMS_DATA_DIR` 指到别处），都不存 Key。

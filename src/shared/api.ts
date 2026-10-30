@@ -105,6 +105,124 @@ export interface SessionLatest {
   session: SessionSnapshot | null
 }
 
+export interface FigureTemplate {
+  id: string
+  title: string
+  group: string
+}
+
+export interface FigureTheme {
+  id: string
+  title: string
+  builtin: boolean
+}
+
+export interface FigureVersion {
+  id: string
+  label: string
+  template: string
+  template_title: string
+  theme: string
+  theme_title: string
+  created: number
+  outputs: Record<string, string>
+  command: string
+  stdout: string
+  stderr: string
+}
+
+export interface FigureState {
+  ok: boolean
+  templates: FigureTemplate[]
+  themes: FigureTheme[]
+  versions: FigureVersion[]
+  active: string | null
+  active_png: string | null
+  previous: string | null
+  previous_png: string | null
+  activeImage?: string | null
+  previousImage?: string | null
+  error?: string
+}
+
+export interface ScoreDimension {
+  id: string
+  label: string
+  score: number
+  max: number
+}
+
+export interface ScoreDeduction {
+  dim: string
+  dim_id: string
+  item: string
+  penalty: number
+  note: string
+  target: string
+  suggestion: string
+}
+
+export interface ScoreChange {
+  dim: string
+  from: number
+  to: number
+  delta: number
+}
+
+export interface ScoreRound {
+  paper: string
+  round: number
+  veto: boolean
+  total: number
+  max: number
+  pass_score: number
+  pass: boolean
+  verdict: 'pass' | 'fix' | 'veto'
+  dimensions: ScoreDimension[]
+  deductions: ScoreDeduction[]
+  changes: ScoreChange[]
+  breaker: boolean
+}
+
+export interface ChapterState {
+  ok: boolean
+  pass?: boolean
+  hard_failed?: number
+  soft_failed?: number
+  manual?: number
+  pass_count?: number
+  error?: string
+}
+
+export interface ScoreState {
+  ok: boolean
+  rounds: ScoreRound[]
+  veto: ScoreRound | null
+  defaultRound: number
+  chapter?: ChapterState
+  error?: string
+}
+
+export interface GateRow {
+  id: string
+  label: string
+  ok: boolean
+  detail: string
+}
+
+export interface WorkbenchState {
+  ok: boolean
+  figure: FigureState
+  score: ScoreState
+  chapter: ChapterState
+  gate: GateRow[]
+}
+
+export interface WorkbenchResult {
+  ok: boolean
+  state: WorkbenchState
+}
+
 export interface ChatEvent {
   chatId: string
   id: string

@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 43
+const MIN_ASSERTIONS = 53
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -35,7 +35,14 @@ const REQUIRED_ASSERTIONS = [
   'G7-7 K2 卡切出两个子问题',
   'G7-7 解释抽屉打开不清除待选',
   'G7-7 runtime 重启后仍停在 K3',
-  'G7-7 选择后阶段 4 进入且待决清空'
+  'G7-7 选择后阶段 4 进入且待决清空',
+  'G7-8 工作台渲染出首版图表',
+  'G7-8 换主题重渲出第二版并并排 diff',
+  'G7-8 回滚到第一版',
+  'G7-8 评分卡五维、总分 86 且达标',
+  'G7-8 扣分项能定位到正文',
+  'G7-8 第三轮低于 85 显示熔断提示',
+  'G7-8 门禁条三项全绿'
 ]
 
 const problems = []

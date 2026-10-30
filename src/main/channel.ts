@@ -243,6 +243,24 @@ export class Channel {
     return session && typeof session === 'object' ? (session as Record<string, unknown>) : null
   }
 
+  async workbenchState(): Promise<Record<string, unknown>> {
+    return this.request('/workbench/state')
+  }
+
+  async renderFigure(template: string, theme: string): Promise<Record<string, unknown>> {
+    return this.request('/workbench/render', {
+      method: 'POST',
+      body: { template, theme }
+    })
+  }
+
+  async rollbackFigure(version: string): Promise<Record<string, unknown>> {
+    return this.request('/workbench/rollback', {
+      method: 'POST',
+      body: { version }
+    })
+  }
+
   async stream(
     chatId: string,
     onEvent: (ev: ChatEventPayload) => void,

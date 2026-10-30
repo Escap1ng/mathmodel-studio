@@ -1,5 +1,5 @@
 /**
- * G7 · 真启动冒烟（M3：阶段状态机、K2/K3 决策卡、K4 抽屉与跨重启恢复）
+ * G7 · 真启动冒烟（M4：工作台图表、主题/回滚、评分与门禁）
  *
  * 关键取舍：本脚本不自己建窗口，而是 require 生产入口 out/main/index.js，
  * 让它按 src/main/index.ts 的窗口配置、preload 路径、IPC 注册、runtime 子进程与导航守卫起窗。
@@ -82,6 +82,22 @@ async function waitFor(win, expression, ms) {
   return false
 }
 
+// 重渲染后 capturePage 可能拿到上一帧；先请求一次整页重绘再截。
+async function freshShot(win) {
+  try {
+    win.show()
+    win.focus()
+    win.webContents.invalidate()
+  } catch {
+    /* 窗口已销毁 */
+  }
+  await sleep(250)
+  // 第一次 capture 常拿到切换标签前的那一帧；丢弃后再取一次。
+  await win.webContents.capturePage()
+  await sleep(350)
+  return win.webContents.capturePage()
+}
+
 function measureInk(image) {
   const bmp = image.toBitmap() // BGRA
   let ink = 0
@@ -100,6 +116,12 @@ async function main() {
   require(distMain)
 
   const win = await firstWindow(20000)
+  win.webContents.on('console-message', (_event, level, message, line, source) => {
+    if (level >= 2) console.log(`[renderer:${level}] ${message} (${source}:${line})`)
+  })
+  win.webContents.on('render-process-gone', (_event, details) => {
+    console.log(`[renderer gone] ${JSON.stringify(details)}`)
+  })
   const url = await waitLoaded(win, 20000)
   record(
     'G7-1 加载的是构建产物',
@@ -134,6 +156,12 @@ async function main() {
     win,
     `(document.querySelector('.statusbar')?.textContent || '').includes('运行时已连接')`,
     20000
+  )
+  // provider 清单是另一条 IPC，工作台状态也在同时加载；等模型条真的选中再抓 DOM。
+  const providerReady = await waitFor(
+    win,
+    `(document.querySelector('.pill--model')?.textContent || '').includes('离线演示')`,
+    15000
   )
 
   const dom = await win.webContents.executeJavaScript(`({
@@ -170,7 +198,7 @@ async function main() {
   )
   record(
     'G7-3 离线演示 provider 自动选中',
-    dom.modelPill.includes('离线演示') && dom.modelPill.includes('fake-stream'),
+    providerReady && dom.modelPill.includes('离线演示') && dom.modelPill.includes('fake-stream'),
     `模型条: ${JSON.stringify(dom.modelPill)}`
   )
 
@@ -531,6 +559,134 @@ async function main() {
     'G7-7 已选卡的动作按钮已禁用',
     phaseChosen.actions.length > 0 && phaseChosen.actions.every((b) => b.disabled),
     `动作按钮 ${JSON.stringify(phaseChosen.actions)}`
+  )
+
+  // —— M4：工作台图表、主题、回滚、评分与门禁 ——
+  await waitFor(
+    win,
+    `!!document.querySelector('[data-role="figure-image"]') || !!document.querySelector('[data-action="render-first"]')`,
+    20000
+  )
+  await win.webContents.executeJavaScript(`(() => {
+    if (!document.querySelector('[data-role="figure-image"]')) {
+      document.querySelector('[data-action="render-first"]')?.click()
+    }
+    return true
+  })()`)
+  const figureReady = await waitFor(
+    win,
+    `(document.querySelector('[data-role="figure-image"]')?.naturalWidth || 0) > 0`,
+    90000
+  )
+  const figState = await win.webContents.executeJavaScript(`window.studio.workbench.state()`)
+  const firstVersion = figState?.figure?.active
+  const firstImage = figState?.figure?.activeImage
+  record(
+    'G7-8 工作台渲染出首版图表',
+    figureReady && Boolean(firstVersion) && (figState?.figure?.versions?.length ?? 0) >= 1,
+    `图片就绪=${figureReady} active=${firstVersion} 版本数=${figState?.figure?.versions?.length}`
+  )
+
+  await win.webContents.executeJavaScript(`(() => {
+    const select = document.querySelector('[data-role="figure-theme"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+    setter.call(select, 'studio-ink')
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await sleep(120)
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="render-figure"]')?.click()`)
+  const reRendered = await waitFor(
+    win,
+    `document.querySelectorAll('.version-chip').length >= 2 && !!document.querySelector('[data-role="figure-diff"]') && (document.querySelector('[data-role="figure-image"]')?.naturalWidth || 0) > 0`,
+    90000
+  )
+  const fig2 = await win.webContents.executeJavaScript(`window.studio.workbench.state()`)
+  const secondVersion = fig2?.figure?.active
+  record(
+    'G7-8 换主题重渲出第二版并并排 diff',
+    reRendered &&
+      Boolean(secondVersion) &&
+      secondVersion !== firstVersion &&
+      fig2.figure.previous === firstVersion &&
+      fig2.figure.activeImage !== firstImage &&
+      Boolean(fig2.figure.previousImage),
+    `v1=${firstVersion} v2=${secondVersion} previous=${fig2?.figure?.previous} 图像变化=${fig2?.figure?.activeImage !== firstImage}`
+  )
+  const figureShot = await freshShot(win)
+  const figureInk = measureInk(figureShot)
+  writeFileSync(join(OUT_DIR, 'figure.png'), figureShot.toPNG())
+  record(
+    'G7-8 图表工作台截图非空',
+    figureInk.ratio >= MIN_INK_RATIO,
+    `非白像素 ${(figureInk.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="rollback"]')?.click()`)
+  const rolledBack = await waitFor(
+    win,
+    `document.querySelector('.version-chip[data-active="true"]')?.getAttribute('data-version') === ${JSON.stringify(firstVersion)}`,
+    15000
+  )
+  const fig3 = await win.webContents.executeJavaScript(`window.studio.workbench.state()`)
+  record(
+    'G7-8 回滚到第一版',
+    rolledBack && fig3?.figure?.active === firstVersion,
+    `回滚=${rolledBack} active=${fig3?.figure?.active} 期望=${firstVersion}`
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="score"]')?.click()`)
+  const scoreOpen = await waitFor(win, `!!document.querySelector('[data-panel="score"]')`, 5000)
+  const scoreInfo = await win.webContents.executeJavaScript(`({
+    bars: document.querySelectorAll('[data-panel="score"] .score-row').length,
+    total: document.querySelector('[data-role="score-total"]')?.textContent ?? '',
+    verdict: document.querySelector('[data-role="score-verdict"]')?.textContent?.trim() ?? '',
+    deductions: document.querySelectorAll('[data-panel="score"] .deduction').length
+  })`)
+  record(
+    'G7-8 评分卡五维、总分 86 且达标',
+    scoreOpen && scoreInfo.bars === 5 && scoreInfo.total.includes('86') && scoreInfo.verdict === '达标',
+    `五维=${scoreInfo.bars} 总分文本=${JSON.stringify(scoreInfo.total)} 判定=${scoreInfo.verdict}`
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('[data-panel="score"] .deduction')?.click()`)
+  const detailOpen = await waitFor(win, `!!document.querySelector('[data-role="deduction-detail"]')`, 5000)
+  const detail = await win.webContents.executeJavaScript(
+    `document.querySelector('[data-role="deduction-detail"]')?.textContent ?? ''`
+  )
+  record(
+    'G7-8 扣分项能定位到正文',
+    detailOpen && detail.includes('定位：') && (detail.includes('摘要') || detail.includes('参数') || detail.includes('模型')),
+    `明细=${JSON.stringify(detail.slice(0, 100))}`
+  )
+  const scoreShot = await freshShot(win)
+  const scoreInk = measureInk(scoreShot)
+  writeFileSync(join(OUT_DIR, 'score.png'), scoreShot.toPNG())
+  record(
+    'G7-8 评分卡截图非空',
+    scoreInk.ratio >= MIN_INK_RATIO,
+    `非白像素 ${(scoreInk.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('.score-round[data-round="3"]')?.click()`)
+  const breaker = await waitFor(
+    win,
+    `!!document.querySelector('.breaker-bar') && (document.querySelector('[data-role="score-total"]')?.textContent || '').includes('84')`,
+    5000
+  )
+  record('G7-8 第三轮低于 85 显示熔断提示', breaker, `熔断条=${breaker}`)
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="veto"]')?.click()`)
+  const veto = await waitFor(win, `!!document.querySelector('.veto-bar')`, 5000)
+  record('G7-8 一票否决示例不进入循环', veto, `红线条=${veto}`)
+
+  await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="gate"]')?.click()`)
+  const gateRows = await waitFor(win, `document.querySelectorAll('[data-gate-row]').length === 3`, 5000)
+  const gateState = await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('[data-gate-row]')].map((n) => ({ id: n.dataset.gateRow, ok: n.classList.contains('gate-row--ok') }))`
+  )
+  record(
+    'G7-8 门禁条三项全绿',
+    gateRows && gateState.length === 3 && gateState.every((row) => row.ok),
+    JSON.stringify(gateState)
   )
 
   // —— M2 回归：自由问答仍能流式出字并显示工具卡 ——

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from 'electron'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
 import type {
@@ -6,7 +7,9 @@ import type {
   ProviderList,
   ProviderView,
   ResumeInput,
-  SessionLatest
+  SessionLatest,
+  WorkbenchResult,
+  WorkbenchState
 } from '../shared/api'
 import {
   activeProviderId,
@@ -192,6 +195,49 @@ ipcMain.handle('session:latest', async (): Promise<SessionLatest> => ({
   ok: true,
   session: (await channel.latestSession()) as SessionLatest['session']
 }))
+
+function imageDataUrl(path: unknown): string | null {
+  if (typeof path !== 'string' || !path) return null
+  try {
+    const bytes = readFileSync(path)
+    if (!bytes.length || bytes.length > 12 * 1024 * 1024) return null
+    return `data:image/png;base64,${bytes.toString('base64')}`
+  } catch {
+    return null
+  }
+}
+
+function withImages(raw: Record<string, unknown>): WorkbenchState {
+  const figure = (raw['figure'] ?? {}) as Record<string, unknown>
+  return {
+    ...(raw as unknown as WorkbenchState),
+    figure: {
+      ...(figure as unknown as WorkbenchState['figure']),
+      activeImage: imageDataUrl(figure['active_png']),
+      previousImage: imageDataUrl(figure['previous_png'])
+    }
+  }
+}
+
+ipcMain.handle('workbench:state', async () => withImages(await channel.workbenchState()))
+
+ipcMain.handle('workbench:render', async (_event, raw: unknown): Promise<WorkbenchResult> => {
+  if (!raw || typeof raw !== 'object') throw new Error('渲染请求格式不对')
+  const obj = raw as Record<string, unknown>
+  const template = typeof obj.template === 'string' ? obj.template : ''
+  const theme = typeof obj.theme === 'string' ? obj.theme : ''
+  if (!template || !theme) throw new Error('缺少模板或主题')
+  const data = await channel.renderFigure(template, theme)
+  return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
+})
+
+ipcMain.handle('workbench:rollback', async (_event, raw: unknown): Promise<WorkbenchResult> => {
+  if (!raw || typeof raw !== 'object') throw new Error('回滚请求格式不对')
+  const version = (raw as Record<string, unknown>).version
+  if (typeof version !== 'string' || !version) throw new Error('缺少版本 id')
+  const data = await channel.rollbackFigure(version)
+  return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
+})
 
 ipcMain.handle('chat:cancel', async (_event, raw: unknown) => {
   const chatId = typeof raw === 'string' ? raw : ''

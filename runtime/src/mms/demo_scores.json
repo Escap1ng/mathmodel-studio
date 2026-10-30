@@ -1,0 +1,152 @@
+{
+  "paper": "第X题_赛题简称",
+  "rounds": [
+    {
+      "round": 1,
+      "veto": false,
+      "dimensions": [
+        {
+          "id": "abstract",
+          "score": 24,
+          "deductions": [
+            {"item": "字数超出 800-1000 字范围", "penalty": 4, "note": "摘要约 1150 字", "target": "摘要第 2 段", "suggestion": "删去背景铺陈，把模型、方法、结论压进 800–1000 字。"},
+            {"item": "缺少误差/不确定度分析", "penalty": 2, "note": "只有一句定性描述", "target": "摘要末句", "suggestion": "补上验证集误差区间或交叉验证结果。"}
+          ]
+        },
+        {
+          "id": "model",
+          "score": 16,
+          "deductions": [
+            {"item": "参数设置无依据", "penalty": 3, "note": "学习率与树深未给来源", "target": "4.2 参数设置", "suggestion": "引用文献建议范围，或给出网格搜索区间与选择依据。"},
+            {"item": "缺少灵敏度分析", "penalty": 1, "note": "只跑了单组参数", "target": "4.4 结果分析", "suggestion": "对 2–3 个关键参数做扰动，报告指标变化。"}
+          ]
+        },
+        {
+          "id": "innovation",
+          "score": 13,
+          "deductions": [
+            {"item": "创新点缺乏理论支撑", "penalty": 4, "note": "改进算子没有收敛性讨论", "target": "5.1 模型改进", "suggestion": "补一段为什么该改动有效，或给出小规模实验证据。"},
+            {"item": "未构建自定义指标", "penalty": 3, "note": "直接复用公开指标", "target": "5.2 评价指标", "suggestion": "结合本题约束新增一个可计算指标，并说明其含义。"}
+          ]
+        },
+        {
+          "id": "writing",
+          "score": 12,
+          "deductions": [
+            {"item": "存在空泛表达", "penalty": 2, "note": "“效果较好” 2 处", "target": "6.1 结论", "suggestion": "把“较好”换成具体数值或比较对象。"},
+            {"item": "无个性化痕迹", "penalty": 1, "note": "展望没有具体切入点", "target": "7 展望", "suggestion": "写清一个可继续做的具体实验。"}
+          ]
+        },
+        {
+          "id": "layout",
+          "score": 13,
+          "deductions": [
+            {"item": "图表编号跳跃或缺失", "penalty": 1, "note": "图 3 缺失", "target": "图 2 与图 4 之间", "suggestion": "重排图号，确保正文引用与图片一致。"},
+            {"item": "页眉信息不规范", "penalty": 1, "note": "缺少赛题编号", "target": "页眉", "suggestion": "按竞赛模板补齐页眉字段。"}
+          ]
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "veto": false,
+      "dimensions": [
+        {
+          "id": "abstract",
+          "score": 26,
+          "deductions": [
+            {"item": "字数超出 800-1000 字范围", "penalty": 3, "note": "摘要 1120 字", "target": "摘要第 2 段", "suggestion": "再压缩约 150 字。"},
+            {"item": "缺少误差/不确定度分析", "penalty": 1, "note": "仅定性提了一句", "target": "摘要末句", "suggestion": "补上交叉验证的误差区间。"}
+          ]
+        },
+        {
+          "id": "model",
+          "score": 18,
+          "deductions": [
+            {"item": "参数设置无依据（未引用文献建议范围）", "penalty": 2, "note": "学习率未给依据", "target": "4.2 参数设置", "suggestion": "补一行文献范围与最终取值理由。"}
+          ]
+        },
+        {
+          "id": "innovation",
+          "score": 15,
+          "deductions": [
+            {"item": "创新点缺乏理论支撑", "penalty": 3, "note": "改进算子无收敛性讨论", "target": "5.1 模型改进", "suggestion": "补收敛性或小规模对比实验。"},
+            {"item": "未构建自定义指标或改进算法", "penalty": 2, "note": "直接复用现有指标", "target": "5.2 评价指标", "suggestion": "新增一个与本题约束对应的指标。"}
+          ]
+        },
+        {
+          "id": "writing",
+          "score": 13,
+          "deductions": [
+            {"item": "存在空泛表达（黑名单词）", "penalty": 1, "note": "“较好” 1 处", "target": "6.1 结论", "suggestion": "换成具体数值。"},
+            {"item": "无个性化痕迹", "penalty": 1, "note": "展望无具体切入点", "target": "7 展望", "suggestion": "补一个可继续做的实验。"}
+          ]
+        },
+        {
+          "id": "layout",
+          "score": 14,
+          "deductions": [
+            {"item": "图表编号跳跃或缺失", "penalty": 1, "note": "图 3 缺失", "target": "图 2 与图 4 之间", "suggestion": "重排图号并核对正文引用。"}
+          ]
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "veto": false,
+      "dimensions": [
+        {
+          "id": "abstract",
+          "score": 24,
+          "deductions": [
+            {"item": "字数超出 800-1000 字范围", "penalty": 3, "note": "摘要 1100 字", "target": "摘要第 2 段", "suggestion": "压缩到 1000 字以内。"},
+            {"item": "缺少误差/不确定度分析", "penalty": 2, "note": "误差区间仍未给出", "target": "摘要末句", "suggestion": "补验证集误差区间。"},
+            {"item": "结论不具体", "penalty": 1, "note": "结论只写“有效”", "target": "摘要末句", "suggestion": "写出提升幅度或适用边界。"}
+          ]
+        },
+        {
+          "id": "model",
+          "score": 19,
+          "deductions": [
+            {"item": "参数设置无依据", "penalty": 1, "note": "仍有一处未引用", "target": "4.2 参数设置", "suggestion": "补齐最后一个参数的出处。"}
+          ]
+        },
+        {
+          "id": "innovation",
+          "score": 14,
+          "deductions": [
+            {"item": "创新点缺乏理论支撑", "penalty": 3, "note": "收敛性讨论仍缺", "target": "5.1 模型改进", "suggestion": "补一段收敛性或实验证据。"},
+            {"item": "未构建自定义指标", "penalty": 3, "note": "自定义指标只写在展望里", "target": "5.2 评价指标", "suggestion": "把指标真正算出来并用于结果表。"}
+          ]
+        },
+        {
+          "id": "writing",
+          "score": 13,
+          "deductions": [
+            {"item": "存在空泛表达", "penalty": 1, "note": "“较好” 1 处", "target": "6.1 结论", "suggestion": "换成具体数值。"},
+            {"item": "无个性化痕迹", "penalty": 1, "note": "展望仍较泛", "target": "7 展望", "suggestion": "补一个具体实验。"}
+          ]
+        },
+        {
+          "id": "layout",
+          "score": 14,
+          "deductions": [
+            {"item": "图表编号跳跃或缺失", "penalty": 1, "note": "图 3 仍缺", "target": "图 2 与图 4 之间", "suggestion": "重排图号。"}
+          ]
+        }
+      ]
+    }
+  ],
+  "veto": {
+    "round": 1,
+    "veto": true,
+    "paper": "第X题_赛题简称（含身份信息）",
+    "dimensions": [
+      {"id": "abstract", "score": 30, "deductions": []},
+      {"id": "model", "score": 20, "deductions": []},
+      {"id": "innovation", "score": 20, "deductions": []},
+      {"id": "writing", "score": 15, "deductions": []},
+      {"id": "layout", "score": 15, "deductions": []}
+    ]
+  }
+}
