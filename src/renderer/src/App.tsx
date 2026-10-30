@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type {
   ChatEvent,
   ChatMessageInput,
@@ -23,6 +24,33 @@ type StudioMeta = Awaited<ReturnType<typeof window.studio.meta>>
 
 type Accent = 'a' | 'b' | 'c'
 const ACCENTS: Record<Accent, string> = { a: '墨青', b: '靛蓝', c: '朱砂' }
+
+const RAIL_WIDTH = 240
+const PANE_MIN = 380
+const PANE_MAX = 1100
+const CHAT_MIN = 480
+const PANE_STORAGE_KEY = 'mms.paneWidth'
+
+function clampPaneWidth(width: number, rail = RAIL_WIDTH): number {
+  const max = Math.min(PANE_MAX, Math.max(PANE_MIN, window.innerWidth - rail - CHAT_MIN))
+  return Math.round(Math.min(max, Math.max(PANE_MIN, width)))
+}
+
+function readPaneWidth(): number | null {
+  try {
+    const raw = window.localStorage.getItem(PANE_STORAGE_KEY)
+    const value = raw ? Number(raw) : Number.NaN
+    return Number.isFinite(value) && value > 0 ? clampPaneWidth(value) : null
+  } catch {
+    return null
+  }
+}
+
+function positionGrip(element: HTMLElement, clientY: number): void {
+  const rect = element.getBoundingClientRect()
+  const y = Math.min(Math.max(24, clientY - rect.top), Math.max(24, rect.height - 24))
+  element.style.setProperty('--grip-y', `${Math.round(y)}px`)
+}
 
 let sequence = 0
 function nextId(prefix: string): string {
@@ -86,6 +114,9 @@ export default function App() {
   const [phases, setPhases] = useState<Record<number, PhaseState>>({})
   const [mode, setMode] = useState<'workflow' | 'chat'>('workflow')
   const [explain, setExplain] = useState<ModelCandidate | null>(null)
+  const [paneWidth, setPaneWidth] = useState<number | null>(readPaneWidth)
+  const [resizingPane, setResizingPane] = useState(false)
+  const shellRef = useRef<HTMLDivElement | null>(null)
 
   // 事件可能比 chat.start 的返回值先到，先按 chatId 暂存，拿到 id 后再按序补放。
   const activeChat = useRef<string | null>(null)
@@ -97,6 +128,37 @@ export default function App() {
   useEffect(() => {
     entriesRef.current = entries
   }, [entries])
+
+  useEffect(() => {
+    try {
+      if (paneWidth == null) window.localStorage.removeItem(PANE_STORAGE_KEY)
+      else window.localStorage.setItem(PANE_STORAGE_KEY, String(paneWidth))
+    } catch {
+      /* 本地存储不可用时只保留本次会话内的宽度 */
+    }
+  }, [paneWidth])
+
+  useEffect(() => {
+    if (paneWidth == null) return
+    let timer = 0
+    const apply = (): void => {
+      const rail =
+        shellRef.current?.querySelector<HTMLElement>('.rail')?.getBoundingClientRect().width ??
+        RAIL_WIDTH
+      setPaneWidth((value) => (value == null ? value : clampPaneWidth(value, rail)))
+    }
+    // 窗口从 1440 拉到 2400 的过程中可能触发多次中间尺寸的 resize；
+    // 立刻夹取会把用户宽度永久压到中间尺寸对应的最小值，所以等尺寸稳定再夹。
+    const onResize = (): void => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(apply, 180)
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [paneWidth == null])
 
   useEffect(() => {
     document.documentElement.dataset.accent = accent
@@ -381,9 +443,61 @@ export default function App() {
     .find((entry) => entry.interrupt && !entry.interrupt.resolved)?.interrupt
   const pending = Boolean(pendingCard)
   const currentPhase = currentPhaseOf(phases)
+  const measuredPane = (): number =>
+    shellRef.current?.querySelector<HTMLElement>('.workspace')?.getBoundingClientRect().width ??
+    paneWidth ??
+    520
+  const measuredRail = (): number =>
+    shellRef.current?.querySelector<HTMLElement>('.rail')?.getBoundingClientRect().width ?? RAIL_WIDTH
+
+  const startPaneResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    const handle = event.currentTarget
+    const startX = event.clientX
+    const startWidth = measuredPane()
+    const rail = measuredRail()
+    setResizingPane(true)
+    document.body.style.userSelect = 'none'
+    const move = (moveEvent: PointerEvent): void => {
+      positionGrip(handle, moveEvent.clientY)
+      setPaneWidth(clampPaneWidth(startWidth - (moveEvent.clientX - startX), rail))
+    }
+    const stop = (): void => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      document.body.style.userSelect = ''
+      setResizingPane(false)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+  }
+
+  const nudgePane = (delta: number): void =>
+    setPaneWidth(clampPaneWidth(measuredPane() + delta, measuredRail()))
+
+  const onPaneKey = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      nudgePane(16)
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      nudgePane(-16)
+    }
+  }
+
+  // 离开时不清 --grip-y：指针常在分隔条外松手，清掉会让高亮在淡出过程中闪回中间。
+  const onGripMove = (event: ReactPointerEvent<HTMLDivElement>): void =>
+    positionGrip(event.currentTarget, event.clientY)
 
   return (
-    <div className="shell">
+    <div
+      className="shell"
+      ref={shellRef}
+      data-resizing={resizingPane ? 'col' : undefined}
+      style={paneWidth == null ? undefined : ({ '--pane-w': `${paneWidth}px` } as CSSProperties)}
+    >
       <PhaseRail states={phases} current={currentPhase} />
       <ChatPane
         runtime={runtime}
@@ -405,6 +519,21 @@ export default function App() {
         onRestart={() => void restart()}
       />
       <WorkspacePane runtimeReady={runtime.state === 'ready'} />
+      <div
+        className="splitter splitter--col"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整工作台宽度"
+        aria-valuenow={Math.round(measuredPane())}
+        tabIndex={0}
+        data-splitter="pane"
+        data-dragging={resizingPane ? 'true' : undefined}
+        onPointerDown={startPaneResize}
+        onPointerMove={onGripMove}
+        onPointerEnter={onGripMove}
+        onDoubleClick={() => setPaneWidth(null)}
+        onKeyDown={onPaneKey}
+      />
       {explain ? <ExplainDrawer candidate={explain} onClose={() => setExplain(null)} /> : null}
       <footer className="statusbar">
         <span>{meta ? `v${meta.version}` : '主进程未响应'}</span>

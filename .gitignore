@@ -29,11 +29,16 @@ screenshots/decision.png
 screenshots/drawer.png
 screenshots/figure.png
 screenshots/score.png
+screenshots/dropzone.png
+screenshots/files.png
 *.7z
 *.dmg
 *.exe
 *.blockmap
 *.zip
+
+# 本机启动快捷方式（.lnk 里存的是绝对路径）
+open-dev.lnk
 
 # 本地状态（含 provider 密钥的临时导出，绝不入库）
 .secrets/
