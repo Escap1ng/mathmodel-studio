@@ -1,11 +1,29 @@
 /* —— M4：工作台 —— */
+/* 与 .tabs 同左内缩（8px）、同带高（46.8 = 8*2 内缩 + 4*2 胶囊内距 + 1*2 描边 + 13px*1.6），
+   两行读作一对平行带，而不是第二组标签。 */
 .gatebar {
   display: flex;
+  align-items: center;
   gap: 6px;
-  padding: 8px 10px;
+  min-height: 46.8px;
+  padding: 8px;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
   overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.gatebar::-webkit-scrollbar {
+  display: none;
+}
+
+.gatebar__label {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-3);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .gatebar__chip {
@@ -19,11 +37,6 @@
   color: var(--text-2);
   font-size: 11px;
   white-space: nowrap;
-  cursor: pointer;
-}
-
-.gatebar__chip:hover {
-  border-color: var(--text-3);
 }
 
 .gatebar__dot,

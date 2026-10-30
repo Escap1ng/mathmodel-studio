@@ -54,22 +54,21 @@ const DIM_SHORT: Record<string, string> = {
   layout: '排版'
 }
 
-function GateBar({ rows, onPick }: { rows: GateRow[]; onPick: (id: string) => void }) {
+function GateBar({ rows }: { rows: GateRow[] }) {
   return (
     <div className="gatebar" aria-label="门禁摘要">
+      <span className="gatebar__label">门禁</span>
       {rows.map((row) => (
-        <button
+        <span
           key={row.id}
-          type="button"
           className="gatebar__chip"
           data-gate={row.id}
           data-ok={row.ok ? 'true' : 'false'}
           title={row.detail}
-          onClick={() => onPick(row.id)}
         >
           <span className="gatebar__dot" aria-hidden="true" />
           {row.label}
-        </button>
+        </span>
       ))}
     </div>
   )
@@ -729,13 +728,6 @@ export default function WorkspacePane({ runtimeReady }: Props) {
     // eslint 未启用，避免把 renderFigure 写进依赖导致反复载入。
   }, [runtimeReady])
 
-  const pickGate = (id: string): void => {
-    if (id === 'figure') setActive('figure')
-    else if (id === 'score') setActive('score')
-    else if (id === 'chapter') setActive('gate')
-    else if (id === 'paper') setActive('paper')
-  }
-
   return (
     <aside className="workspace" aria-label="工作台" data-loading={loading ? 'true' : 'false'}>
       <div className="tabs" role="tablist">
@@ -753,7 +745,7 @@ export default function WorkspacePane({ runtimeReady }: Props) {
         ))}
       </div>
 
-      {state ? <GateBar rows={state.gate} onPick={pickGate} /> : null}
+      {state ? <GateBar rows={state.gate} /> : null}
 
       <div className="workspace__body" role="tabpanel">
         {!state && !error && active !== 'files' ? (
