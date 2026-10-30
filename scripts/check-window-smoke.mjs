@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 27
+const MIN_ASSERTIONS = 42
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -31,7 +31,11 @@ const REQUIRED_ASSERTIONS = [
   'G7-5 工具卡完成并给出结构化结果',
   'G7-5 回复文本含模板总数',
   'G7-6 设置对话框打开并列出服务商',
-  'G7-6 Key 落盘只有密文或明确拒绝'
+  'G7-6 Key 落盘只有密文或明确拒绝',
+  'G7-7 K2 卡切出两个子问题',
+  'G7-7 解释抽屉打开不清除待选',
+  'G7-7 runtime 重启后仍停在 K3',
+  'G7-7 选择后阶段 4 进入且待决清空'
 ]
 
 const problems = []
@@ -145,6 +149,14 @@ function selftest() {
       mutate: (d) => {
         const idx = d.results.findIndex((r) => r.name === 'G7-5 工具卡完成并给出结构化结果')
         d.results[idx] = { name: 'A-extra', ok: true, detail: 'ok' }
+      },
+      wantPass: false
+    },
+    {
+      name: '删掉 M3 的持久化断言、补一条 A 行',
+      mutate: (d) => {
+        const idx = d.results.findIndex((r) => r.name === 'G7-7 runtime 重启后仍停在 K3')
+        d.results[idx] = { name: 'A-m3', ok: true, detail: 'ok' }
       },
       wantPass: false
     },

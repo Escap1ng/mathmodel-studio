@@ -50,7 +50,10 @@ export class Channel {
   private startPromise: Promise<void> | null = null
   private stopping = false
 
-  constructor(private readonly root: string) {}
+  constructor(
+    private readonly root: string,
+    private readonly dataDir?: string
+  ) {}
 
   onStatus(cb: (s: RuntimeStatus) => void): () => void {
     this.listeners.add(cb)
@@ -90,6 +93,7 @@ export class Channel {
       env: {
         ...process.env,
         MMS_HOME: this.root,
+        ...(this.dataDir ? { MMS_DATA_DIR: this.dataDir } : {}),
         PYTHONIOENCODING: 'utf-8',
         PYTHONUTF8: '1'
       }
@@ -224,6 +228,19 @@ export class Channel {
 
   async cancel(chatId: string): Promise<void> {
     await this.request(`/chats/${encodeURIComponent(chatId)}/cancel`, { method: 'POST', body: {} })
+  }
+
+  async resumeSession(sessionId: string, action: string, choice: string): Promise<void> {
+    await this.request(`/sessions/${encodeURIComponent(sessionId)}/resume`, {
+      method: 'POST',
+      body: { action, choice }
+    })
+  }
+
+  async latestSession(): Promise<Record<string, unknown> | null> {
+    const data = await this.request('/sessions/latest')
+    const session = data['session']
+    return session && typeof session === 'object' ? (session as Record<string, unknown>) : null
   }
 
   async stream(

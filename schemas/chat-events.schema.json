@@ -9,7 +9,7 @@
   "properties": {
     "id": { "type": "string", "pattern": "^[1-9][0-9]*$" },
     "event": {
-      "enum": ["token", "reasoning", "tool_call", "artifact", "interrupt", "gate", "error", "done"]
+      "enum": ["token", "reasoning", "tool_call", "artifact", "interrupt", "gate", "phase", "error", "done"]
     },
     "data": { "type": "object" }
   },
@@ -113,6 +113,23 @@
       }
     },
     {
+      "if": { "properties": { "event": { "const": "phase" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["phase", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "phase": { "type": "integer", "minimum": 0, "maximum": 6 },
+              "status": { "enum": ["idle", "running", "waiting", "passed", "failed"] },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
       "if": { "properties": { "event": { "const": "error" } }, "required": ["event"] },
       "then": {
         "properties": {
@@ -134,7 +151,7 @@
             "required": ["reason"],
             "additionalProperties": false,
             "properties": {
-              "reason": { "enum": ["stop", "error", "cancelled", "max_tool_rounds"] },
+              "reason": { "enum": ["stop", "error", "cancelled", "max_tool_rounds", "waiting"] },
               "usage": { "type": "object" }
             }
           }

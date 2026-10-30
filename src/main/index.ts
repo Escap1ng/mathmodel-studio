@@ -1,7 +1,13 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
-import type { ChatStartInput, ProviderList, ProviderView } from '../shared/api'
+import type {
+  ChatStartInput,
+  ProviderList,
+  ProviderView,
+  ResumeInput,
+  SessionLatest
+} from '../shared/api'
 import {
   activeProviderId,
   apiKeyFor,
@@ -14,7 +20,7 @@ import {
 // 开发时 electron-vite 会注入 ELECTRON_RENDERER_URL；打包后走 out/renderer/index.html。
 const DEV_SERVER_URL = process.env['ELECTRON_RENDERER_URL']
 const ROOT = process.env['MMS_HOME'] || join(__dirname, '..', '..')
-const channel = new Channel(ROOT)
+const channel = new Channel(ROOT, app.getPath('userData'))
 const activeStreams = new Map<string, AbortController>()
 
 type ChatInput = ChatStartInput
@@ -91,7 +97,39 @@ function parseChatInput(raw: unknown): ChatInput {
     if (total > 200_000) throw new Error('消息总长度超过上限')
     messages.push({ role: m.role, content: m.content })
   }
-  return { providerId, model, messages }
+  return { providerId, model, mode: obj.mode === 'workflow' ? 'workflow' : 'chat', messages }
+}
+
+function parseResumeInput(raw: unknown): ResumeInput {
+  if (!raw || typeof raw !== 'object') throw new Error('恢复请求格式不对')
+  const obj = raw as Record<string, unknown>
+  const sessionId = typeof obj.sessionId === 'string' ? obj.sessionId.trim() : ''
+  const action = obj.action
+  if (!sessionId) throw new Error('缺少会话 id')
+  if (action !== 'confirm' && action !== 'reroll' && action !== 'choose') throw new Error('未知决策动作')
+  const choice = typeof obj.choice === 'string' ? obj.choice : undefined
+  if (action === 'choose' && !choice) throw new Error('缺少候选 id')
+  return { sessionId, action, choice }
+}
+
+function attachStream(chatId: string, sender: WebContents): void {
+  const controller = new AbortController()
+  activeStreams.set(chatId, controller)
+  void channel
+    .stream(
+      chatId,
+      (ev: ChatEventPayload) => {
+        if (!sender.isDestroyed()) sender.send('chat:event', { chatId, ...ev })
+      },
+      controller.signal
+    )
+    .catch((err: unknown) => {
+      if (controller.signal.aborted || sender.isDestroyed()) return
+      const message = err instanceof Error ? err.message : String(err)
+      sender.send('chat:event', { chatId, id: '0', event: 'error', data: { message } })
+      sender.send('chat:event', { chatId, id: '0', event: 'done', data: { reason: 'error' } })
+    })
+    .finally(() => activeStreams.delete(chatId))
 }
 
 ipcMain.handle('app:meta', () => ({
@@ -134,30 +172,26 @@ ipcMain.handle('chat:start', async (event, raw: unknown) => {
   const chatId = await channel.startChat({
     providerId: view.id,
     model: input.model || view.model,
+    mode: input.mode,
     apiKey,
     baseUrl: view.custom ? view.baseUrl : undefined,
     messages: input.messages
   })
-  const controller = new AbortController()
-  activeStreams.set(chatId, controller)
-  const sender = event.sender
-  void channel
-    .stream(
-      chatId,
-      (ev: ChatEventPayload) => {
-        if (!sender.isDestroyed()) sender.send('chat:event', { chatId, ...ev })
-      },
-      controller.signal
-    )
-    .catch((err: unknown) => {
-      if (controller.signal.aborted || sender.isDestroyed()) return
-      const message = err instanceof Error ? err.message : String(err)
-      sender.send('chat:event', { chatId, id: '0', event: 'error', data: { message } })
-      sender.send('chat:event', { chatId, id: '0', event: 'done', data: { reason: 'error' } })
-    })
-    .finally(() => activeStreams.delete(chatId))
+  attachStream(chatId, event.sender)
   return { ok: true, chatId }
 })
+
+ipcMain.handle('chat:resume', async (event, raw: unknown) => {
+  const input = parseResumeInput(raw)
+  await channel.resumeSession(input.sessionId, input.action, input.choice ?? '')
+  attachStream(input.sessionId, event.sender)
+  return { ok: true, chatId: input.sessionId }
+})
+
+ipcMain.handle('session:latest', async (): Promise<SessionLatest> => ({
+  ok: true,
+  session: (await channel.latestSession()) as SessionLatest['session']
+}))
 
 ipcMain.handle('chat:cancel', async (_event, raw: unknown) => {
   const chatId = typeof raw === 'string' ? raw : ''
@@ -191,7 +225,12 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    // 分数缩放（本机 150%）下，Windows 会把 useContentSize 的结果再抖动 1–2 DIP；
+    // 布局基准是内容区 1440×900，显示前再钉一次。
+    win.setContentSize(1440, 900)
+    win.show()
+  })
 
   if (DEV_SERVER_URL && !app.isPackaged) {
     void win.loadURL(DEV_SERVER_URL)

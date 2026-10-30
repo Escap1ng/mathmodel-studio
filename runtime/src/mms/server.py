@@ -21,10 +21,12 @@ import threading
 import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import __version__
+from . import __version__, orchestrator
 from .invoke import list_templates
+from .store import SessionStore, data_dir, snapshot
 from .provider import (
     CancelledError,
     ProviderError,
@@ -272,14 +274,47 @@ class ChatSession:
             self.finish("error")
 
 
+class WorkflowSession(ChatSession):
+    """M3 编排会话：复用事件缓冲与 SSE 语义，内容由状态机产生。"""
+
+    def __init__(self, chat_id: str, store: SessionStore, record: dict, action: str, choice: str):
+        super().__init__(chat_id, {}, "", "", [])
+        self.store = store
+        self.record = record
+        self.action = action
+        self.choice = choice
+
+    def _run(self) -> None:
+        try:
+            if self.action == "start":
+                events = orchestrator.start(self.store, self.record)
+            else:
+                events = orchestrator.resume(self.store, self.record, self.action, self.choice)
+            for ev in events:
+                if self.cancelled:
+                    raise CancelledError()
+                self.append(ev["event"], ev["data"])
+            self.finish("stop" if self.action == "choose" else "waiting")
+        except CancelledError:
+            self.finish("cancelled")
+        except ValueError as exc:
+            self.append("error", {"message": str(exc)})
+            self.finish("error")
+        except Exception:
+            traceback.print_exc(file=sys.stderr)
+            self.append("error", {"message": "编排状态机内部错误，详情见 stderr"})
+            self.finish("error")
+
+
 class ChannelServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address, handler, token: str, fake: bool):
+    def __init__(self, address, handler, token: str, fake: bool, store: SessionStore):
         super().__init__(address, handler)
         self.token = token
         self.fake = fake
+        self.store = store
         self.sessions: dict[str, ChatSession] = {}
         self.sessions_lock = threading.Lock()
 
@@ -360,6 +395,17 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/providers":
             self._json(200, {"ok": True, "fake": self.server.fake, "providers": provider_rows(self.server.fake)})
             return
+        if parsed.path == "/sessions/latest":
+            self._json(200, {"ok": True, "session": snapshot(self.server.store.latest())})
+            return
+        if parsed.path.startswith("/sessions/") and parsed.path.count("/") == 2:
+            session_id = parsed.path[len("/sessions/") :]
+            record = self.server.store.get(session_id)
+            if not record:
+                self._error(404, "session", "没有这个会话")
+                return
+            self._json(200, {"ok": True, "session": snapshot(record)})
+            return
         if parsed.path.startswith("/chats/") and parsed.path.endswith("/events"):
             chat_id = parsed.path[len("/chats/") : -len("/events")].strip("/")
             self._stream(chat_id, parse_qs(parsed.query))
@@ -372,6 +418,10 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/chats":
             self._start_chat()
+            return
+        if parsed.path.startswith("/sessions/") and parsed.path.endswith("/resume"):
+            session_id = parsed.path[len("/sessions/") : -len("/resume")].strip("/")
+            self._resume_session(session_id)
             return
         if parsed.path.startswith("/chats/") and parsed.path.endswith("/cancel"):
             chat_id = parsed.path[len("/chats/") : -len("/cancel")].strip("/")
@@ -430,11 +480,45 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
         chat_id = secrets.token_hex(8)
-        session = ChatSession(chat_id, provider, api_key, model, messages)
+        mode = str(body.get("mode") or "chat")
+        if mode not in ("chat", "workflow"):
+            self._error(400, "mode", f"未知对话模式: {mode}")
+            return
+        if mode == "workflow":
+            problem = next(m["content"] for m in reversed(messages) if m["role"] == "user")
+            record = self.server.store.create(chat_id, provider_id, model, problem)
+            session: ChatSession = WorkflowSession(chat_id, self.server.store, record, "start", "")
+        else:
+            session = ChatSession(chat_id, provider, api_key, model, messages)
         with self.server.sessions_lock:
             self.server.sessions[chat_id] = session
         session.start()
-        self._json(200, {"ok": True, "chatId": chat_id})
+        self._json(200, {"ok": True, "chatId": chat_id, "mode": mode})
+
+    def _resume_session(self, session_id: str) -> None:
+        body = self._body()
+        if body is None:
+            return
+        action = str(body.get("action") or "")
+        choice = str(body.get("choice") or "")
+        if action not in ("confirm", "reroll", "choose"):
+            self._error(400, "action", f"未知动作: {action}")
+            return
+        if action == "choose" and not choice:
+            self._error(400, "choice", "选择候选时必须给出 choice")
+            return
+        record = self.server.store.get(session_id)
+        if not record:
+            self._error(404, "session", "没有这个会话")
+            return
+        if not record.get("pending"):
+            self._error(409, "pending", "这个会话没有等待中的决策")
+            return
+        session = WorkflowSession(session_id, self.server.store, record, action, choice)
+        with self.server.sessions_lock:
+            self.server.sessions[session_id] = session
+        session.start()
+        self._json(200, {"ok": True, "chatId": session_id})
 
     def _stream(self, chat_id: str, query: dict) -> None:
         with self.server.sessions_lock:
@@ -495,7 +579,9 @@ class Handler(BaseHTTPRequestHandler):
 def serve(port: int = 0) -> int:
     token = secrets.token_hex(24)
     fake = fake_enabled()
-    server = ChannelServer(("127.0.0.1", port), Handler, token, fake)
+    root = Path(os.environ.get("MMS_HOME") or ".").resolve()
+    store = SessionStore(data_dir(root) / "sessions.db")
+    server = ChannelServer(("127.0.0.1", port), Handler, token, fake, store)
     # 握手行是 stdout 的唯一内容；之后所有诊断都走 stderr。
     print(
         json.dumps(

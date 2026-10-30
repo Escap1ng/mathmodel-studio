@@ -97,7 +97,7 @@ npmmirror 可用——镜像本身也会挂，超时不等于配置错了。
 ## 6 写脚本时的 Windows 坑
 
 - **PowerShell 5.1 按 GBK 解 `.ps1`**：含中文的安装/启动脚本会报语法错或静默吞语句。要么脚本全 ASCII，要么带 UTF-8 BOM。上游 metamath-harness 就因为漏了 BOM 导致旧终端下装机必炸。
-- **Python 在 GBK 控制台 print 中文会抛 `UnicodeEncodeError`**：`mms` CLI 已在入口显式把 stdout/stderr 重配成 UTF-8，你自己的脚本也要照做。
+- **Python 在 GBK 控制台 print 中文会抛 `UnicodeEncodeError`**：本机是 GBK，Windows CI 的 stdout 更窄（cp1252）。`mms` CLI 与两个自检脚本都在入口把 stdout/stderr 重配成 UTF-8；你自己的脚本也要照做，否则本机乱码、CI 直接崩。
 - **别按进程名杀进程**（`taskkill /IM`），按 PID 杀；Git Bash 会把 `/PID` 当路径吃掉，需要 `MSYS_NO_PATHCONV=1`。
 
 ## 7 装完之后
@@ -111,5 +111,6 @@ npm run gate
 `check:cli` 需要 `requirements.txt` 里的科学计算包。这是刻意设计，方便你在任何机器上验证注册表与通道没漂。
 
 想看界面就两条路：`npm run dev` 起开发窗口；或先 `npm run build` 再 `npm run smoke:window`，
-它会 `require` 生产入口真起一次窗口、拉起 Python 通道、用离线 provider 发一句话，按像素与 DOM 断言（27 条），
-并把截图写到 `screenshots/`。本机有显示器，不需要 xvfb；CI 那条 job 才需要，并且要先修好 Electron 的 SUID 沙箱助手（见 `ci.yml` 的注释）。
+它会 `require` 生产入口真起一次窗口、拉起 Python 通道、用离线 provider 走完 K2→K3→解释→换一批→选择，再重启 runtime 确认待选卡还在（42 条），
+截图写到 `screenshots/`（`decision.png`、`drawer.png` 是 M3 新增）。本机有显示器，不需要 xvfb；CI 那条 job 才需要，并且要先修好 Electron 的 SUID 沙箱助手（见 `ci.yml` 的注释）。
+会话状态默认写在 Electron `userData/sessions.db`（开发期也可用 `MMS_DATA_DIR` 指到别处），不存 Key。

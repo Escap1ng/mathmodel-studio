@@ -1,6 +1,6 @@
 [project]
 name = "mms-runtime"
-version = "0.2.0"
+version = "0.3.0"
 description = "mathmodel-studio 的 Agent 运行时：技能注册表读取、阶段编排、provider 适配与产物登记"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }

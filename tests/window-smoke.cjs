@@ -1,5 +1,5 @@
 /**
- * G7 · 真启动冒烟（M2：含离线 provider 的流式对话与工具卡）
+ * G7 · 真启动冒烟（M3：阶段状态机、K2/K3 决策卡、K4 抽屉与跨重启恢复）
  *
  * 关键取舍：本脚本不自己建窗口，而是 require 生产入口 out/main/index.js，
  * 让它按 src/main/index.ts 的窗口配置、preload 路径、IPC 注册、runtime 子进程与导航守卫起窗。
@@ -13,7 +13,9 @@
  *   5 结构与交互：阶段轨道 7 节、工作台 6 标签、runtime 就绪后输入区可用、点色块换 --accent
  *   6 中文按真字形渲染——用「国」与空心框「□」的墨量比值区分；像素总量和
  *     document.fonts.check 都分不清字与方框，上一轮的豆腐块截图就是这么混过去的
- *   7 M2 闭环：本机 SSE 事件真的把文字流进气泡、list_templates 工具卡走到完成、设置页不回显 Key
+ *   7 M3 闭环：新赛题停在 K2 → 确认后 K3 三张候选 → 解释抽屉不清待选 →
+ *     runtime 重启后待选仍在 → 换一批 → 选择后进入阶段 4
+ *   8 M2 回归：自由问答仍能流式出字、list_templates 工具卡走到完成、设置页不回显 Key
  *
  * 假 provider 只在本脚本进程里打开（MMS_FAKE_PROVIDER=1），不联网、不需要 Key；
  * 真实 DeepSeek/Kimi 需要用户自己的 Key，不能在这里代跑。
@@ -327,7 +329,203 @@ async function main() {
   )
   if (!backToFake) throw new Error('切回离线演示 provider 失败，拒绝继续以免带着假 Key 联网')
 
-  // —— M2：离线 provider 的流式回复 + 工具卡 ——
+  // —— M3：从赛题到选模卡，再到持久化恢复 ——
+  const defaultMode = await win.webContents.executeJavaScript(
+    `document.querySelector('.mode-switch__btn[data-mode="workflow"]')?.getAttribute('aria-pressed')`
+  )
+  record('G7-7 默认进入建模模式', defaultMode === 'true', `aria-pressed=${defaultMode}`)
+
+  const problem = '问题1 预测未来三个月的销量。\n问题2 给出补货建议。'
+  await win.webContents.executeJavaScript(`(() => {
+    const input = document.querySelector('.composer__input')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(input, ${JSON.stringify(problem)})
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return input.value.length
+  })()`)
+  await sleep(100)
+  await win.webContents.executeJavaScript(`document.querySelector('.pill--send[data-mode="workflow"]')?.click()`)
+
+  const k2Open = await waitFor(
+    win,
+    `!!document.querySelector('.decision[data-card="problem-confirm"]')`,
+    15000
+  )
+  const k2 = await win.webContents.executeJavaScript(`({
+    questions: document.querySelectorAll('.decision[data-card="problem-confirm"] .decision__questions li').length,
+    phase1: document.querySelector('.rail .phase[data-phase="1"]')?.dataset.state ?? null,
+    sendDisabled: document.querySelector('.pill--send[data-mode="workflow"]')?.disabled ?? null,
+    cardText: document.querySelector('.decision[data-card="problem-confirm"]')?.textContent ?? ''
+  })`)
+  record(
+    'G7-7 K2 卡切出两个子问题',
+    k2Open && k2.questions === 2 && k2.cardText.includes('赛题与附件确认'),
+    `卡片出现=${k2Open}，子问题=${k2.questions}`
+  )
+  record(
+    'G7-7 阶段 1 停在等你确认',
+    k2.phase1 === 'waiting',
+    `阶段 1 状态=${k2.phase1}`
+  )
+  record(
+    'G7-7 待决时建模发送禁用',
+    k2.sendDisabled === true,
+    `发送按钮 disabled=${k2.sendDisabled}`
+  )
+
+  const snapK2 = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  record(
+    'G7-7 K2 待决已写入会话表',
+    snapK2?.session?.pending?.card === 'problem-confirm' &&
+      snapK2.session.messages.some((m) => m.role === 'user' && m.content.includes('销量')),
+    `pending=${snapK2?.session?.pending?.card} 消息数=${snapK2?.session?.messages?.length}`
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="confirm"]')?.click()`)
+  const k3Open = await waitFor(
+    win,
+    `[...document.querySelectorAll('.decision[data-card="model-choice"]')].some((c) => !c.querySelector('.decision__resolved'))`,
+    15000
+  )
+  const k3 = await win.webContents.executeJavaScript(`(() => {
+    const card = [...document.querySelectorAll('.decision[data-card="model-choice"]')].find((c) => !c.querySelector('.decision__resolved'))
+    return {
+      candidates: card ? card.querySelectorAll('.candidate').length : 0,
+      phase3: document.querySelector('.rail .phase[data-phase="3"]')?.dataset.state ?? null,
+      names: card ? [...card.querySelectorAll('.candidate__name')].map((n) => n.textContent) : []
+    }
+  })()`)
+  const snapK3 = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  const candidatesK3 = snapK3?.session?.pending?.payload?.candidates ?? []
+  record(
+    'G7-7 确认后出现三张候选，含创新性高的一项',
+    k3Open &&
+      k3.candidates === 3 &&
+      candidatesK3.length === 3 &&
+      candidatesK3.some((c) => c.innovation === '高'),
+    `候选=${k3.candidates} 创新度=${candidatesK3.map((c) => c.innovation)}`
+  )
+  record('G7-7 阶段 3 停在等你选', k3.phase3 === 'waiting', `阶段 3 状态=${k3.phase3}`)
+
+  await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.decision[data-card="model-choice"]')].find((c) => !c.querySelector('.decision__resolved'))?.querySelector('[data-action="explain"]')?.click()`
+  )
+  const drawerOpen = await waitFor(win, `!!document.querySelector('.drawer[data-drawer="explain"]')`, 5000)
+  const explainState = await win.webContents.executeJavaScript(`(() => {
+    const card = [...document.querySelectorAll('.decision[data-card="model-choice"]')].find((c) => !c.querySelector('.decision__resolved'))
+    return {
+      cardStill: !!card,
+      phase3: document.querySelector('.rail .phase[data-phase="3"]')?.dataset.state ?? null,
+      sections: document.querySelectorAll('.drawer .drawer__section').length
+    }
+  })()`)
+  const snapExplain = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  record(
+    'G7-7 解释抽屉打开不清除待选',
+    drawerOpen &&
+      explainState.cardStill &&
+      explainState.phase3 === 'waiting' &&
+      explainState.sections >= 5 &&
+      snapExplain?.session?.pending?.card === 'model-choice',
+    `抽屉=${drawerOpen} 卡片仍在=${explainState.cardStill} 阶段3=${explainState.phase3} 小节=${explainState.sections}`
+  )
+  const drawerShot = await win.webContents.capturePage()
+  const drawerInk = measureInk(drawerShot)
+  writeFileSync(join(OUT_DIR, 'drawer.png'), drawerShot.toPNG())
+  record(
+    'G7-7 解释抽屉截图非空',
+    drawerInk.ratio >= MIN_INK_RATIO,
+    `非白像素 ${(drawerInk.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
+  )
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="close-drawer"]')?.click()`)
+  const drawerClosed = await waitFor(win, `!document.querySelector('.drawer')`, 5000)
+  record('G7-7 解释抽屉可以关闭', drawerClosed, `关闭后仍存在=${!drawerClosed}`)
+
+  // 杀掉 runtime 再拉起：待选卡必须从 SQLite 快照回到界面，而不是靠内存。
+  const sidBefore = snapK3?.session?.id
+  await win.webContents.executeJavaScript(`window.studio.runtime.restart().then(() => true)`)
+  const restored = await waitFor(
+    win,
+    `!!document.querySelector('.decision[data-card="model-choice"]') && document.querySelector('.rail .phase[data-phase="3"]')?.dataset.state === 'waiting' && !document.querySelector('.pill--stop')`,
+    25000
+  )
+  const snapRestored = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  record(
+    'G7-7 runtime 重启后仍停在 K3',
+    restored &&
+      snapRestored?.session?.id === sidBefore &&
+      snapRestored.session.pending?.card === 'model-choice',
+    `恢复=${restored} 会话一致=${snapRestored?.session?.id === sidBefore} pending=${snapRestored?.session?.pending?.card}`
+  )
+
+  const firstName = (snapRestored?.session?.pending?.payload?.candidates ?? [])[0]?.name
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="reroll"]')?.click()`)
+  const rerolled = await waitFor(
+    win,
+    `[...document.querySelectorAll('.decision[data-card="model-choice"]')].some((c) => !c.querySelector('.decision__resolved') && c.textContent.includes('第 2 组'))`,
+    15000
+  )
+  const snapReroll = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  const rerollCandidates = snapReroll?.session?.pending?.payload?.candidates ?? []
+  record(
+    'G7-7 换一批给出第 2 组新候选',
+    rerolled &&
+      snapReroll?.session?.batch === 2 &&
+      rerollCandidates[0]?.name &&
+      rerollCandidates[0].name !== firstName,
+    `batch=${snapReroll?.session?.batch} 首项 ${firstName} → ${rerollCandidates[0]?.name}`
+  )
+
+  await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.decision[data-card="model-choice"]')].find((c) => !c.querySelector('.decision__resolved'))?.scrollIntoView({ block: 'start' })`
+  )
+  await sleep(250)
+  const decisionShot = await win.webContents.capturePage()
+  const decisionInk = measureInk(decisionShot)
+  writeFileSync(join(OUT_DIR, 'decision.png'), decisionShot.toPNG())
+  record(
+    'G7-7 选模卡截图非空',
+    decisionInk.ratio >= MIN_INK_RATIO,
+    `非白像素 ${(decisionInk.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
+  )
+
+  const pick = rerollCandidates[0]?.id
+  await win.webContents.executeJavaScript(`(() => {
+    const card = [...document.querySelectorAll('.decision[data-card="model-choice"]')].find((c) => !c.querySelector('.decision__resolved'))
+    card?.querySelector('[data-action="choose"][data-choice="${pick}"]')?.click()
+  })()`)
+  const chosen = await waitFor(
+    win,
+    `document.querySelector('.rail .phase[data-phase="4"]')?.dataset.state === 'running' && [...document.querySelectorAll('.msg--assistant .msg__text')].some((n) => n.textContent.includes('已选择'))`,
+    15000
+  )
+  const snapChosen = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  const phaseChosen = await win.webContents.executeJavaScript(`({
+    p3: document.querySelector('.rail .phase[data-phase="3"]')?.dataset.state ?? null,
+    p4: document.querySelector('.rail .phase[data-phase="4"]')?.dataset.state ?? null,
+    stop: !!document.querySelector('.pill--stop'),
+    actions: [...document.querySelectorAll('.decision[data-card="model-choice"]')]
+      .filter((c) => c.querySelector('.decision__resolved'))
+      .flatMap((c) => [...c.querySelectorAll('[data-action="choose"], [data-action="reroll"]')])
+      .map((b) => ({ action: b.dataset.action, disabled: b.disabled, opacity: getComputedStyle(b).opacity }))
+  })`)
+  record(
+    'G7-7 选择后阶段 4 进入且待决清空',
+    chosen &&
+      phaseChosen.p3 === 'passed' &&
+      phaseChosen.p4 === 'running' &&
+      snapChosen?.session?.pending === null &&
+      !phaseChosen.stop,
+    `阶段3=${phaseChosen.p3} 阶段4=${phaseChosen.p4} pending=${snapChosen?.session?.pending} 停止键=${phaseChosen.stop}`
+  )
+  record(
+    'G7-7 已选卡的动作按钮已禁用',
+    phaseChosen.actions.length > 0 && phaseChosen.actions.every((b) => b.disabled),
+    `动作按钮 ${JSON.stringify(phaseChosen.actions)}`
+  )
+
+  // —— M2 回归：自由问答仍能流式出字并显示工具卡 ——
+  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="chat"]')?.click()`)
   await win.webContents.executeJavaScript(`(() => {
     const input = document.querySelector('.composer__input')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
@@ -336,7 +534,7 @@ async function main() {
     return input.value
   })()`)
   await sleep(120)
-  await win.webContents.executeJavaScript(`document.querySelector('.pill--send')?.click()`)
+  await win.webContents.executeJavaScript(`document.querySelector('.pill--send[data-mode="chat"]')?.click()`)
 
   const userVisible = await waitFor(
     win,
