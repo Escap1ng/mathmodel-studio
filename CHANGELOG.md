@@ -32,6 +32,13 @@ M5 排版全链路：一题进，`paper.pdf` 与 `paper.docx` 出，去 AI 与�
 - 论文页真起窗：构建 → 三道门禁 → pdf.js 预览出第 1 页，截图 `screenshots/paper.png`。
 - 工具版本：MiKTeX-XeTeX 4.16（MiKTeX 25.12）、pandoc 3.13（装在仓库外的 `%LOCALAPPDATA%\mms-tools`）。
 
+### 验证（CI，run 41017241564）
+
+- 三 job 全绿：`门禁 · ubuntu-latest`、`门禁 · windows-latest`、`真启动冒烟 · ubuntu`。
+- ubuntu 上 G10 10/10（真编 PDF/DOCX 与四条反向）、G9 13/13、G6 14/14。
+- ubuntu 真启动 57/57，内容尺寸 1440x900，非白像素 2.96%；论文页构建与 pdf.js 预览通过（预览截图非白 7.86%）。G6b 独立复算一致。
+- Windows 的 G10 显式跳过：`SKIP 缺少排版工具：['xelatex', 'pandoc']（MMS_PAPER_SKIP=1，未验证 G10）`，没有当成通过。
+
 ### 尚未做
 
 - **阶段机没有接论文**：论文构建是工作台动作，阶段五不会因构建成功自动标为已过；K1 环境预检卡也未接。
