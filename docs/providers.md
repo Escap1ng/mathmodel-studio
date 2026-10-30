@@ -64,7 +64,7 @@ G7 真启动冒烟会在自己的进程里打开这个开关，并把 `userData`
 - OpenAI 兼容协议本身：429 退避、`reasoning_content` 与正文分离、分片 `tool_calls` 拼装、历史剥离 reasoning、Key 只出现在 Authorization（G5，用本地假端点，不联网）。
 - 界面端到端：设置页打开/关闭、不回显 Key、哨兵 Key 经 UI 保存后磁盘上只有密文（G7 共 42 条，本机 Windows 真启动；M2 的 27 条同组已由 CI 的 ubuntu 跑过）。
 - 离线 provider 的文字真的流进气泡，`list_templates` 工具卡从 running 走到 ok，结束后按钮回到「发送」（G7 同一轮）。
-- 安全存储不可用时明确拒绝且不落盘：CI run `40658227855` 的 Linux runner 没有 Secret Service，G7 实得 `可用=false、文件存在=false、明确拒绝=true`。
+- 安全存储不可用时明确拒绝且不落盘：CI run `40982728779`（M3）的 Linux runner 没有 Secret Service，G7 实得 `可用=false、文件存在=false、明确拒绝=true`。
 
 **未验证**：
 
