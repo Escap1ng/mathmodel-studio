@@ -66,7 +66,7 @@ gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
 | 结论 | 证据来源 | 强度 |
 | --- | --- | --- |
 | 注册表、技能规范、契约与 CLI 仍自洽 | 本机 gate + CI 双平台（M1 起） | 强 |
-| 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消 | `selfcheck_channel.py` 46/46（本机 Windows） | 强（本机） |
+| 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消 | `selfcheck_channel.py` 47/47（本机 Windows） | 强（本机） |
 | 编排闭环：K2→K3→换一批→选择→阶段四 | 同上的 C12，事件与快照双向核对 | 强（本机） |
 | 跨进程恢复：换一个服务器进程仍停在 K2 | 同上的 C13 | 强（本机） |
 | 界面端到端：78 条，含论文构建、预览、可拖拽布局、附件拖放与正文送入、工作区文件页 | G7 78/78，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
@@ -78,6 +78,7 @@ gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
 | 缺工具 / 坏 TeX / 缺稿件 | G10 P6/P8/P9：分别退出 2 / 1 / 2，不产出假 PDF | 强（反向） |
 | pdf.js 页级预览 | G7-9：画布尺寸与截图墨迹；`screenshots/paper.png` | 强（本机） |
 | M5 在 CI 上真编 | run `41017241564`：ubuntu G10 10/10、G7 57/57、G6b 核验一致 | 强（ubuntu） |
+| 0.5.2 在 CI 上真起窗 | run `41065088121`：ubuntu G7 78/78、非白像素 3.81%、G6b 核验一致；双平台 G4 47/47、G9 13/13、G3 13/13，ubuntu G10 10/10 | 强（ubuntu） |
 | Windows CI 跑 G10 | 未装 MiKTeX，gates job 显式跳过并打印「未验证 G10」 | **未证**（执行层跳过，不是通过） |
 | PDF 与 Word 版式一致性 | 未自动化；只做 docx 生成与后处理 | **未证** |
 | 阶段五由构建驱动 / K1 环境预检 | 未接；论文页构建不推进阶段机 | **未证** |

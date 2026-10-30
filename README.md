@@ -113,7 +113,7 @@ G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
 **执行状态要说清**：M5 的本机 `npm run gate` 全绿——G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言）、G4（47 条通道断言，含跨进程恢复）、事件判据自测（10/10）、G9（13 条工作台断言）、G10（10 条论文断言）、G6b 自测（12/12）、类型检查、构建与 G6 产物冒烟。G7 在本机 Windows 上 78/78，独立核验通过；选模卡、图表工作台、评分卡、论文页、拖放区、文件页与附件气泡截图在 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`、`screenshots/paper.png`、`screenshots/dropzone.png`、`screenshots/files.png`、`screenshots/attachments.png`。
-M5 的 CI（run `41017241564`）三 job 全绿：ubuntu 真启动 57/57、内容尺寸 1440x900、非白像素 2.96%，G6b 独立核验一致，G10 10/10、G9 13/13、G6 14/14；Windows 的 G10 显式跳过并标注未验证。0.4.0 的 run `41008695577` 三 job 全绿：ubuntu 真启动 53/53、非白像素 3.98%。0.3.0/0.3.1 的 run `40982728779`、`41000678500` 同样三 job 全绿。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
+M5 的 CI（run `41017241564`）三 job 全绿：ubuntu 真启动 57/57、内容尺寸 1440x900、非白像素 2.96%，G6b 独立核验一致，G10 10/10、G9 13/13、G6 14/14；Windows 的 G10 显式跳过并标注未验证。0.5.2 的 CI（run `41065088121`）同样三 job 全绿：ubuntu 真启动 78/78、非白像素 3.81%，G6b 一致，双平台 G4 47/47、G9 13/13、G3 13/13，ubuntu 的 G10 10/10；Windows 的 G10 仍显式跳过并标注未验证。0.4.0 的 run `41008695577` 三 job 全绿：ubuntu 真启动 53/53、非白像素 3.98%。0.3.0/0.3.1 的 run `40982728779`、`41000678500` 同样三 job 全绿。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
 
 ## 依赖
 
