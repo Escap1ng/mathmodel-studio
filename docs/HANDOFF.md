@@ -1,13 +1,13 @@
-# 交接 · M3 完成时的状态
+# 交接 · M4 完成时的状态
 
 给接手的人（或下一轮会话的我）。日期 2026-10-30。
 提交数与文件数不要信我抄在这里的数字，跑 `git rev-list --count HEAD` 和 `git ls-files | wc -l` 自己取；HEAD 以 `git log -1` 为准。
 
 ## 0 一句话现状
 
-M3 编排闭环：发一道题后状态机停在 K2 赛题确认，确认后给 3 张 K3 选模卡，可换一批、可打开 K4 解释抽屉（不清待选）；点选后阶段 4 进入。阶段、待决卡与消息写在本机 SQLite，**杀掉 runtime 再拉起仍停在原处**。
-M3 的候选由内置方法族模板按题面关键词选出，**不是模型判断**；接真实模型选型在 M4。
-**还不能真正做题**——代码实现、图表返工、论文编译与评分在 M4/M5。里程碑见 [../PLAN.md](../PLAN.md) §7。
+M4 工作台：M3 的 K2/K3/K4 编排闭环保留；右栏现在能真渲一张图、换主题重渲、并排看新旧版并回滚；评分页给五维分、总分 86 达标、扣分正文定位、第三轮熔断与一票否决示例；顶部门禁条汇总图表/评分/章节。
+工作台样例来自 vendored 技能与演示评分卡，**不是对真实论文的自动评判**；论文 PDF 预览与自动代码/排版在 M5。
+**还不能自动写代码或生成论文**。里程碑见 [../PLAN.md](../PLAN.md) §7。
 
 两句必须保留的限制：
 
@@ -32,27 +32,28 @@ python scripts/validate_contracts.py            # 9/9 项通过（jsonschema） 
 python runtime/selfcheck.py                     # 13/13 条 CLI 断言，含真渲一张图  → exit 0
 python runtime/selfcheck_channel.py             # 46/46 条通道断言（含 M3 恢复）  → exit 0
 python runtime/selfcheck_channel.py --selftest  # 10/10 条坏事件被拒                → exit 0
+python runtime/selfcheck_workbench.py           # 13/13 条工作台断言（真渲两版）   → exit 0
 ```
 
-`selfcheck.py` 会真的调 matplotlib 渲染 `paired-raincloud`（约十几秒），需要 `requirements.txt`；
+`selfcheck.py` 与 `selfcheck_workbench.py` 会真的调 matplotlib 渲染（各十几秒），需要 `requirements.txt`；
 `selfcheck_channel.py` 只起本机 Python 子进程与 127.0.0.1 上的假 OpenAI 端点，不需要 matplotlib、也不联网。
 
 需要显示器的部分：
 
 ```bash
-npm run smoke:window   # 真起窗口，43/43，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png
+npm run smoke:window   # 真起窗口，53/53，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png、figure.png、score.png
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
 
-`smoke:window` 自己设置 `MMS_FAKE_PROVIDER=1`，并把 Electron `userData` 指到临时目录，所以它不会用你已保存的真实 provider，也不会带着哨兵 Key 发请求。
-跑完可以直接看 `screenshots/decision.png` 与 `screenshots/drawer.png`；断言通过不等于观感合格。
+`smoke:window` 自己设置 `MMS_FAKE_PROVIDER=1`，并把 Electron `userData` 指到临时目录，所以它不会用你已保存的真实 provider，也不会带着哨兵 Key 发请求；工作台的图表与版式也写在这个临时目录。
+跑完可以直接看 `screenshots/decision.png`、`screenshots/figure.png` 与 `screenshots/score.png`；断言通过不等于观感合格。
 
 一把梭：`npm run gate`（顺序见 `package.json` 的 scripts；G7 不在 gate 里，因为它要显示器和 Electron 二进制）。
 
 **本机跑 G7 前去掉 `ELECTRON_RUN_AS_NODE`**：本会话 shell 里它是 `1`，会让 `electron` 退化成 Node 并报 `app.setPath` 不存在。用 `env -u ELECTRON_RUN_AS_NODE npx electron tests/window-smoke.cjs`。
 
 CI：<https://github.com/Escap1ng/mathmodel-studio/actions> —— 三 job：`门禁 · ubuntu-latest`、`门禁 · windows-latest`、`真启动冒烟 · ubuntu`。
-0.3.0 的 run `40982728779` 三 job 全绿；ubuntu 真启动 42/42、非白像素 3.15%（M2 的历史 run `40658227855` 为 27/27）。0.3.1 的 run `41000678500` 三 job 全绿，ubuntu 真启动 43/43、非白像素 3.12%，Linux 应用菜单为空。取回截图：
+0.3.0 的 run `40982728779` 三 job 全绿；ubuntu 真启动 42/42、非白像素 3.15%（M2 的历史 run `40658227855` 为 27/27）。0.3.1 的 run `41000678500` 三 job 全绿，ubuntu 真启动 43/43、非白像素 3.12%，Linux 应用菜单为空。M4 的界面修订以本轮推送后的 run 为准。取回截图：
 
 ```bash
 gh run download <run-id> -n window-smoke --dir screenshots-m3-ci
@@ -66,16 +67,21 @@ gh run download <run-id> -n window-smoke --dir screenshots-m3-ci
 | 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消 | `selfcheck_channel.py` 46/46（本机 Windows） | 强（本机） |
 | 编排闭环：K2→K3→换一批→选择→阶段四 | 同上的 C12，事件与快照双向核对 | 强（本机） |
 | 跨进程恢复：换一个服务器进程仍停在 K2 | 同上的 C13，两个 `Channel` 进程共用一个临时数据目录 | 强（本机） |
-| 界面端到端：K2/K3 卡、解释抽屉、换一批、选择、runtime 重启后 K3 仍在 | G7 43/43，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
+| 界面端到端：K2/K3 卡、解释抽屉、换一批、选择、runtime 重启后 K3 仍在 | G7 53/53，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
+| 图表工作台：真渲两版、换主题、并排 diff、回滚 | G9 W2–W4；G7 工作台段；两版 PNG hash 不同 | 强（本机） |
+| 评分卡：三轮、五维、扣分定位、第三轮熔断、一票否决 | G9 W6；G7 评分段；评分由 vendored `score_card.py` 计算 | 强（演示数据，非真实论文） |
+| 章节样例 hard/soft 为 0 | G9 W7，`check_chapters.py` 跑 `chapter-sample.tex` | 强（样例文件） |
+| 论文 PDF/Word 预览 | 未接；论文页只显示边界说明 | **未证**（M5） |
+| K5 换数据列/字号密度/容量超框 | 未接；当前只做模板/主题/版本/回滚 | **未证** |
 | OpenAI 兼容协议：429 退避、reasoning 分离、分片 tool_calls、历史剥离、Key 不外泄 | 本地假端点，3 次真实 HTTP 请求 | 强（协议层，非真实厂商） |
 | Key 落盘：Windows 上只有 `safeStorage` 密文，无明文 | G7 写入哨兵 Key 后读 `settings.json`，只输出布尔值 | 强（Windows 可用分支） |
 | 安全存储不可用时拒绝保存且不落盘 | CI run `40982728779` 的 Linux runner 无 Secret Service，G7 实得 `可用=false、文件存在=false、明确拒绝=true` | 强（拒绝分支）；Linux 桌面 Secret Service 可用分支仍未证 |
 | 真实 DeepSeek / Kimi 联网对话 | 无 Key，未跑 | **未证** |
-| Linux 上真起窗与整条链路 | 0.3.1 CI run `41000678500`，43/43（1440x900，非白像素 3.12%）；0.3.0 的 42/42 见 `40982728779` | 强 |
-| Windows CI 真起窗 | 无 | **未证**；M2/M3 的 Windows 证据来自本机 |
-| K4 数学公式用 KaTeX 渲染 | M3 用等宽文本展示公式，没有引入 KaTeX | **未证**（排版增强留待 M4/M5） |
-| `gate` / `artifact` 能渲染成卡片 | 只有契约与转发，没有 UI | **未证**（M4） |
-| 工具不只 `list_templates` | 无 | **未证**；M3 仍只接了一个只读工具 |
+| Linux 上真起窗与整条链路 | 0.3.1 CI run `41000678500`，43/43（1440x900，非白像素 3.12%）；M4 待本轮 CI | 强（M3）；M4 待证 |
+| Windows CI 真起窗 | 无 | **未证**；M2/M3/M4 的 Windows 证据来自本机 |
+| K4 数学公式用 KaTeX 渲染 | M3 用等宽文本展示公式，没有引入 KaTeX | **未证**（排版增强留待 M5） |
+| `gate` / `artifact` 事件能渲染成卡片 | 工作台有门禁条；事件本身仍只有契约与转发 | **未证**（M5） |
+| 工具不只 `list_templates` | 无 | **未证**；M4 仍未扩工具面 |
 
 ## 3 待维护者定的项
 
@@ -87,9 +93,9 @@ gh run download <run-id> -n window-smoke --dir screenshots-m3-ci
 
 ## 4 界面待判的观感问题（我只报，没改）
 
-`screenshots/window-smoke.png`、`conversation.png`、`settings.png`、`decision.png`、`drawer.png` 都是 1440×900、本机 Windows 下渲染。
+`screenshots/window-smoke.png`、`conversation.png`、`settings.png`、`decision.png`、`drawer.png`、`figure.png`、`score.png` 都是 1440×900、本机 Windows 下渲染。
 
-0.3.1 已处理：左栏阶段名折行、候选卡密度与元数据排布、抽屉关闭按钮对齐、输入条与状态栏间距；下面保留仍需你判断的观感项。
+0.3.1 已处理：左栏阶段名折行、候选卡密度与元数据排布、抽屉关闭按钮对齐、输入条与状态栏间距；0.4.0 新增工作台。下面保留仍需你判断的观感项。
 
 M1 已报、仍未改：
 
@@ -113,26 +119,32 @@ M2 已报、仍适用：
 - 设置页四个服务商是等宽胶囊，没有分组；离线演示排在第一位。
 - 对话截图是在测试点了 B 案靛蓝之后拍的，默认仍是 A 墨青。
 
-## 5 M3 做完的与仍欠的
+M4 新增：
+
+- 图表页在 440px 右栏里做两图并排 diff，单张会缩到约 180px 宽；看得清趋势，看不清细节。是否改成上下堆叠或加“放大查看”，需要你定。
+- 评分页信息密度较高：五维条、轮次、较上一轮变化、扣分明细、定位卡都在一屏内滚动；是否把“较上一轮”折起来，属于视觉选择。
+- 论文页明确写了 PDF/Word 预览等到 M5，没有放假预览。
+- 门禁条三项（图表/评分/章节）目前都能从工作台状态复算，但章节检查跑的是样例 `chapter-sample.tex`。
+
+## 5 M4 做完的与仍欠的
 
 已完成：
 
-1. `runtime/src/mms/store.py`：SQLite 保存阶段、待决卡、消息与轮次；数据目录走 `MMS_DATA_DIR`（Electron 传 `userData`），不存 Key。
-2. `runtime/src/mms/orchestrator.py`：K2 切题/附件缺口、K3 三条候选与换一批、选择后阶段 4；内容确定性生成，不冒充模型。
-3. 通道：`phase` 事件、`done.waiting`、`/sessions/latest`、`/sessions/{id}/resume`；`/chats` 支持 `mode=workflow`，自由问答不变。
-4. Electron：`chat:resume`、`session:latest`；runtime 子进程继承 `MMS_DATA_DIR`；窗口内容区在分数缩放下二次钉到 1440×900。
-5. 界面：建模/问答切换、阶段轨道接真实状态、K2/K3 卡、K4 抽屉、待决时禁用建模发送、启动/重启后恢复快照。
-6. G4 46 条、事件自测 10 条、G6b 12 条、G7 43 条；M2 的自由问答与工具卡保留为回归。
-7. 文档：README/README_EN、CHANGELOG 0.3.0、env-setup 的 G7 说明。
+1. `workbench_figure.py`：真渲两版、主题切换、版目录、当前/上一版、回滚；未知模板/主题/版本不落版本。
+2. `workbench_score.py` + `demo_scores.json`：三轮评分（78/86/84）、五维、扣分定位、熔断、一票否决；章节样例。
+3. 通道与 IPC：`/workbench/state|render|rollback`；主进程读 PNG 成 data URL，渲染层不碰文件路径。
+4. 右栏：图表页、评分页、门禁页、代码页、日志页；顶部门禁条；论文页明确留待 M5。
+5. G9 13 条、G7 53 条、G6b 下限 53；CI window-smoke 增加 matplotlib 依赖。
+6. 文档：README/README_EN、CHANGELOG 0.4.0、HANDOFF。
 
 仍欠：
 
-- **选模候选仍由内置模板生成**；真实模型、`mathmodel-methods` 检索与选型理由在 M4。
-- K1 环境预检、K5 图表返工、K6 评分轮次没有界面；`gate` / `artifact` 仍只有契约与转发。
-- 真实厂商连通性（需要你的 Key）。
-- 设置页的「清除 Key」只有实现，没有自动化覆盖。
-- `docs/env-setup.md` 英文版；便携 Python（M5/M6）。
-- Windows CI 起窗；Linux 桌面 safeStorage 可用分支。
+- **论文 PDF/Word 预览**（M5）。
+- K5 的换数据列、字号密度与容量超框检查；当前只有模板/主题/版本/回滚。
+- 评分是演示数据，不是对用户真实论文的自动评分。
+- 选模候选仍由内置模板生成；真实模型选型与工具面扩展未做。
+- 真实厂商连通性、Linux 桌面 safeStorage 可用分支、Windows CI 起窗。
+- 便携 Python 与 `docs/env-setup.md` 英文版。
 
 ## 6 这一轮踩过的坑（别再踩）
 
@@ -142,7 +154,15 @@ M2 已报、仍适用：
 
 **G7 的假 provider 必须在 require 生产入口之前设环境变量**，否则主进程在 `whenReady` 拉起 Python 时继承不到。`userData` 也要在 ready 之前 `app.setPath` 到临时目录，否则你机器上已保存的 DeepSeek 会改变默认选中项，测试会莫名其妙地发向真实网络。G7 还显式把 provider 切回离线演示，切不回去就中止，绝不带着哨兵 Key 发请求。
 
-**G6b 只数条数不够**：删掉一条关键断言、拿凑数的 `A` 行补齐，条数照样够。现在下限 43，点名 10 条关键断言（M2 与 M3 各 5 条），并拒绝重复断言名；自测 12 条。
+**G6b 只数条数不够**：删掉一条关键断言、拿凑数的 `A` 行补齐，条数照样够。现在下限 53，点名 17 条关键断言（M2/M3/M4），并拒绝重复断言名；自测 12 条。
+
+**不要在 runtime 里自动起图**：最初工作台在首次载入时自动 `render`，但 G7 会在 K3 阶段重启 runtime，渲染 POST 与重启撞上，留下 `ECONNRESET` 且版本没写成，之后界面永远没有图表。现在改成空态里的「渲染样例图」显式按钮；重启后工作台重新读状态，用户再点一次。
+
+**评分轮次的字段要防缺**：一票否决示例没有“较上一轮”的变化，`round.changes.length` 直接读会崩掉整个评分页。后端给每张卡补 `changes: []`，前端也用 `round.changes ?? []`。
+
+**data URL 有体积上限**：主进程把 PNG 读成 base64 后通过 IPC 下发，超过 12 MB 直接返回 null，避免一次渲染把 IPC 撑爆；渲染层只拿到 data URL，不拿本地路径。
+
+**工作台也是 CI 依赖**：window-smoke job 现在要真渲图，必须装 `requirements.txt`（matplotlib/numpy/seaborn）；gates job 的 G9 也需要。别把它们当成“只跑标准库”的 job。
 
 **快照必须先落盘再发 `done`**：界面在收到 `done` 后就会允许下一步操作，若此时 SQLite 还没写完，用户点“重开仍在”就会读到旧状态。orchestrator 先 `store.put`，再返回事件；WorkflowSession 只是把事件顺序发出。
 
@@ -174,15 +194,20 @@ M2 已报、仍适用：
 skills/                     7 个 vendor 进来的技能（原样）+ manifest.json + VENDOR.md
 schemas/                    skill-manifest.schema.json、chat-events.schema.json
 runtime/src/mms/
-  server.py                 本机通道：握手、鉴权、SSE、会话与工具轮次、workflow 入口
+  server.py                 本机通道：握手、鉴权、SSE、会话、workflow 与工作台端点
   store.py                  SQLite：阶段、待决卡、消息、轮次
   orchestrator.py           K2/K3/K4 的确定性状态机
+  workbench_figure.py       图表渲染、主题、版本与回滚
+  workbench_score.py        评分卡、扣分定位、章节样例与一票否决
+  demo_scores.json          三轮演示评分卡
+  themes/                   studio-ink / studio-amber 主题
   provider.py               OpenAI 兼容流式客户端 + 离线假 provider
   providers.json            DeepSeek / Kimi / 自定义端点预设
   registry.py / invoke.py   技能注册表与 subprocess 调用
   cli.py                    serve / templates / invoke
 runtime/cli.py              开发期入口（npm run mms）
 runtime/selfcheck_channel.py G4/G5 自检与 10 条反向覆盖（含跨进程恢复）
+runtime/selfcheck_workbench.py G9 工作台自检（真渲两版）
 src/main/
   index.ts                  窗口、IPC、provider 合并视图、SSE 转发、resume
   channel.ts                Python 子进程生命周期、HTTP/SSE 客户端
@@ -194,14 +219,17 @@ src/renderer/src/
   components/ChatPane.tsx   流式消息、工具卡、输入区、阶段胶囊
   components/DecisionCard.tsx  K2 确认卡与 K3 选模卡
   components/ExplainDrawer.tsx K4 右栏抽屉
+  components/WorkspacePane.tsx 图表/评分/门禁/代码/日志工作台
   components/SettingsDialog.tsx  服务商/模型/Key 设置
   lib/chat.ts               事件折叠的纯函数
   lib/phases.ts             阶段名与状态文案
+  styles/workbench.css      M4 工作台样式
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
-tests/window-smoke.cjs      真启动断言（43 条）+ 截图与 JSON 结论
-.github/workflows/ci.yml    gates（ubuntu+windows）与 window-smoke（ubuntu）
+tests/window-smoke.cjs      真启动断言（53 条）+ 截图与 JSON 结论
+.github/workflows/ci.yml    gates（ubuntu+windows，含 G9）与 window-smoke（ubuntu，装图表依赖）
 ```
 
 会话库位置：Electron `userData/sessions.db`；命令行直接起 runtime 时是 `<MMS_HOME>/.mms/sessions.db`，可用 `MMS_DATA_DIR` 覆盖。库内只有阶段、待决卡与消息，没有 Key。
+图表版本位置：`userData/workbench/figure/versions/<v>`，`state.json` 记当前版与上一版；同样随 `MMS_DATA_DIR` 走。
 
 一处刻意的设计：`runtime` 只用 subprocess 调技能脚本、按退出码判定，不 import 技能内部函数——这样 `skills/` 仍可被 Claude Code 等宿主单独装载。改这条要先想清楚代价。

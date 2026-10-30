@@ -27,6 +27,7 @@ from urllib.parse import parse_qs, urlparse
 from . import __version__, orchestrator
 from .invoke import list_templates
 from .store import SessionStore, data_dir, snapshot
+from . import workbench_figure, workbench_score
 from .provider import (
     CancelledError,
     ProviderError,
@@ -310,11 +311,12 @@ class ChannelServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address, handler, token: str, fake: bool, store: SessionStore):
+    def __init__(self, address, handler, token: str, fake: bool, store: SessionStore, root: Path):
         super().__init__(address, handler)
         self.token = token
         self.fake = fake
         self.store = store
+        self.root = root
         self.sessions: dict[str, ChatSession] = {}
         self.sessions_lock = threading.Lock()
 
@@ -398,6 +400,9 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/sessions/latest":
             self._json(200, {"ok": True, "session": snapshot(self.server.store.latest())})
             return
+        if parsed.path == "/workbench/state":
+            self._json(200, self._workbench())
+            return
         if parsed.path.startswith("/sessions/") and parsed.path.count("/") == 2:
             session_id = parsed.path[len("/sessions/") :]
             record = self.server.store.get(session_id)
@@ -423,6 +428,12 @@ class Handler(BaseHTTPRequestHandler):
             session_id = parsed.path[len("/sessions/") : -len("/resume")].strip("/")
             self._resume_session(session_id)
             return
+        if parsed.path == "/workbench/render":
+            self._render_figure()
+            return
+        if parsed.path == "/workbench/rollback":
+            self._rollback_figure()
+            return
         if parsed.path.startswith("/chats/") and parsed.path.endswith("/cancel"):
             chat_id = parsed.path[len("/chats/") : -len("/cancel")].strip("/")
             with self.server.sessions_lock:
@@ -434,6 +445,85 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, "chatId": chat_id})
             return
         self._error(404, "not_found", "没有这个端点")
+
+    def _workbench(self) -> dict:
+        figure = workbench_figure.state_payload(
+            self.server.root, self.server.store.path.parent
+        )
+        try:
+            score = workbench_score.state(self.server.root)
+            chapter = score.get("chapter", {})
+            round_row = next(
+                (r for r in score.get("rounds", []) if r.get("round") == score.get("defaultRound")),
+                None,
+            )
+            score_ok = bool(round_row and round_row.get("pass"))
+            score_detail = (
+                f"第 {round_row['round']} 轮 {round_row['total']} / 100"
+                if round_row
+                else (score.get("error") or "无法评分")
+            )
+        except Exception as exc:  # 评分脚本坏掉时工作台仍能打开
+            score = {"ok": False, "error": str(exc), "rounds": []}
+            chapter = {"ok": False, "error": str(exc)}
+            score_ok = False
+            score_detail = str(exc)
+        active = next(
+            (v for v in figure.get("versions", []) if v.get("id") == figure.get("active")),
+            None,
+        )
+        outputs = (active or {}).get("outputs", {})
+        figure_ok = bool(active) and all(
+            kind in outputs and Path(outputs[kind]).is_file() and Path(outputs[kind]).stat().st_size > 0
+            for kind in ("png", "pdf", "svg")
+        )
+        gate = [
+            {
+                "id": "figure",
+                "label": "图表产物",
+                "ok": figure_ok,
+                "detail": "PNG / PDF / SVG 齐全" if figure_ok else "尚未渲染出三件产物",
+            },
+            {"id": "score", "label": "评分", "ok": score_ok, "detail": score_detail},
+            {
+                "id": "chapter",
+                "label": "章节结构",
+                "ok": bool(chapter.get("pass")),
+                "detail": (
+                    f"hard {chapter.get('hard_failed', 0)} · soft {chapter.get('soft_failed', 0)} · 人工 {chapter.get('manual', 0)}"
+                    if chapter.get("ok")
+                    else chapter.get("error", "章节自检未运行")
+                ),
+            },
+        ]
+        return {"ok": True, "figure": figure, "score": score, "chapter": chapter, "gate": gate}
+
+    def _render_figure(self) -> None:
+        body = self._body()
+        if body is None:
+            return
+        template = str(body.get("template") or "")
+        theme = str(body.get("theme") or "")
+        code, result = workbench_figure.render(
+            template, theme, self.server.root, self.server.store.path.parent
+        )
+        if code != 0:
+            self._error(400, "figure", str(result.get("error") or "渲染失败"))
+            return
+        self._json(200, {"ok": True, "version": result.get("version"), "state": self._workbench()})
+
+    def _rollback_figure(self) -> None:
+        body = self._body()
+        if body is None:
+            return
+        version = str(body.get("version") or "")
+        code, result = workbench_figure.rollback(
+            version, self.server.root, self.server.store.path.parent
+        )
+        if code != 0:
+            self._error(404, "figure", str(result.get("error") or "没有这个版本"))
+            return
+        self._json(200, {"ok": True, "state": self._workbench()})
 
     def _start_chat(self) -> None:
         body = self._body()
@@ -581,7 +671,7 @@ def serve(port: int = 0) -> int:
     fake = fake_enabled()
     root = Path(os.environ.get("MMS_HOME") or ".").resolve()
     store = SessionStore(data_dir(root) / "sessions.db")
-    server = ChannelServer(("127.0.0.1", port), Handler, token, fake, store)
+    server = ChannelServer(("127.0.0.1", port), Handler, token, fake, store, root)
     # 握手行是 stdout 的唯一内容；之后所有诊断都走 stderr。
     print(
         json.dumps(

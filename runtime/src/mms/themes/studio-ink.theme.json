@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "name": "studio-ink",
+  "title": "工作台 · 墨青",
+  "description": "与界面默认强调色一致的墨青主题；只换颜色，不改模板代码。",
+  "author": "mathmodel-studio",
+  "roles": {
+    "identity": {
+      "main": "#17494D",
+      "main_light": "#4C7C80",
+      "main_pale": "#CFE0E1",
+      "accents": ["#E28E2C", "#7B5FD6", "#33B5A5", "#D9544D", "#8FA6A8"]
+    },
+    "baseline": {
+      "base": "#6B6B6B",
+      "dark": "#3F3F3F"
+    },
+    "signal": {
+      "positive": "#2E9E44",
+      "negative": "#E53935"
+    },
+    "neutral": {
+      "bg": "#F7F8F8",
+      "light": "#DDE3E4",
+      "mid": "#A5B0B2",
+      "dark": "#5D6A6C",
+      "ink": "#243033"
+    }
+  },
+  "cmaps": {
+    "divergent": ["#17494D", "#F5F7F7", "#D9544D"],
+    "sequential": ["#F2F7F7", "#17494D"]
+  }
+}

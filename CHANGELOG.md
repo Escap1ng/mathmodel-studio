@@ -3,6 +3,38 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
 
+## 0.4.0 - 2026-10-30
+
+M4 工作台：图表返工、评分卡与门禁条。目标是「一张图能换主题重渲并回滚；一份稿子能出五维评分与扣分定位」。
+
+### 新增
+
+- **图表工作台** `runtime/src/mms/workbench_figure.py`：复用 `mathmodel-figure` 的渲染器与注册表，渲染结果落到 `userData/workbench/figure/versions/<v>`；记录当前版/上一版、命令、stdout/stderr，支持回滚。未知模板/主题/版本不落版本。
+- **两套自定义主题** `runtime/src/mms/themes/`：`studio-ink` 与 `studio-amber`，与内置 `nature` 并列；主题文件通过 vendored `validate_theme.py` 校验。
+- **评分卡** `runtime/src/mms/workbench_score.py` + `demo_scores.json`：三轮示例评分（78 / 86 / 84），每轮五维、扣分明细带正文定位与改法；第 3 轮低于 85 显示熔断提示；另带一票否决示例；章节结构跑 `chapter-sample.tex` 的 `check_chapters.py`。
+- **工作台界面**：右栏图表页（模板/主题选择、重渲、并排 diff、版本条、回滚）、评分页（五维条、总分、轮次、扣分定位、熔断/否决）、门禁页、代码页（实际渲染命令与产物路径）、日志页（最近一次渲染输出）；顶部三项门禁条。
+- **IPC/通道**：`GET /workbench/state`、`POST /workbench/render`、`POST /workbench/rollback`；主进程把 PNG 读成 data URL 下发，渲染层拿不到本地路径权限。
+- **G9 工作台自检**：13 条，真渲两版、回滚、未知输入不落版本、三轮评分、扣分定位、一票否决与章节样例。
+- **G7 扩展**：首版渲染、换主题 diff、回滚、评分五维/86、扣分定位、熔断、否决、门禁条，共 53 条；G6b 下限同步 53、点名 17 条。
+- CI 的 window-smoke job 增加图表依赖安装。
+
+### 变更
+
+- 版本 `0.3.1 → 0.4.0`。
+- 工作台不再只是占位卡片；论文页明确标注 PDF 预览待到 M5。
+
+### 验证（本机 Windows，2026-10-30）
+
+- `npm run gate` 全绿：G9 13/13、G4 46/46、事件自测 10/10、G6b 自测 12/12、G7 53/53（内容尺寸 1440x900）。
+- 真启动：工作台首版 → 换 `studio-ink` 出 v2 与并排 diff → 回滚 v1；评分五维 86、扣分定位、第三轮熔断、一票否决与门禁条均通过。
+
+### 尚未做
+
+- **论文 PDF/Word 预览**要等 M5；现在论文页只给边界说明，没有假预览。
+- K5 的换数据列、改字号密度与容量超框检查还没接；本版只做模板/主题/版本/回滚。
+- 评分卡是演示数据，不是对真实论文的自动评判；真实评分与扣分定位要等用户稿子接入。
+- 真实 DeepSeek/Kimi 联网、Linux 桌面 Secret Service 可用分支仍未证。
+
 ## 0.3.1 - 2026-10-30
 
 界面留白、对齐与中文文案修订。

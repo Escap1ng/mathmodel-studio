@@ -8,7 +8,9 @@ import type {
   RuntimeStatus,
   SaveProviderPayload,
   SessionLatest,
-  StudioMeta
+  StudioMeta,
+  WorkbenchResult,
+  WorkbenchState
 } from '../shared/api'
 
 // 渲染层只能看到这几条窄接口：主进程的 runtime 端口、token 与 API Key 都不经过这里。
@@ -46,6 +48,14 @@ const studioApi = {
 
   session: {
     latest: (): Promise<SessionLatest> => ipcRenderer.invoke('session:latest')
+  },
+
+  workbench: {
+    state: (): Promise<WorkbenchState> => ipcRenderer.invoke('workbench:state'),
+    render: (template: string, theme: string): Promise<WorkbenchResult> =>
+      ipcRenderer.invoke('workbench:render', { template, theme }),
+    rollback: (version: string): Promise<WorkbenchResult> =>
+      ipcRenderer.invoke('workbench:rollback', { version })
   }
 }
 
