@@ -1,6 +1,6 @@
 import { dialog, shell, type BrowserWindow, type OpenDialogOptions } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { copyFile, mkdir, stat, unlink } from 'node:fs/promises'
+import { copyFile, mkdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { StagedFile, StageRejection, StageResult } from '../shared/api'
 import { attachmentsRoot } from './workspace'
@@ -101,6 +101,42 @@ export async function stageFiles(paths: unknown): Promise<StageResult> {
     }
   }
   return { ok: true, files, rejected, folder }
+}
+
+function cleanName(raw: string): string {
+  const base = basename(raw).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim()
+  return (base || '剪贴板文件').slice(0, 120)
+}
+
+// 截图与剪贴板里的文件没有本地路径，只能把字节写进暂存区。
+export async function stageBlob(payload: unknown): Promise<StagedFile> {
+  if (!payload || typeof payload !== 'object') throw new Error('没有收到文件内容')
+  const { name, data } = payload as { name?: unknown; data?: unknown }
+  if (typeof name !== 'string' || !name.trim()) throw new Error('缺少文件名')
+  const bytes =
+    data instanceof Uint8Array
+      ? data
+      : data instanceof ArrayBuffer
+        ? new Uint8Array(data)
+        : null
+  if (!bytes) throw new Error('文件内容类型不对')
+  if (bytes.byteLength === 0) throw new Error('文件是空的')
+  if (bytes.byteLength > MAX_FILE_BYTES) throw new Error('超过 100 MB')
+
+  const folder = join(rootDir(), dayStamp())
+  await mkdir(folder, { recursive: true })
+  const finalName = cleanName(name)
+  const target = await uniqueTarget(folder, finalName)
+  await writeFile(target, bytes)
+  const ext = extname(finalName).slice(1).toLowerCase()
+  return {
+    id: randomUUID(),
+    name: finalName,
+    size: bytes.byteLength,
+    ext,
+    kind: KIND_BY_EXT[ext] ?? 'other',
+    path: target
+  }
 }
 
 export async function pickFiles(win: BrowserWindow | null): Promise<StageResult | null> {

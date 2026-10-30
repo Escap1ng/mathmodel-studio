@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
+  ClipboardEvent as ReactClipboardEvent,
   CSSProperties,
   DragEvent,
   KeyboardEvent as ReactKeyboardEvent,
@@ -326,6 +327,80 @@ export default function ChatPane({
     }
   }
 
+  const stampName = (base: string, ext: string): string => {
+    const now = new Date()
+    const pad = (n: number): string => String(n).padStart(2, '0')
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+    return `${base}-${stamp}.${ext}`
+  }
+
+  const extOf = (file: File): string => {
+    const dot = file.name.lastIndexOf('.')
+    const fromName = dot > 0 ? file.name.slice(dot + 1).toLowerCase() : ''
+    if (fromName) return fromName
+    const fromType = file.type.split('/')[1] ?? ''
+    return (fromType === 'jpeg' ? 'jpg' : fromType) || 'png'
+  }
+
+  // 剪贴板里的截图没有本地路径，字节直接写进暂存区；带路径的仍走 stage。
+  const pastedFiles = async (list: File[]): Promise<void> => {
+    if (list.length === 0 || stageLock.current) return
+    stageLock.current = true
+    setStaging(true)
+    try {
+      const staged: StagedFile[] = []
+      const rejectedList: { name: string; reason: string }[] = []
+      const paths: string[] = []
+      for (const file of list) {
+        let path = ''
+        try {
+          path = window.studio.files.pathFor(file)
+        } catch {
+          path = ''
+        }
+        if (path) {
+          paths.push(path)
+          continue
+        }
+        try {
+          const data = await file.arrayBuffer()
+          const base = file.type.startsWith('image/') ? '截图' : '剪贴板'
+          staged.push(
+            await window.studio.files.stageBlob({ name: stampName(base, extOf(file)), data })
+          )
+        } catch (err) {
+          rejectedList.push({ name: file.name || '剪贴板文件', reason: errorText(err) })
+        }
+      }
+      if (paths.length > 0) {
+        const result = await window.studio.files.stage(paths)
+        staged.push(...result.files)
+        rejectedList.push(...result.rejected)
+      }
+      merge({ files: staged, rejected: rejectedList })
+    } catch (err) {
+      setAttachError(errorText(err))
+    } finally {
+      stageLock.current = false
+      setStaging(false)
+    }
+  }
+
+  const onPaste = (event: ReactClipboardEvent<HTMLTextAreaElement>): void => {
+    const data = event.clipboardData
+    if (!data) return
+    const list: File[] = []
+    for (let index = 0; index < data.items.length; index++) {
+      const item = data.items[index]
+      if (item.kind !== 'file') continue
+      const file = item.getAsFile()
+      if (file) list.push(file)
+    }
+    if (list.length === 0) return
+    event.preventDefault()
+    void pastedFiles(list)
+  }
+
   const pick = async (): Promise<void> => {
     if (stageLock.current) return
     try {
@@ -434,8 +509,8 @@ export default function ChatPane({
           : files.length > 0
             ? '可以只发附件，也可以补充说明'
             : mode === 'workflow'
-              ? '粘贴赛题正文，先确认题面与附件'
-              : '描述这道题，或粘贴题目正文'
+              ? '粘贴赛题正文，也可以粘贴截图或拖入文件'
+              : '描述这道题，或粘贴题目正文与截图'
 
   const attachNotice = attachError ?? (rejected.length > 0 ? rejected.join('；') : null)
 
@@ -503,16 +578,7 @@ export default function ChatPane({
         </div>
       ) : null}
 
-      <div
-        className="chat__composer"
-        ref={composerRef}
-        data-resized={composerHeight != null ? 'true' : 'false'}
-        style={
-          composerHeight != null
-            ? ({ height: `${composerHeight}px` } as CSSProperties)
-            : undefined
-        }
-      >
+      <div className="chat__composer">
         <div
           className="splitter splitter--row"
           role="separator"
@@ -526,23 +592,23 @@ export default function ChatPane({
           onDoubleClick={() => setComposerHeight(null)}
           onKeyDown={onComposerKey}
         />
-        <div className="composer">
-          {entries.length > 0 ? (
+        <div
+          className="composer"
+          ref={composerRef}
+          data-resized={composerHeight != null ? 'true' : 'false'}
+          style={
+            composerHeight != null
+              ? ({ height: `${composerHeight}px` } as CSSProperties)
+              : undefined
+          }
+        >
+          {files.length > 0 ? (
             <div className="composer__attach">
               <FileChips
                 items={files}
                 onRemove={(index) => remove(files[index])}
                 label="待发送的附件"
               />
-              <button
-                type="button"
-                className="composer__add"
-                onClick={() => void pick()}
-                disabled={!ready}
-                title="添加附件"
-              >
-                ＋ 附件
-              </button>
             </div>
           ) : null}
           <textarea
@@ -551,6 +617,7 @@ export default function ChatPane({
             value={draft}
             disabled={!ready}
             onChange={(event) => setDraft(event.target.value)}
+            onPaste={onPaste}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault()
@@ -558,57 +625,57 @@ export default function ChatPane({
               }
             }}
           />
-          <div className="composer__bar">
-            <div className="mode-switch" role="group" aria-label="输入模式">
-              <button
-                type="button"
-                className="mode-switch__btn"
-                data-mode="workflow"
-                aria-pressed={mode === 'workflow'}
-                onClick={() => onModeChange('workflow')}
-              >
-                建模
-              </button>
-              <button
-                type="button"
-                className="mode-switch__btn"
-                data-mode="chat"
-                aria-pressed={mode === 'chat'}
-                onClick={() => onModeChange('chat')}
-              >
-                问答
-              </button>
-            </div>
+        </div>
+        <div className="composer__bar">
+          <div className="mode-switch" role="group" aria-label="输入模式">
             <button
               type="button"
-              className="pill pill--button pill--model"
-              onClick={onOpenSettings}
-              disabled={!provider}
-              title="模型与 API Key 设置"
+              className="mode-switch__btn"
+              data-mode="workflow"
+              aria-pressed={mode === 'workflow'}
+              onClick={() => onModeChange('workflow')}
             >
-              {provider
-                ? `${provider.display} · ${provider.model}`
-                : '未选择模型'}
+              建模
             </button>
-            <span className="pill" data-role="phase-pill">
-              {phaseText}
-            </span>
-            {streaming ? (
-              <button type="button" className="pill pill--send pill--stop" onClick={onStop}>
-                停止
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="pill pill--send"
-                data-mode={mode}
-                disabled={sendDisabled}
-                onClick={() => void submit()}
-              >
-                {attaching ? '读取附件…' : mode === 'workflow' ? '开始建模' : '发送'}
-              </button>
-            )}
+            <button
+              type="button"
+              className="mode-switch__btn"
+              data-mode="chat"
+              aria-pressed={mode === 'chat'}
+              onClick={() => onModeChange('chat')}
+            >
+              问答
+            </button>
           </div>
+          <button
+            type="button"
+            className="pill pill--button pill--model"
+            onClick={onOpenSettings}
+            disabled={!provider}
+            title="模型与 API Key 设置"
+          >
+            {provider
+              ? `${provider.display} · ${provider.model}`
+              : '未选择模型'}
+          </button>
+          <span className="pill" data-role="phase-pill">
+            {phaseText}
+          </span>
+          {streaming ? (
+            <button type="button" className="pill pill--send pill--stop" onClick={onStop}>
+              停止
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="pill pill--send"
+              data-mode={mode}
+              disabled={sendDisabled}
+              onClick={() => void submit()}
+            >
+              {attaching ? '读取附件…' : mode === 'workflow' ? '开始建模' : '发送'}
+            </button>
+          )}
         </div>
       </div>
     </section>

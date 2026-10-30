@@ -10,6 +10,8 @@ import type {
   SaveProviderPayload,
   SessionLatest,
   StageResult,
+  StagedFile,
+  StagedBlob,
   StudioMeta,
   WorkbenchResult,
   WorkbenchState,
@@ -56,6 +58,7 @@ const studioApi = {
   files: {
     pick: (): Promise<StageResult | null> => ipcRenderer.invoke('files:pick'),
     stage: (paths: string[]): Promise<StageResult> => ipcRenderer.invoke('files:stage', paths),
+    stageBlob: (payload: StagedBlob): Promise<StagedFile> => ipcRenderer.invoke('files:stage-blob', payload),
     discard: (path: string): Promise<void> => ipcRenderer.invoke('files:discard', path),
     context: (paths: string[]): Promise<AttachmentContext> => ipcRenderer.invoke('files:context', paths),
     reveal: (): Promise<void> => ipcRenderer.invoke('files:reveal'),
