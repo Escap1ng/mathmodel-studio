@@ -25,9 +25,9 @@
 > **能交给机器校验的，交给门禁；该由人判断的，留给人，并且把判断点做成界面。**
 > 本项目把 [mathmodel-kit](https://github.com/Escap1ng/mathmodel-kit) 的契约化技能集（出版级图表、排版规范、降 AI 检查、结构自检与评分）落到一个本地桌面程序里：模型自带、数据不外传、过程可审计。
 
-**当前状态：M4 工作台**。M3 的编排闭环仍在：发赛题停在 **K2**，确认后给 3 张 **K3 选模卡**，可换一批、可打开 **K4 解释抽屉**；待决卡跨重启保留。M4 把右栏变成可用的工作台：真渲一张图（PNG/PDF/SVG），**换主题重渲、并排 diff、回滚**；评分页给出 **五维评分、总分 85 判定、扣分正文定位、三轮熔断与一票否决示例**；顶部门禁条汇总图表/评分/章节。
-工作台样例仍来自 vendored 技能与演示评分卡，**不是对真实论文的自动评判**；论文 PDF 预览要等 M5 接上 xelatex/pandoc。模型接入、流式对话、工具卡与 Key 的 `safeStorage` 边界沿用 M2；没有 Key 也能开 `MMS_FAKE_PROVIDER=1` 的离线演示，见 [docs/providers.md](docs/providers.md)。
-**还不能自动写代码或生成论文**——代码实现与排版编译在 M5。里程碑见 [PLAN.md](PLAN.md) §7。
+**当前状态：M5 排版全链路**。M3 的编排闭环仍在：发赛题停在 **K2**，确认后给 3 张 **K3 选模卡**，可换一批、可打开 **K4 解释抽屉**；待决卡跨重启保留。M4 的工作台保留：图表真渲、换主题重渲、并排 diff、回滚；五维评分与扣分定位。M5 把右栏「论文」页接成真流水线：**xelatex 两遍 → pandoc 转 Word → Word 版式微调 → 去 AI 措辞 / 结构指标 / 章节结构三道门禁**，PDF 用 pdf.js 做页级预览；顶部门禁条变成图表 / 评分 / 章节 / 论文排版四项。
+论文页的「构建」是工作台动作，**阶段机不会因构建成功自动把阶段五标成已过**，也不会替你写正文；现在编译的是仓库里的演示稿 `runtime/src/mms/paper_sample/paper.tex`（约 7 页），不是对真实赛题的自动解答。模型接入、流式对话、工具卡与 Key 的 `safeStorage` 边界沿用 M2；没有 Key 也能开 `MMS_FAKE_PROVIDER=1` 的离线演示，见 [docs/providers.md](docs/providers.md)。
+里程碑见 [PLAN.md](PLAN.md) §7；打包、便携 Python 与 Release 在 M6。
 要接手或复核，先读 [docs/HANDOFF.md](docs/HANDOFF.md)：哪些结论已被证明、哪些还没有、以及这一轮踩过的坑。
 
 ## 快速开始
@@ -44,12 +44,12 @@ npm run dev
 npm run mms -- templates
 npm run mms -- invoke figure paired-raincloud
 
-# 跑全部本地门禁：注册表 + 技能规范 + 反向覆盖 + 类型检查 + 构建 + 产物冒烟 + 契约 + CLI + 通道 + 工作台
+# 跑全部本地门禁：注册表 + 技能规范 + 反向覆盖 + 类型检查 + 构建 + 产物冒烟 + 契约 + CLI + 通道 + 工作台 + 论文
 npm run gate
 ```
 
-`npm run gate` 全绿即说明脚手架自洽；它不依赖网络，也不依赖显示器。
-界面分「建模」与「问答」两种输入：建模会把赛题送进状态机并停在决策卡，问答保持 M2 的自由流式对话与工具卡。右栏工作台可先渲染一张样例图，再换主题重渲；评分页能点开扣分项看到正文位置。截图见 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`（本地生成，不入库）。
+`npm run gate` 全绿即说明脚手架自洽；它不依赖网络，也不依赖显示器。论文自检需要本机有 `xelatex` 与 `pandoc`（见「依赖」）。
+界面分「建模」与「问答」两种输入：建模会把赛题送进状态机并停在决策卡，问答保持 M2 的自由流式对话与工具卡。右栏工作台可先渲染一张样例图，再换主题重渲；评分页能点开扣分项看到正文位置；论文页点「构建论文」真编演示稿、跑三道门禁并预览 PDF。截图见 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`、`screenshots/paper.png`（本地生成，不入库）。
 
 ## 这是什么
 
@@ -68,6 +68,7 @@ npm run gate
 - **六个卡点**：环境缺件确认、赛题与附件确认、**选模卡**、**就地解释**、图表返工、评分轮次放行。暂停是可持久化的——关窗再开仍停在原处。
 - **追溯链**：论文里的每个数字都能点回产出它的脚本和那次运行的输出。
 - **门禁把守**：图表容量、章节结构、词表级与结构级 AI 痕迹、零宽字符、五维评分（≥85 达标，3 轮熔断），全部由脚本判定，不靠肉眼。
+- **排版链路（M5）**：论文页真跑 xelatex 两遍、pandoc 转 DOCX、Word 版式微调，再把去 AI 措辞、结构指标与章节结构三道门禁摊在界面上；PDF 用 pdf.js 做页级预览。演示稿与评分卡都是样例，不是对真实赛题的自动解答。
 
 ## 技能
 
@@ -100,9 +101,10 @@ npm run gate
 | G4 事件流 | 握手一行 JSON；Bearer token 与 Host/Origin 回环白名单；SSE 九类事件按契约校验；`Last-Event-ID` 续传；取消后必须收到 `done.reason=cancelled`。M3 追加：新赛题停在 K2、确认进 K3、换一批、选择后进阶段四，以及**换一个服务器进程仍读得到待决卡**（46 条） | 10 种坏事件逐个必须被拒；无 token / 错 Host / 无待决时恢复被拒（`python runtime/selfcheck_channel.py --selftest`） |
 | G5 provider 离线契约 | 本地假 OpenAI 端点跑 429 退避、`reasoning_content` 与正文分离、分片 `tool_calls` 拼装、历史剥离 reasoning、Key 只出现在 Authorization | Key 哨兵不得出现在事件流与 stderr；未开 `MMS_FAKE_PROVIDER` 时必须拒绝假 provider（同上） |
 | G9 工作台 | 真渲两版图（nature → studio-ink）、并排版本与回滚、未知模板/主题/版本被拒且不落版本；三轮评分、扣分正文定位、章节样例与一票否决示例（13 条） | 未知模板/主题/版本均为反向；需要 matplotlib（gates job 已装） |
+| G10 论文排版 | 真跑 xelatex 两遍 → pandoc → Word 后处理：PDF/DOCX 文件头与体积、六个步骤、三道门禁、状态落盘；缺 pandoc 明确拒绝；坏稿仍出 PDF 但门禁判红；坏 TeX 退出 1；稿件不存在退出 2（10 条） | 缺件、坏稿、坏 TeX、缺稿件四条反向；`MMS_PAPER_SKIP=1` 才允许跳过，且会打印未验证（`runtime/selfcheck_paper.py`） |
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
-| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗，再断言：加载构建产物、内容尺寸 1440×900、非白像素 ≥1%、IPC 端到端、阶段轨道与输入区、中文真字形、设置页不回显 Key 且落盘只有密文/明确拒绝；M3 追加 K2→K3→解释抽屉→换一批→选择→阶段四与跨重启恢复；M4 追加首版渲染、换主题重渲 diff、回滚、评分五维/86、扣分定位、第三轮熔断、一票否决与门禁条；M2 自由问答与工具卡保留为回归（53 条） | 空白截图过不了像素阈值；自建窗口的假版本、豆腐块截图、删掉关键断言再补满条数，三类都暴露过（`tests/window-smoke.cjs`） |
-| G6b 结果核验 | 读 `screenshots/window-smoke.json` 并**复算读数**：内容尺寸、非白像素比、断言条数下限、17 条关键断言是否还在、自述计数与明细一致 | 带 `--selftest`，12 份合成结果证明「ok=true 但读数不对」「删掉 M2/M3/M4 的关键断言再补满条数」照样被拒（`scripts/check-window-smoke.mjs`） |
+| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗，再断言：加载构建产物、内容尺寸 1440×900、非白像素 ≥1%、IPC 端到端、阶段轨道与输入区、中文真字形、设置页不回显 Key 且落盘只有密文/明确拒绝；M3 追加 K2→K3→解释抽屉→换一批→选择→阶段四与跨重启恢复；M4 追加首版渲染、换主题重渲 diff、回滚、评分五维/86、扣分定位、第三轮熔断、一票否决与门禁条；M5 追加论文页构建、PDF/DOCX、三道门禁与 pdf.js 预览；M2 自由问答与工具卡保留为回归（57 条） | 空白截图过不了像素阈值；自建窗口的假版本、豆腐块截图、删掉关键断言再补满条数，三类都暴露过（`tests/window-smoke.cjs`） |
+| G6b 结果核验 | 读 `screenshots/window-smoke.json` 并**复算读数**：内容尺寸、非白像素比、断言条数下限、21 条关键断言是否还在、自述计数与明细一致 | 带 `--selftest`，12 份合成结果证明「ok=true 但读数不对」「删掉 M2/M3/M4/M5 的关键断言再补满条数」照样被拒（`scripts/check-window-smoke.mjs`） |
 
 G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动，所以 preload 与 IPC 是在生产那套 `sandbox: true` 下验的，不是靠 `--no-sandbox` 绕过。
 为什么要有 G6b 这道独立核验：CI 里曾经出现过冒烟打印「10/12 项通过」但 job 是绿的——`app.exit(1)` 被生产入口的 `window-all-closed → app.quit()` 抢先顶掉了。通过与否从此不吊在 Electron 的退出码管道上。
@@ -110,8 +112,8 @@ G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
-**执行状态要说清**：M4 的本机 `npm run gate` 全绿——G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言）、G4（46 条通道断言，含跨进程恢复）、事件判据自测（10/10）、G9（13 条工作台断言）、G6b 自测（12/12）、类型检查、构建与 G6 产物冒烟。G7 在本机 Windows 上 53/53，独立核验通过；选模卡、图表工作台与评分卡截图在 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`。
-M4 的 CI（run `41008695577`）三 job 全绿：ubuntu 真启动 53/53、内容尺寸 1440x900、非白像素 3.98%，G6b 独立核验一致，G9 13/13、G6 14/14；Linux 上 `safeStorage` 不可用分支仍被覆盖。0.3.0/0.3.1 的 run `40982728779`、`41000678500` 同样三 job 全绿。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
+**执行状态要说清**：M5 的本机 `npm run gate` 全绿——G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言）、G4（46 条通道断言，含跨进程恢复）、事件判据自测（10/10）、G9（13 条工作台断言）、G10（10 条论文断言）、G6b 自测（12/12）、类型检查、构建与 G6 产物冒烟。G7 在本机 Windows 上 57/57，独立核验通过；选模卡、图表工作台、评分卡与论文页截图在 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`、`screenshots/paper.png`。
+M5 的 CI 结果以本次推送后的 run 为准；0.4.0 的 run `41008695577` 三 job 全绿：ubuntu 真启动 53/53、内容尺寸 1440x900、非白像素 3.98%，G6b 独立核验一致，G9 13/13、G6 14/14。0.3.0/0.3.1 的 run `40982728779`、`41000678500` 同样三 job 全绿。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
 
 ## 依赖
 
@@ -120,10 +122,11 @@ M4 的 CI（run `41008695577`）三 job 全绿：ubuntu 真启动 53/53、内容
 | 桌面壳 | Electron、electron-vite、React、TypeScript | 见 `package.json` |
 | 运行时 | Python 3.12+（通道服务器、SSE、provider 客户端只用标准库） | `jsonschema>=4.20` 可选，缺席时契约校验降级 |
 | 模型接入 | DeepSeek / Kimi / 任意 OpenAI 兼容端点（BYOK） | 见 [docs/providers.md](docs/providers.md)；Key 只经主进程 `safeStorage` 加密落盘 |
-| 排版（M5） | xelatex（TeX Live 或 MiKTeX）、pandoc | 系统级安装，不由 pip 提供，缺件时阶段零只给指引 |
+| 排版（M5） | xelatex（TeX Live 或 MiKTeX）、pandoc、python-docx | 系统级安装，不由 pip 提供；pandoc 可放 PATH、设 `MMS_PANDOC`，或放到 `%LOCALAPPDATA%\mms-tools\pandoc.exe`。缺件时论文页明确列出缺什么，不自动安装 |
 | 出图（M1） | matplotlib、numpy、seaborn | 已随技能 vendor；版本下限写在 `requirements.txt`，安装走镜像 |
+| 论文预览（M5） | pdfjs-dist | 随 `npm install` 安装，worker 由 Vite 打进 `out/renderer/assets`，运行时不需要网络 |
 
-打包形态已定：**内置便携 Python 运行时**（bundled `uv` + python-build-standalone），用户不需要装 Python；TeX 与 pandoc 的处理在 M5 决定。
+打包形态已定：**内置便携 Python 运行时**（bundled `uv` + python-build-standalone），用户不需要装 Python。TeX 与 pandoc 的打包方案（要求本机安装 / 内置 Tectonic / 两者都支持）还没定，M5 只做了本机检测与明确拒绝，留到 M6 处理。
 
 ## 定位与合规声明
 

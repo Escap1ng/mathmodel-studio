@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 53
+const MIN_ASSERTIONS = 57
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -42,7 +42,11 @@ const REQUIRED_ASSERTIONS = [
   'G7-8 评分卡五维、总分 86 且达标',
   'G7-8 扣分项能定位到正文',
   'G7-8 第三轮低于 85 显示熔断提示',
-  'G7-8 门禁条三项全绿'
+  'G7-8 门禁条四项全绿',
+  'G7-9 论文页打开且构建按钮可用',
+  'G7-9 论文构建出 PDF 与 DOCX',
+  'G7-9 去 AI 与章节门禁全绿',
+  'G7-9 论文 PDF 预览渲染且截图非空'
 ]
 
 const problems = []

@@ -83,6 +83,19 @@ jobs:
       - name: G9 工作台（真渲两版、回滚、评分）
         run: python runtime/selfcheck_workbench.py
 
+      - name: 装排版依赖（G10 要真编 PDF，只在 ubuntu 跑）
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq pandoc texlive-xetex texlive-lang-chinese texlive-latex-extra
+
+      - name: G10 论文排版（xelatex → pandoc → 三道门禁）
+        # Windows 的 gates job 不装 TeX/MiKTeX（体积与安装时长都不划算），显式跳过并在文档里记成未证；
+        # 真启动冒烟的 job 在 ubuntu 上有 TeX，G7-9 会真编一遍。
+        env:
+          MMS_PAPER_SKIP: ${{ matrix.os == 'windows-latest' && '1' || '' }}
+        run: python runtime/selfcheck_paper.py
+
       - name: 运行时语法检查
         run: python -m compileall -q runtime
 
@@ -147,10 +160,13 @@ jobs:
           ls -l node_modules/electron/dist/chrome-sandbox
           npx electron --version
 
-      - name: 准备 Xvfb 与中文字体
+      - name: 准备 Xvfb、中文字体与排版工具
         # fonts-noto-cjk 不是可选装饰：runner 默认没有中文字体，整片界面会渲染成豆腐块，
         # 而「非白像素 ≥1%」这种断言照样能过。G7-5 现在会直接问字体在不在。
-        run: sudo apt-get update -q && sudo apt-get install -yq xvfb fonts-noto-cjk
+        # M5 起 G7-9 会真编一篇演示稿，所以 xelatex（texlive-xetex + 中文支持）与 pandoc 也要装。
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq xvfb fonts-noto-cjk pandoc texlive-xetex texlive-lang-chinese texlive-latex-extra
 
       - name: G7 无头真启动与像素断言
         # 虚拟屏幕必须大于设计基准：屏幕正好 1440x900 时装不下带边框的窗口，

@@ -3,6 +3,44 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
 
+## 0.5.0 - 2026-10-30
+
+M5 排版全链路：一题进，`paper.pdf` 与 `paper.docx` 出，去 AI 与章节门禁全绿。目标是「论文页能真编译、真给产物、真跑门禁」，不是自动写正文。
+
+### 新增
+
+- **论文流水线** `runtime/src/mms/paper_build.py`：工作区在 `userData/workbench/paper`；xelatex 两遍 → 产物核验（`%PDF` 文件头与体积）→ pandoc 转 DOCX → `word_postprocess.py` 版式微调；每步记耗时与输出尾部，失败保留错误位置。
+- **演示稿** `runtime/src/mms/paper_sample/paper.tex`：摘要、问题重述、问题分析、模型假设、符号说明、模型建立与求解、模型检验、模型评价与改进、AI 使用声明、参考文献与带代码的附录；配图从 vendored `mathmodel-figure` 的预览复制进 `figures/final`。真编 7 页。
+- **三道门禁**：`check_phrasing.py`（词表级 AI 痕迹）、`check_style.py`（长被动句、句式重复、过渡词密度、长短句与段落节奏、小数位）、`check_chapters.py`（国赛章节结构，hard/soft/manual）。结果按 JSON 解析成门禁条，不只看退出码。
+- **工具探测**：`MMS_XELATEX` / `MMS_PANDOC` 可覆盖；pandoc 回落到 `%LOCALAPPDATA%\mms-tools\pandoc.exe`。缺件时明确列出缺什么并以退出码 2 拒绝，不自动安装。
+- **通道与 IPC**：`POST /workbench/paper/build`；`GET /workbench/state` 增加 `paper` 字段与门禁条第四项「论文排版」；主进程把 PDF 读成 data URL 下发，渲染层拿不到文件路径。
+- **论文页**：构建/重新构建按钮、工具版本、六步进度、三道门禁 chips、编译日志尾部、pdf.js 页级预览（上一页/下一页）。
+- **依赖 `pdfjs-dist`**：worker 由 Vite 打包进 `out/renderer/assets`；CSP 增加 `worker-src 'self' blob:`，PDF 以二进制交给 pdf.js，不走网络。
+- **G10 论文自检** `runtime/selfcheck_paper.py`：10 条，真编 PDF/DOCX、文件头、六步、三道门禁、状态落盘，外加缺 pandoc、坏稿、坏 TeX、缺稿件四条反向。
+- **G7 扩展**：论文页构建、PDF/DOCX、三道门禁与预览渲染，共 57 条；G6b 下限同步 57、点名 21 条。
+- **CI**：gates job 在 ubuntu 安装 pandoc 与 texlive-xetex/中文支持并跑 G10（Windows 显式跳过并标注未证）；window-smoke job 安装同套依赖，G7-9 真编一篇。
+
+### 变更
+
+- 门禁条由三项变四项：图表 / 评分 / 章节 / 论文排版。
+- 版本 `0.4.0 → 0.5.0`。
+
+### 验证（本机 Windows，2026-10-30）
+
+- `npm run gate` 全绿：G9 13/13、G4 46/46、事件自测 10/10、G10 10/10、G6b 自测 12/12、G7 57/57（内容尺寸 1440x900）。
+- 论文构建 5.4 秒：PDF 284 KB（7 页）、DOCX 151 KB；phrasing 0、style 0、chapters hard 0 / soft 0。
+- 论文页真起窗：构建 → 三道门禁 → pdf.js 预览出第 1 页，截图 `screenshots/paper.png`。
+- 工具版本：MiKTeX-XeTeX 4.16（MiKTeX 25.12）、pandoc 3.13（装在仓库外的 `%LOCALAPPDATA%\mms-tools`）。
+
+### 尚未做
+
+- **阶段机没有接论文**：论文构建是工作台动作，阶段五不会因构建成功自动标为已过；K1 环境预检卡也未接。
+- **演示稿不是真实赛题**：不读用户上传的题目，不自动生成正文；评分卡仍是演示数据。
+- PDF 与 Word 的一致性核对未自动化，只做了 docx 生成与版式微调。
+- 排版工具打包未定：要求本机安装还是内置，留给 M6。
+- Linux 桌面 `safeStorage` 可用分支、Windows CI 真起窗仍未证。
+- 便携 Python 与 `docs/env-setup.md` 英文版仍未做。
+
 ## 0.4.0 - 2026-10-30
 
 M4 工作台：图表返工、评分卡与门禁条。目标是「一张图能换主题重渲并回滚；一份稿子能出五维评分与扣分定位」。

@@ -210,11 +210,59 @@ export interface GateRow {
   detail: string
 }
 
+export interface PaperTool {
+  found: boolean
+  path: string
+  version: string
+}
+
+export interface PaperEnv {
+  ok: boolean
+  missing: string[]
+  xelatex: PaperTool
+  pandoc: PaperTool
+  python_docx: boolean
+}
+
+export interface PaperStep {
+  id: string
+  label: string
+  ok: boolean
+  detail: string
+  ms?: number
+}
+
+export interface PaperGate {
+  id: string
+  label: string
+  ok: boolean
+  detail: string
+}
+
+export interface PaperArtifact {
+  path: string
+  size: number
+}
+
+export interface PaperState {
+  ok: boolean
+  env: PaperEnv
+  artifacts: Record<string, PaperArtifact>
+  builtAt: string | null
+  steps: PaperStep[]
+  gates: PaperGate[]
+  error: string | null
+  logTail: string
+  workspace: string
+  pdfData?: string | null
+}
+
 export interface WorkbenchState {
   ok: boolean
   figure: FigureState
   score: ScoreState
   chapter: ChapterState
+  paper: PaperState
   gate: GateRow[]
 }
 

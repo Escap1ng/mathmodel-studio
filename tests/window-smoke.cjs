@@ -634,6 +634,52 @@ async function main() {
     `回滚=${rolledBack} active=${fig3?.figure?.active} 期望=${firstVersion}`
   )
 
+  await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="paper"]')?.click()`)
+  const paperOpen = await waitFor(win, `!!document.querySelector('[data-panel="paper"]')`, 5000)
+  const paperLead = await win.webContents.executeJavaScript(`({
+    button: !!document.querySelector('[data-action="build-paper"]'),
+    disabled: document.querySelector('[data-action="build-paper"]')?.disabled ?? null,
+    envError: document.querySelector('[data-panel="paper"] .panel__error')?.textContent ?? ''
+  })`)
+  record(
+    'G7-9 论文页打开且构建按钮可用',
+    paperOpen && paperLead.button && paperLead.disabled === false,
+    `按钮=${paperLead.button} 禁用=${paperLead.disabled} 缺件提示=${JSON.stringify(paperLead.envError)}`
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="build-paper"]')?.click()`)
+  const paperSteps = await waitFor(
+    win,
+    `document.querySelectorAll('[data-role="paper-steps"] li').length >= 6 && document.querySelectorAll('[data-role="paper-gates"] .paper-gate').length === 3`,
+    240000
+  )
+  const paperState = await win.webContents.executeJavaScript(`window.studio.workbench.state()`)
+  const paper = paperState?.paper ?? {}
+  record(
+    'G7-9 论文构建出 PDF 与 DOCX',
+    paperSteps && paper.ok === true && Boolean(paper.artifacts?.pdf) && Boolean(paper.artifacts?.docx),
+    `步骤=${paperSteps} ok=${paper.ok} artifacts=${Object.keys(paper.artifacts ?? {})} error=${paper.error}`
+  )
+  const paperGates = paper.gates ?? []
+  record(
+    'G7-9 去 AI 与章节门禁全绿',
+    paperGates.length === 3 && paperGates.every((row) => row.ok),
+    JSON.stringify(paperGates.map((row) => [row.id, row.ok, row.detail]))
+  )
+  const preview = await waitFor(
+    win,
+    `(() => { const c = document.querySelector('[data-role="paper-preview"] canvas'); return !!c && c.width > 200 && c.height > 200 })()`,
+    30000
+  )
+  const paperShot = await freshShot(win)
+  const paperInk = measureInk(paperShot)
+  writeFileSync(join(OUT_DIR, 'paper.png'), paperShot.toPNG())
+  record(
+    'G7-9 论文 PDF 预览渲染且截图非空',
+    preview && paperInk.ratio >= MIN_INK_RATIO,
+    `画布=${preview} 非白像素 ${(paperInk.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
+  )
+
   await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="score"]')?.click()`)
   const scoreOpen = await waitFor(win, `!!document.querySelector('[data-panel="score"]')`, 5000)
   const scoreInfo = await win.webContents.executeJavaScript(`({
@@ -679,13 +725,13 @@ async function main() {
   record('G7-8 一票否决示例不进入循环', veto, `红线条=${veto}`)
 
   await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="gate"]')?.click()`)
-  const gateRows = await waitFor(win, `document.querySelectorAll('[data-gate-row]').length === 3`, 5000)
+  const gateRows = await waitFor(win, `document.querySelectorAll('[data-gate-row]').length === 4`, 5000)
   const gateState = await win.webContents.executeJavaScript(
     `[...document.querySelectorAll('[data-gate-row]')].map((n) => ({ id: n.dataset.gateRow, ok: n.classList.contains('gate-row--ok') }))`
   )
   record(
-    'G7-8 门禁条三项全绿',
-    gateRows && gateState.length === 3 && gateState.every((row) => row.ok),
+    'G7-8 门禁条四项全绿',
+    gateRows && gateState.length === 4 && gateState.every((row) => row.ok),
     JSON.stringify(gateState)
   )
 
