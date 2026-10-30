@@ -154,7 +154,7 @@ function ModelChoice({ card, busy, onDecision, onExplain }: Props) {
                 <dd>{candidate.accuracy}</dd>
               </div>
             </dl>
-            <p className="candidate__reason">{candidate.reason}</p>
+            {candidate.recommended ? <p className="candidate__reason">{candidate.reason}</p> : null}
             <div className="candidate__actions">
               <button
                 type="button"

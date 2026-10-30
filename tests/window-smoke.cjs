@@ -23,7 +23,7 @@
  *
  * 退出码：0 全部通过 / 1 任一断言失败 / 2 环境错误（没有构建产物或窗口没起来）
  */
-const { app, BrowserWindow, safeStorage } = require('electron')
+const { app, BrowserWindow, Menu, safeStorage } = require('electron')
 const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
@@ -132,7 +132,7 @@ async function main() {
   // runtime 由主进程在 whenReady 里拉起，握手完成后状态栏才会变。等它，而不是固定睡一段时间。
   const ready = await waitFor(
     win,
-    `(document.querySelector('.statusbar')?.textContent || '').includes('runtime 已连接')`,
+    `(document.querySelector('.statusbar')?.textContent || '').includes('运行时已连接')`,
     20000
   )
 
@@ -163,7 +163,9 @@ async function main() {
   )
   record(
     'G7-3 runtime 通过握手就绪',
-    ready && String(dom.statusbar).includes('离线演示'),
+    ready &&
+      String(dom.statusbar).includes('离线演示') &&
+      String(dom.statusbar).includes('运行时已连接'),
     `状态栏: ${JSON.stringify(String(dom.statusbar).trim().slice(0, 120))}`
   )
   record(
@@ -173,6 +175,12 @@ async function main() {
   )
 
   record('G7-4 阶段轨道 7 节', dom.phases === 7, `实得 ${dom.phases}`)
+  const appMenu = Menu.getApplicationMenu()
+  record(
+    'G7-4 Windows/Linux 不挂英文系统菜单',
+    process.platform === 'darwin' || appMenu === null,
+    `platform=${process.platform}，应用菜单=${appMenu === null ? 'null' : 'still set'}`
+  )
   record('G7-4 工作台 6 个标签', dom.tabs === 6, `实得 ${dom.tabs}`)
   record(
     'G7-4 输入区在 runtime 就绪后可用',
@@ -429,6 +437,7 @@ async function main() {
       snapExplain?.session?.pending?.card === 'model-choice',
     `抽屉=${drawerOpen} 卡片仍在=${explainState.cardStill} 阶段3=${explainState.phase3} 小节=${explainState.sections}`
   )
+  await sleep(300)
   const drawerShot = await win.webContents.capturePage()
   const drawerInk = measureInk(drawerShot)
   writeFileSync(join(OUT_DIR, 'drawer.png'), drawerShot.toPNG())

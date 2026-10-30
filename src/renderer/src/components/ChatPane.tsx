@@ -191,7 +191,7 @@ export default function ChatPane({
 
   const placeholder = !ready
     ? runtime.state === 'starting'
-      ? '正在启动本地 runtime…'
+      ? '正在启动本地运行时…'
       : '运行时未连接'
     : !provider
       ? '先在模型设置里选择一个服务商'
@@ -231,7 +231,7 @@ export default function ChatPane({
 
       {runtime.state === 'error' ? (
         <div className="chat__banner" role="alert">
-          <span>{runtime.message ?? '本地 runtime 启动失败'}</span>
+          <span>{runtime.message ?? '本地运行时启动失败'}</span>
           <button type="button" className="btn btn--ghost btn--sm" onClick={onRestart}>
             重试
           </button>
@@ -286,7 +286,9 @@ export default function ChatPane({
               disabled={!provider}
               title="模型与 API Key 设置"
             >
-              {provider ? `${provider.display} · ${provider.model}` : '未选择模型'}
+              {provider
+                ? `${provider.display} · ${provider.model}`
+                : '未选择模型'}
             </button>
             <span className="pill" data-role="phase-pill">
               {phaseText}

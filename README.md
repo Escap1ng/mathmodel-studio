@@ -100,7 +100,7 @@ npm run gate
 | G4 事件流 | 握手一行 JSON；Bearer token 与 Host/Origin 回环白名单；SSE 九类事件按契约校验；`Last-Event-ID` 续传；取消后必须收到 `done.reason=cancelled`。M3 追加：新赛题停在 K2、确认进 K3、换一批、选择后进阶段四，以及**换一个服务器进程仍读得到待决卡**（46 条） | 10 种坏事件逐个必须被拒；无 token / 错 Host / 无待决时恢复被拒（`python runtime/selfcheck_channel.py --selftest`） |
 | G5 provider 离线契约 | 本地假 OpenAI 端点跑 429 退避、`reasoning_content` 与正文分离、分片 `tool_calls` 拼装、历史剥离 reasoning、Key 只出现在 Authorization | Key 哨兵不得出现在事件流与 stderr；未开 `MMS_FAKE_PROVIDER` 时必须拒绝假 provider（同上） |
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
-| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗，再断言：加载构建产物、内容尺寸 1440×900、非白像素 ≥1%、IPC 端到端、阶段轨道与输入区、中文真字形、设置页不回显 Key 且落盘只有密文/明确拒绝；M3 追加 K2→K3→解释抽屉→换一批→选择→阶段四，以及**杀掉 runtime 再拉起后 K3 仍在**；M2 自由问答与工具卡保留为回归（42 条） | 空白截图过不了像素阈值；自建窗口的假版本、豆腐块截图、删掉关键断言再补满条数，三类都暴露过（`tests/window-smoke.cjs`） |
+| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗，再断言：加载构建产物、内容尺寸 1440×900、非白像素 ≥1%、IPC 端到端、阶段轨道与输入区、中文真字形、设置页不回显 Key 且落盘只有密文/明确拒绝；M3 追加 K2→K3→解释抽屉→换一批→选择→阶段四，以及**杀掉 runtime 再拉起后 K3 仍在**；M2 自由问答与工具卡保留为回归（43 条） | 空白截图过不了像素阈值；自建窗口的假版本、豆腐块截图、删掉关键断言再补满条数，三类都暴露过（`tests/window-smoke.cjs`） |
 | G6b 结果核验 | 读 `screenshots/window-smoke.json` 并**复算读数**：内容尺寸、非白像素比、断言条数下限、10 条关键断言是否还在、自述计数与明细一致 | 带 `--selftest`，12 份合成结果证明「ok=true 但读数不对」「删掉 M2 或 M3 的关键断言再补满条数」照样被拒（`scripts/check-window-smoke.mjs`） |
 
 G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动，所以 preload 与 IPC 是在生产那套 `sandbox: true` 下验的，不是靠 `--no-sandbox` 绕过。
@@ -109,8 +109,8 @@ G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
-**执行状态要说清**：M3 的本机 `npm run gate` 全绿——G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言）、G4（46 条通道断言，含跨进程恢复）、事件判据自测（10/10）、G6b 自测（12/12）、类型检查、构建与 G6 产物冒烟。G7 在本机 Windows 上 42/42，独立核验通过（内容尺寸 1440x900，非白像素 2.37%）；选模卡与解释抽屉截图在 `screenshots/decision.png`、`screenshots/drawer.png`。
-M3 的 CI run `40982728779` 三 job 全绿：ubuntu/windows 门禁同跑 G4 46 条；ubuntu 真启动冒烟 42/42（非白像素 3.15%），K2→K3→解释→重启恢复→换一批→选择全过，`safeStorage` 不可用时仍走「明确拒绝且不落盘」。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
+**执行状态要说清**：M3 的本机 `npm run gate` 全绿——G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言）、G4（46 条通道断言，含跨进程恢复）、事件判据自测（10/10）、G6b 自测（12/12）、类型检查、构建与 G6 产物冒烟。G7 在本机 Windows 上 43/43，独立核验通过（内容尺寸 1440x900，非白像素 2.37%）；选模卡与解释抽屉截图在 `screenshots/decision.png`、`screenshots/drawer.png`。
+0.3.0 的 CI run `40982728779` 三 job 全绿：ubuntu/windows 门禁同跑 G4 46 条；ubuntu 真启动冒烟 42/42（非白像素 3.15%），K2→K3→解释→重启恢复→换一批→选择全过，`safeStorage` 不可用时仍走「明确拒绝且不落盘」。0.3.1 的界面修订以本次推送后的 run 为准。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
 
 ## 依赖
 

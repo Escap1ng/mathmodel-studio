@@ -102,7 +102,7 @@ export class Channel {
 
     try {
       const handshake = await this.readHandshake(child)
-      if (this.child !== child) throw new Error('runtime 启动被新的启动请求取代')
+      if (this.child !== child) throw new Error('运行时启动被新的启动请求取代')
       this.handshake = handshake
 
       child.stdout.on('data', (chunk: Buffer) => {
@@ -184,7 +184,7 @@ export class Channel {
 
   private async request(path: string, options: RequestOptions = {}): Promise<Record<string, unknown>> {
     const hs = this.handshake
-    if (!hs) throw new Error('runtime 未连接')
+    if (!hs) throw new Error('运行时未连接')
     const headers: Record<string, string> = { Authorization: `Bearer ${hs.token}` }
     let body: string | undefined
     if (options.body !== undefined) {
@@ -206,7 +206,7 @@ export class Channel {
     }
     if (!res.ok) {
       const detail = (json['error'] as { message?: string } | undefined)?.message
-      throw new Error(detail || `runtime HTTP ${res.status}`)
+      throw new Error(detail || `运行时 HTTP ${res.status}`)
     }
     return json
   }
@@ -222,7 +222,7 @@ export class Channel {
   async startChat(payload: Record<string, unknown>): Promise<string> {
     const data = await this.request('/chats', { method: 'POST', body: payload })
     const chatId = String(data['chatId'] ?? '')
-    if (!chatId) throw new Error('runtime 没有返回 chatId')
+    if (!chatId) throw new Error('运行时没有返回会话 id')
     return chatId
   }
 
@@ -249,7 +249,7 @@ export class Channel {
     signal: AbortSignal
   ): Promise<void> {
     const hs = this.handshake
-    if (!hs) throw new Error('runtime 未连接')
+    if (!hs) throw new Error('运行时未连接')
     const res = await fetch(`http://127.0.0.1:${hs.port}/chats/${encodeURIComponent(chatId)}/events`, {
       headers: { Authorization: `Bearer ${hs.token}` },
       signal

@@ -125,7 +125,7 @@ def _post_stream(payload: dict, api_key: str, url: str):
                 time.sleep(1.0 * (attempt + 1))
                 continue
             raise ProviderError(f"连不上 provider：{exc.reason}") from exc
-    raise ProviderError("provider 连续重试后仍失败")
+    raise ProviderError("服务商连续重试后仍失败")
 
 
 def stream_completion(

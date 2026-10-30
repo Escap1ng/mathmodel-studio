@@ -95,7 +95,7 @@ export default function SettingsDialog({ list, onClose, onChanged }: Props) {
             模型与服务商
           </h2>
           <p className="settings__sub">
-            Key 只交给主进程，用系统安全存储加密后落盘；渲染层、事件流与日志里都不会出现明文。
+            API Key 只交给主进程，用系统安全存储加密后落盘；渲染层、事件流与日志里都不会出现明文。
           </p>
         </div>
 
@@ -178,7 +178,7 @@ export default function SettingsDialog({ list, onClose, onChanged }: Props) {
           {error ? <span className="settings__error">{error}</span> : null}
           {!error && view.requiresKey && view.configured ? (
             <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void clearKey()}>
-              清除 Key
+              清除密钥
             </button>
           ) : null}
           <span className="settings__spacer" />
