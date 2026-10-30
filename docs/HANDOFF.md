@@ -54,7 +54,7 @@ npm run verify:window  # 独立读 JSON 并复算读数
 **本机跑 G7 前去掉 `ELECTRON_RUN_AS_NODE`**：本会话 shell 里它是 `1`，会让 `electron` 退化成 Node 并报 `app.setPath` 不存在。用 `env -u ELECTRON_RUN_AS_NODE npx electron tests/window-smoke.cjs`。
 
 CI：<https://github.com/Escap1ng/mathmodel-studio/actions> —— 三 job：`门禁 · ubuntu-latest`、`门禁 · windows-latest`、`真启动冒烟 · ubuntu`。
-0.3.0 的 run `40982728779` 三 job 全绿；ubuntu 真启动 42/42、非白像素 3.15%（M2 的历史 run `40658227855` 为 27/27）。0.3.1 的 run `41000678500` 三 job 全绿，ubuntu 真启动 43/43、非白像素 3.12%。0.4.0 的 run `41008695577` 三 job 全绿，ubuntu 真启动 53/53、非白像素 3.98%，G9 13/13、G6 14/14。**M5 的结果以本次推送后的 run 为准**；gates job 在 ubuntu 装了 pandoc 与 texlive，Windows 的 G10 显式跳过。取回截图：
+0.3.0 的 run `40982728779` 三 job 全绿；ubuntu 真启动 42/42、非白像素 3.15%（M2 的历史 run `40658227855` 为 27/27）。0.3.1 的 run `41000678500` 三 job 全绿，ubuntu 真启动 43/43、非白像素 3.12%。0.4.0 的 run `41008695577` 三 job 全绿，ubuntu 真启动 53/53、非白像素 3.98%。**0.5.0 的 run `41017241564` 三 job 全绿**：ubuntu 真启动 57/57、1440x900、非白像素 2.96%，G10 10/10、G9 13/13、G6 14/14；Windows 的 G10 显式跳过。取回截图：
 
 ```bash
 gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
@@ -76,8 +76,8 @@ gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
 | 门禁能抓住坏稿 | G10 P7：注入两处过渡词后 phrasing 判红，PDF 仍生成 | 强（反向） |
 | 缺工具 / 坏 TeX / 缺稿件 | G10 P6/P8/P9：分别退出 2 / 1 / 2，不产出假 PDF | 强（反向） |
 | pdf.js 页级预览 | G7-9：画布尺寸与截图墨迹；`screenshots/paper.png` | 强（本机） |
-| M5 在 CI 上真编 | 未跑；本次推送后看 run | **未证** |
-| Windows CI 跑 G10 | 未装 MiKTeX，gates job 显式跳过 | **未证**（执行层跳过，不是通过） |
+| M5 在 CI 上真编 | run `41017241564`：ubuntu G10 10/10、G7 57/57、G6b 核验一致 | 强（ubuntu） |
+| Windows CI 跑 G10 | 未装 MiKTeX，gates job 显式跳过并打印「未验证 G10」 | **未证**（执行层跳过，不是通过） |
 | PDF 与 Word 版式一致性 | 未自动化；只做 docx 生成与后处理 | **未证** |
 | 阶段五由构建驱动 / K1 环境预检 | 未接；论文页构建不推进阶段机 | **未证** |
 | 论文 PDF/Word 之外的正文自动生成 | 未做；只编演示稿 | **未证** |
