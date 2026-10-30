@@ -52,7 +52,7 @@ npm run verify:window  # 独立读 JSON 并复算读数
 **本机跑 G7 前去掉 `ELECTRON_RUN_AS_NODE`**：本会话 shell 里它是 `1`，会让 `electron` 退化成 Node 并报 `app.setPath` 不存在。用 `env -u ELECTRON_RUN_AS_NODE npx electron tests/window-smoke.cjs`。
 
 CI：<https://github.com/Escap1ng/mathmodel-studio/actions> —— 三 job：`门禁 · ubuntu-latest`、`门禁 · windows-latest`、`真启动冒烟 · ubuntu`。
-M3 的 CI 结果以本轮推送后的 run 为准（M2 的 run `40658227855` 三 job 全绿，ubuntu 真启动 27/27）。取回截图：
+M3 的 run `40982728779` 三 job 全绿；ubuntu 真启动 42/42、非白像素 3.15%（M2 的历史 run `40658227855` 为 27/27）。取回截图：
 
 ```bash
 gh run download <run-id> -n window-smoke --dir screenshots-m3-ci
@@ -69,9 +69,9 @@ gh run download <run-id> -n window-smoke --dir screenshots-m3-ci
 | 界面端到端：K2/K3 卡、解释抽屉、换一批、选择、runtime 重启后 K3 仍在 | G7 42/42，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
 | OpenAI 兼容协议：429 退避、reasoning 分离、分片 tool_calls、历史剥离、Key 不外泄 | 本地假端点，3 次真实 HTTP 请求 | 强（协议层，非真实厂商） |
 | Key 落盘：Windows 上只有 `safeStorage` 密文，无明文 | G7 写入哨兵 Key 后读 `settings.json`，只输出布尔值 | 强（Windows 可用分支） |
-| 安全存储不可用时拒绝保存且不落盘 | CI run `40658227855` 的 Linux runner 无 Secret Service，G7 实得 `可用=false、文件存在=false、明确拒绝=true` | 强（拒绝分支）；Linux 桌面 Secret Service 可用分支仍未证 |
+| 安全存储不可用时拒绝保存且不落盘 | CI run `40982728779` 的 Linux runner 无 Secret Service，G7 实得 `可用=false、文件存在=false、明确拒绝=true` | 强（拒绝分支）；Linux 桌面 Secret Service 可用分支仍未证 |
 | 真实 DeepSeek / Kimi 联网对话 | 无 Key，未跑 | **未证** |
-| Linux 上真起窗与整条链路 | M2 由 CI run `40658227855` 验过 27/27；M3 待本轮 CI | 强（M2）/ 待 CI（M3） |
+| Linux 上真起窗与整条链路 | CI run `40982728779`，M3 42/42 + 独立核验（1440x900，非白像素 3.15%） | 强 |
 | Windows CI 真起窗 | 无 | **未证**；M2/M3 的 Windows 证据来自本机 |
 | K4 数学公式用 KaTeX 渲染 | M3 用等宽文本展示公式，没有引入 KaTeX | **未证**（排版增强留待 M4/M5） |
 | `gate` / `artifact` 能渲染成卡片 | 只有契约与转发，没有 UI | **未证**（M4） |
