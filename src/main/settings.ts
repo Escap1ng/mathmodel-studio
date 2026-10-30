@@ -85,7 +85,7 @@ export interface SaveProviderInput {
 export function saveProvider(input: SaveProviderInput): void {
   const id = String(input.id || '').trim()
   const model = String(input.model || '').trim()
-  if (!id) throw new Error('缺少 provider id')
+  if (!id) throw new Error('缺少服务商标识')
   if (!model) throw new Error('缺少模型名')
   const file = loadSettings()
   const prev = file.providers[id] ?? {}

@@ -111,6 +111,6 @@ npm run gate
 `check:cli` 需要 `requirements.txt` 里的科学计算包。这是刻意设计，方便你在任何机器上验证注册表与通道没漂。
 
 想看界面就两条路：`npm run dev` 起开发窗口；或先 `npm run build` 再 `npm run smoke:window`，
-它会 `require` 生产入口真起一次窗口、拉起 Python 通道、用离线 provider 走完 K2→K3→解释→换一批→选择，再重启 runtime 确认待选卡还在（42 条），
+它会 `require` 生产入口真起一次窗口、拉起 Python 通道、用离线 provider 走完 K2→K3→解释→换一批→选择，再重启 runtime 确认待选卡还在（43 条），
 截图写到 `screenshots/`（`decision.png`、`drawer.png` 是 M3 新增）。本机有显示器，不需要 xvfb；CI 那条 job 才需要，并且要先修好 Electron 的 SUID 沙箱助手（见 `ci.yml` 的注释）。
 会话状态默认写在 Electron `userData/sessions.db`（开发期也可用 `MMS_DATA_DIR` 指到别处），不存 Key。

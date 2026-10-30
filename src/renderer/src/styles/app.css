@@ -69,10 +69,10 @@ button {
 
 .phase {
   display: grid;
-  grid-template-columns: 18px 1fr auto;
+  grid-template-columns: 16px 1fr auto;
   align-items: baseline;
-  gap: 8px;
-  padding: 7px 8px;
+  gap: 6px;
+  padding: 9px 6px;
   border-radius: var(--radius-sm);
   transition: background var(--t);
 }
@@ -96,18 +96,20 @@ button {
 
 .phase__name {
   font-family: var(--font-cjk);
-  font-size: 13.5px;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .phase__num {
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
-  margin-right: 6px;
+  margin-right: 5px;
 }
 
 .phase__state {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-3);
+  white-space: nowrap;
 }
 
 /* —— 中栏：对话流 —— */
@@ -380,9 +382,9 @@ button {
   border-radius: var(--radius);
   background: var(--bg);
   box-shadow: var(--shadow-1);
-  padding: 10px 12px;
+  padding: 12px 14px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .composer__input {
@@ -400,17 +402,19 @@ button {
 .composer__bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .pill {
   border: 1px solid var(--line-strong);
   background: var(--bg);
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 4px 11px;
   font-size: 12px;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .pill--send {
@@ -530,8 +534,8 @@ button:disabled {
   background: var(--bg);
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px;
+  gap: 12px;
+  padding: 0 14px;
   font-size: 11.5px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
@@ -544,7 +548,7 @@ button:disabled {
 .swatches {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
 }
 
 .swatch {
@@ -877,15 +881,15 @@ button:disabled {
 
 /* —— M3：决策卡 —— */
 .decision {
-  margin: 14px 0 4px;
-  padding: 16px 18px 14px;
+  margin: 16px 0 6px;
+  padding: 18px 20px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
 }
 
 .decision__head {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .decision__kicker {
@@ -913,7 +917,7 @@ button:disabled {
 
 .decision__questions {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -922,9 +926,9 @@ button:disabled {
 .decision__questions li {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 12px;
   align-items: baseline;
-  padding: 8px 10px;
+  padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg);
@@ -985,13 +989,14 @@ button:disabled {
 .decision__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .candidate {
   display: flex;
   flex-direction: column;
-  padding: 12px 12px 10px;
+  min-width: 0;
+  padding: 14px 14px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg);
@@ -1006,10 +1011,11 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .candidate__index {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1024,13 +1030,15 @@ button:disabled {
 
 .candidate__name {
   margin: 0;
+  min-width: 0;
   font-family: var(--font-cjk);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.4;
 }
 
 .candidate__badge {
+  flex: none;
   margin-left: auto;
   padding: 1px 6px;
   border-radius: 999px;
@@ -1038,50 +1046,59 @@ button:disabled {
   color: var(--on-accent);
   font-size: 10px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .candidate__idea {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   color: var(--text-2);
   font-size: 12px;
-  line-height: 1.65;
+  line-height: 1.7;
 }
 
 .candidate__spec {
   display: grid;
-  gap: 3px;
-  margin: 0 0 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px 12px;
+  margin: 0 0 12px;
 }
 
 .candidate__spec > div {
-  display: flex;
-  gap: 8px;
-  font-size: 11.5px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.candidate__spec > div:last-child {
+  grid-column: 1 / -1;
 }
 
 .candidate__spec dt {
-  min-width: 60px;
   color: var(--text-3);
+  font-size: 10.5px;
+  line-height: 1.4;
 }
 
 .candidate__spec dd {
   margin: 0;
   color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .candidate__reason {
-  margin: 0 0 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
+  margin: 0 0 12px;
   color: var(--text-2);
   font-size: 11.5px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .candidate__actions {
   display: flex;
   gap: 6px;
   margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 
 /* —— M3：解释抽屉 —— */
@@ -1100,11 +1117,15 @@ button:disabled {
 }
 
 .drawer__head {
-  padding: 18px 20px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  padding: 20px 22px 16px;
   border-bottom: 1px solid var(--line);
 }
 
 .drawer__kicker {
+  grid-column: 1;
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -1112,20 +1133,27 @@ button:disabled {
 }
 
 .drawer__title {
-  margin: 4px 0 12px;
+  grid-column: 1;
+  margin: 4px 0 0;
   font-family: var(--font-cjk);
   font-size: 18px;
   font-weight: 600;
 }
 
+.drawer__head .btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
 .drawer__body {
   flex: 1;
   overflow: auto;
-  padding: 16px 20px 8px;
+  padding: 18px 22px 10px;
 }
 
 .drawer__section {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .drawer__section h3 {
@@ -1157,7 +1185,7 @@ button:disabled {
 
 .drawer__note {
   margin: 0;
-  padding: 12px 20px 16px;
+  padding: 14px 22px 18px;
   border-top: 1px solid var(--line);
   color: var(--text-3);
   font-size: 11.5px;

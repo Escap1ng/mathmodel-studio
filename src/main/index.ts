@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, type WebContents } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
 import type {
@@ -67,7 +67,7 @@ function parseSaveInput(raw: unknown): SaveProviderInput {
   const obj = raw as Record<string, unknown>
   const id = typeof obj.id === 'string' ? obj.id.trim() : ''
   const model = typeof obj.model === 'string' ? obj.model.trim() : ''
-  if (!id) throw new Error('缺少 provider')
+  if (!id) throw new Error('缺少服务商')
   if (!model) throw new Error('缺少模型名')
   return {
     id,
@@ -155,7 +155,7 @@ ipcMain.handle('providers:save', async (_event, raw: unknown) => {
 
 ipcMain.handle('providers:clear', async (_event, raw: unknown) => {
   const id = typeof raw === 'string' ? raw : ''
-  if (!id) throw new Error('缺少 provider')
+  if (!id) throw new Error('缺少服务商')
   clearProviderKey(id)
   return providerViews()
 })
@@ -195,7 +195,7 @@ ipcMain.handle('session:latest', async (): Promise<SessionLatest> => ({
 
 ipcMain.handle('chat:cancel', async (_event, raw: unknown) => {
   const chatId = typeof raw === 'string' ? raw : ''
-  if (!chatId) throw new Error('缺少 chatId')
+  if (!chatId) throw new Error('缺少会话 id')
   await channel.cancel(chatId)
   // provider 正在等下一块数据时，cancel 只能等它醒来；2 秒后断开本地流兜底。
   const controller = activeStreams.get(chatId)
@@ -255,6 +255,8 @@ app.on('web-contents-created', (_event, contents) => {
 })
 
 app.whenReady().then(() => {
+  // Windows/Linux 上默认的英文 File/Edit/View 菜单没有用武之地；中文界面不挂它。
+  if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
   void channel.start().catch((err: unknown) => {
     console.error('[runtime] 启动失败:', err instanceof Error ? err.message : err)
   })

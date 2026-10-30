@@ -371,10 +371,10 @@ export default function App() {
 
   const statusText =
     runtime.state === 'ready'
-      ? `runtime 已连接${runtime.fake ? ' · 离线演示' : ''}`
+      ? `运行时已连接${runtime.fake ? ' · 离线演示' : ''}`
       : runtime.state === 'starting'
-        ? 'runtime 启动中'
-        : 'runtime 未连接'
+        ? '运行时启动中'
+        : '运行时未连接'
 
   const pendingCard = [...entries]
     .reverse()

@@ -111,14 +111,14 @@ def run_tool(name: str, args: dict | None) -> tuple[dict, bool]:
 
 def normalize_messages(raw) -> list[dict]:
     if not isinstance(raw, list) or not raw:
-        raise ValueError("messages 必须是非空数组")
+        raise ValueError("消息必须是非空数组")
     if len(raw) > MAX_MESSAGES:
-        raise ValueError(f"messages 超过 {MAX_MESSAGES} 条")
+        raise ValueError(f"消息超过 {MAX_MESSAGES} 条")
     out: list[dict] = []
     total = 0
     for item in raw:
         if not isinstance(item, dict):
-            raise ValueError("messages 每一项必须是对象")
+            raise ValueError("消息每一项必须是对象")
         role = item.get("role")
         content = item.get("content")
         if role not in ("user", "assistant", "system"):
@@ -463,7 +463,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             provider = find_provider(provider_id)
             if not provider:
-                self._error(400, "provider", f"未知 provider: {provider_id}")
+                self._error(400, "provider", f"未知服务商: {provider_id}")
                 return
             if provider.get("custom"):
                 provider["base_url"] = str(body.get("baseUrl") or "")
