@@ -261,6 +261,13 @@ export class Channel {
     })
   }
 
+  async buildPaper(): Promise<Record<string, unknown>> {
+    return this.request('/workbench/paper/build', {
+      method: 'POST',
+      body: {}
+    })
+  }
+
   async stream(
     chatId: string,
     onEvent: (ev: ChatEventPayload) => void,

@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { GlobalWorkerOptions, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist'
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import type {
   FigureVersion,
   GateRow,
+  PaperState,
   ScoreDeduction,
   ScoreRound,
   WorkbenchState
 } from '../../../shared/api'
+
+GlobalWorkerOptions.workerSrc = pdfWorker
 
 const TABS = [
   { id: 'figure', label: '图表' },
@@ -398,11 +403,202 @@ function LogPanel({ state }: { state: WorkbenchState }) {
   )
 }
 
+function pdfBytes(dataUrl: string): Uint8Array {
+  const comma = dataUrl.indexOf(',')
+  const raw = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl
+  const binary = atob(raw)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+function PdfPreview({ data }: { data: string }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const docRef = useRef<PDFDocumentProxy | null>(null)
+  const taskRef = useRef<PDFDocumentLoadingTask | null>(null)
+  const [page, setPage] = useState(1)
+  const [pages, setPages] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setPage(1)
+    setPages(0)
+    setError(null)
+    let task: PDFDocumentLoadingTask
+    try {
+      // 传二进制而不是 data: URL：pdf.js 默认会去 fetch，CSP 的 connect-src 不放行 data:。
+      task = getDocument({ data: pdfBytes(data) })
+    } catch (err) {
+      setError(errorText(err))
+      return
+    }
+    taskRef.current = task
+    task.promise
+      .then((doc) => {
+        if (!alive) return
+        docRef.current = doc
+        setPages(doc.numPages)
+      })
+      .catch((err: unknown) => {
+        if (alive) setError(errorText(err))
+      })
+    return () => {
+      alive = false
+      void taskRef.current?.destroy()
+      taskRef.current = null
+      docRef.current = null
+    }
+  }, [data])
+
+  useEffect(() => {
+    const doc = docRef.current
+    const canvas = canvasRef.current
+    if (!doc || !canvas || pages === 0) return
+    let alive = true
+    doc
+      .getPage(page)
+      .then(async (pdfPage) => {
+        const viewport = pdfPage.getViewport({ scale: 1.4 })
+        if (!alive) return
+        canvas.width = Math.floor(viewport.width)
+        canvas.height = Math.floor(viewport.height)
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        await pdfPage.render({ canvasContext: ctx, viewport, canvas }).promise
+      })
+      .catch((err: unknown) => {
+        if (alive) setError(errorText(err))
+      })
+    return () => {
+      alive = false
+    }
+  }, [page, pages])
+
+  return (
+    <div className="paper-preview" data-role="paper-preview">
+      {error ? <div className="panel__error" role="alert">{error}</div> : null}
+      <canvas ref={canvasRef} aria-label={`论文第 ${page} 页`} />
+      {pages > 1 ? (
+        <div className="paper-pager">
+          <button type="button" className="linkbtn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            上一页
+          </button>
+          <span>
+            {page} / {pages}
+          </span>
+          <button type="button" className="linkbtn" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>
+            下一页
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function PaperPanel({
+  state,
+  building,
+  error,
+  onBuild
+}: {
+  state: WorkbenchState
+  building: boolean
+  error: string | null
+  onBuild: () => void
+}) {
+  const paper: PaperState = state.paper
+  const built = Boolean(paper.builtAt)
+  return (
+    <div className="panel" data-panel="paper">
+      <div className="panel__head">
+        <div>
+          <div className="panel__kicker">工作台 · 论文</div>
+          <h2 className="panel__title">排版与预览</h2>
+        </div>
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          data-action="build-paper"
+          disabled={building || !paper.env.ok}
+          onClick={onBuild}
+        >
+          {building ? '编译中…' : built ? '重新构建' : '构建论文'}
+        </button>
+      </div>
+
+      {paper.env.ok ? (
+        <p className="panel__hint">
+          {paper.env.xelatex.version || 'xelatex'} · {paper.env.pandoc.version || 'pandoc'} · 演示稿真跑
+          xelatex → pandoc → 去 AI 与章节门禁
+        </p>
+      ) : (
+        <div className="panel__error" role="alert">
+          缺少排版工具：{paper.env.missing.join('、')}。pandoc 可放到
+          %LOCALAPPDATA%\mms-tools\pandoc.exe 或加入 PATH；xelatex 由 MiKTeX 或 TeX Live 提供。
+        </div>
+      )}
+
+      {error ? <div className="panel__error" role="alert">{error}</div> : null}
+      {paper.error ? <div className="panel__error" role="alert" data-role="paper-error">{paper.error}</div> : null}
+
+      {paper.pdfData ? (
+        <PdfPreview data={paper.pdfData} />
+      ) : built ? (
+        <p className="panel__hint">上次构建的 PDF 不在了，重新构建一次。</p>
+      ) : (
+        <div className="panel__empty">
+          <p>还没有论文产物。点击「构建论文」会编译演示稿，并跑去 AI 措辞、结构指标与章节门禁。</p>
+        </div>
+      )}
+
+      {paper.steps.length ? (
+        <ul className="paper-steps" data-role="paper-steps">
+          {paper.steps.map((step) => (
+            <li key={step.id} data-ok={step.ok ? 'true' : 'false'} data-step={step.id}>
+              <span className="paper-steps__dot" aria-hidden="true" />
+              <span className="paper-steps__label">{step.label}</span>
+              <span className="paper-steps__detail">{step.detail}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {paper.gates.length ? (
+        <div className="paper-gates" data-role="paper-gates">
+          {paper.gates.map((gate) => (
+            <span
+              key={gate.id}
+              className="paper-gate"
+              data-gate={gate.id}
+              data-ok={gate.ok ? 'true' : 'false'}
+              title={gate.detail}
+            >
+              <span className="paper-gate__dot" aria-hidden="true" />
+              {gate.label} · {gate.detail}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {built ? <p className="panel__meta">构建于 {paper.builtAt}</p> : null}
+
+      {paper.logTail ? (
+        <details className="paper-log">
+          <summary>编译日志尾部</summary>
+          <pre className="code-block code-block--log">{paper.logTail}</pre>
+        </details>
+      ) : null}
+    </div>
+  )
+}
+
 export default function WorkspacePane({ runtimeReady }: Props) {
   const [active, setActive] = useState<TabId>('figure')
   const [state, setState] = useState<WorkbenchState | null>(null)
   const [loading, setLoading] = useState(false)
   const [rendering, setRendering] = useState(false)
+  const [building, setBuilding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [template, setTemplate] = useState('line-compare')
   const [theme, setTheme] = useState('nature')
@@ -420,6 +616,19 @@ export default function WorkspacePane({ runtimeReady }: Props) {
       setError(errorText(err))
     } finally {
       setRendering(false)
+    }
+  }
+
+  const buildPaper = async (): Promise<void> => {
+    setBuilding(true)
+    setError(null)
+    try {
+      const result = await window.studio.paper.build()
+      setState(result.state)
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBuilding(false)
     }
   }
 
@@ -456,6 +665,7 @@ export default function WorkspacePane({ runtimeReady }: Props) {
     if (id === 'figure') setActive('figure')
     else if (id === 'score') setActive('score')
     else if (id === 'chapter') setActive('gate')
+    else if (id === 'paper') setActive('paper')
   }
 
   return (
@@ -531,18 +741,7 @@ export default function WorkspacePane({ runtimeReady }: Props) {
         {state && active === 'code' ? <CodePanel state={state} /> : null}
         {state && active === 'log' ? <LogPanel state={state} /> : null}
         {state && active === 'paper' ? (
-          <div className="panel" data-panel="paper">
-            <div className="panel__head">
-              <div>
-                <div className="panel__kicker">工作台 · 论文</div>
-                <h2 className="panel__title">论文预览</h2>
-              </div>
-            </div>
-            <div className="panel__empty">
-              <p>论文 PDF / Word 的页级预览要在 M5 接上 xelatex 与 pandoc 之后才有产物。</p>
-              <p>现在能先看图表、评分与扣分定位；评分样例来自 mathmodel-score 技能。</p>
-            </div>
-          </div>
+          <PaperPanel state={state} building={building} error={error} onBuild={() => void buildPaper()} />
         ) : null}
       </div>
     </aside>

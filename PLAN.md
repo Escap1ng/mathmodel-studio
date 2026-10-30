@@ -64,7 +64,7 @@ kit 的三个缺口，正是这个产品的全部工作量：**没有 UI**、**�
 | `where link.exe` | 命中 `D:\git\usr\bin\link.exe` → `link (GNU coreutils) 8.32`，**不是 MSVC 链接器** | 假阳性，必须辨认 |
 | VS / Windows SDK | `C:\Program Files\Microsoft Visual Studio` 不存在；`Windows Kits\10\Lib` 不存在；`cl.exe` 找不到 | **Tauri 在本机不可构建**，Electron 是唯一路 |
 | `xelatex` | MiKTeX-XeTeX 4.16（MiKTeX 25.12） | M5 排版可本地真跑 |
-| `pandoc` | command not found | M5 前需补装，进阶段零预检清单 |
+| `pandoc` | 2026-10-16 未安装；2026-10-30 装好 3.13（`%LOCALAPPDATA%\mms-tools\pandoc.exe`） | M5 的 Word 链路已接通 |
 | `registry.npmjs.org` | `npm view electron` 25 s 超时 | 直连不可用 |
 | `registry.npmmirror.com` | 200，1.37 s；Electron 二进制镜像 HEAD → 302 | **镜像可用**，装依赖走 npmmirror |
 | `github.com:443` | `curl` 超时；同一时刻 `gh api` 全程正常 | api 通道 ≠ git 通道，push/release 需备代理，写进手册不自动执行 |
@@ -180,7 +180,7 @@ LangGraph `interrupt()` + `SqliteSaver`（`thread_id` = 赛题会话）。选它
 
 照 Cherry 的做法：bundled `uv` + python-build-standalone **3.12.13**（不是本机 3.14——科学计算 wheel 面在 3.12 最厚，且这是上游已验证的钉法），装进应用自有目录，npmmirror 优先再回落官方源，**绝不收养系统解释器**。体积代价预估安装包 300–400 MB（Electron ~100 + Python+whl ~200），需要在 M5 实测后回填真实数字。
 
-LaTeX 不在本轮决定内（v1 边界不含排版），M5 三选一：要求本机 MiKTeX/TeX Live（本机已有）、内置 Tectonic 单文件二进制、或两个都支持并让阶段零检测。中文排版另有一条暗坑：`xeCJK` 依赖本机 SimHei/SimSun 存在，`plot_style.pick_cjk_font` 的字体回退要同样用于预览。
+LaTeX 路线已在 2026-10-30 定为 **xelatex 优先**（接 kit 现状），Word 由 pandoc 转换；Tectonic/Typst 不作为 v1 路径。打包方式（要求本机装 / 内置）留到 M6。中文排版另有一条暗坑：`xeCJK` 依赖本机 SimHei/SimSun 存在，`plot_style.pick_cjk_font` 的字体回退要同样用于预览。
 
 ---
 
@@ -243,7 +243,7 @@ Escap1ng/<仓库名>/
 | LangGraph 拖入 langchain-core 语义 | 中 | 只用 `interrupt`/`SqliteSaver` 两点，把依赖面写死在 G6；不可控则自研 200 行状态机（已识别为可退让项） |
 | provider 工具调用漂移（尤其国产 + Ollama） | 高 | 能力矩阵按数据登记，UI 在缺 `tool_calling` 时降级为"建议式工具调用"，不谎报 |
 | 中文 LaTeX 缺字体 / matplotlib 方框 | 中 | 阶段零把字体也当依赖检测；复用 `pick_cjk_font` |
-| 安装包体积与未签名告警 | 中 | 先出"依赖系统 TeX、内置 Python"的折中包；体积数字 M5 实测后回填 |
+| 安装包体积与未签名告警 | 中 | 先出"依赖系统 TeX、内置 Python"的折中包；体积数字 M6 打包实测后回填 |
 | 单人维护、面铺太宽 | 高 | v1 边界已收窄到 M3/M4；排版与 EI 改稿后置；每步有可运行判据 |
 
 ---
@@ -252,6 +252,6 @@ Escap1ng/<仓库名>/
 
 1. **仓库名**。候选：`mathmodel-studio`（撞名 `yan315598-design/mathmodel-studio` ★47，但全名带你的命名空间仍唯一）／`mathmodel-desk`／`mathmodework`（都不撞）。
 2. **UI 依赖取向**：手写 CSS 令牌 + 只引 Radix 原语（无 Tailwind，视觉可控、少一层"AI 味"）／Tailwind v4（快，但默认观感要额外压）。kit 和 VisualLaTeX 都是零依赖取向，我倾向前者，但它会让每个视觉细节都变成真代码。
-3. **排版引擎优先级**（可以现在不定，但影响 M5 与 skills 层要不要扩）：xelatex 优先（接 kit 现状）／Typst 优先（MathModelAgent 靠 17 套 Typst 模板赢在观感）／双支持。
+3. **排版引擎优先级**（2026-10-30 已定）：xelatex 优先，pandoc 出 Word；Typst 不进入 v1。
 
 定完我从 M0 开工：先建仓、出双语 README 骨架和环境手册，再动代码。

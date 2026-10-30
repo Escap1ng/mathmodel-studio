@@ -1,6 +1,6 @@
 {
   "name": "mathmodel-studio",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "数学建模竞赛桌面 Agent：白底三栏工作台，人在环的选模、解释、门禁与评分",
   "author": "Escap1ng",
@@ -24,8 +24,9 @@
     "smoke:window": "electron tests/window-smoke.cjs",
     "verify:window": "node scripts/check-window-smoke.mjs",
     "verify:window:selftest": "node scripts/check-window-smoke.mjs --selftest",
-    "gate": "npm run check:registry && npm run check:registry:negative && npm run check:skills && npm run check:skills:negative && npm run verify:window:selftest && npm run typecheck && npm run build && npm run smoke:dist && npm run check:contracts && npm run check:cli && npm run check:channel && npm run check:channel:negative && npm run check:workbench",
-    "check:workbench": "python runtime/selfcheck_workbench.py"
+    "gate": "npm run check:registry && npm run check:registry:negative && npm run check:skills && npm run check:skills:negative && npm run verify:window:selftest && npm run typecheck && npm run build && npm run smoke:dist && npm run check:contracts && npm run check:cli && npm run check:channel && npm run check:channel:negative && npm run check:workbench && npm run check:paper",
+    "check:workbench": "python runtime/selfcheck_workbench.py",
+    "check:paper": "python runtime/selfcheck_paper.py"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
@@ -38,5 +39,8 @@
     "react-dom": "^19.3.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.4.299"
   }
 }

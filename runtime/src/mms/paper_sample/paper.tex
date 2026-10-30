@@ -1,0 +1,224 @@
+% M5 演示稿：完整走通 xelatex -> pandoc -> 门禁，不是对真实赛题的解答。
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{ctex}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{seqsplit}
+
+\IfFontExistsTF{Times New Roman}
+  {\setmainfont{Times New Roman}}
+  {\setmainfont{TeX Gyre Termes}}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+
+\renewcommand{\thesection}{\chinese{section}}
+\titleformat{\section}{\centering\heiti\fontsize{14}{18}\selectfont}{\thesection、}{1em}{}
+\titleformat{\subsection}{\heiti\fontsize{12}{16}\selectfont}{\arabic{section}.\arabic{subsection}}{1em}{}
+\titleformat{\subsubsection}{\heiti\fontsize{12}{16}\selectfont}{\arabic{section}.\arabic{subsection}.\arabic{subsubsection}}{1em}{}
+
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0pt}
+\renewcommand{\baselinestretch}{1}
+
+\captionsetup{font=small, labelsep=space, skip=6pt}
+\captionsetup[figure]{position=below}
+\captionsetup[table]{position=above}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+\lstset{
+    basicstyle=\small\ttfamily,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red!70!black},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    breaklines=true
+}
+
+\begin{document}
+
+\title{\heiti\fontsize{16}{20}\selectfont 共享单车早晚高峰调度模型}
+\author{}
+\date{}
+\maketitle
+\thispagestyle{fancy}
+
+\vspace{0.3cm}
+
+\begin{abstract}
+本文研究单城市共享单车的早晚高峰调度问题。运营方在每个调度周期只能移动有限数量的车辆，站点容量与骑行需求共同决定车辆缺口。本文建立以缺口加权和最小为目标的整数规划模型，并用贪心算法给出可在分钟级求解的调度方案。
+问题一估计各站点的净需求。本文用历史骑行记录构造半小时粒度的流入流出差，再按天气与工作日标记做分层修正。
+问题二安排调度车辆。模型把每个调度员的路线切成若干段，每段只服务相邻站点，避免跨区空驶。
+在演示数据上，方案把加权缺口从 41.20 降到 12.35，调度里程减少 9.60\%。灵敏度分析显示，缺口权重在 $\pm 20\%$ 内变化时，方案结构保持稳定。
+\end{abstract}
+
+\vspace{0.2cm}
+
+\noindent{\heiti 关键词：}共享单车；整数规划；贪心调度；灵敏度分析
+
+\newpage
+
+\section{问题重述}
+
+共享单车系统在早高峰呈现单向潮汐。住宅区站点清晨集中流出，写字楼站点同时集中流入。运营方通常安排厢式货车在峰值前把车辆从盈余站点调到缺口站点。
+本文只讨论单城市、单运营商的调度，不涉及跨城市调拨与车辆维修。题目给出前一日的骑行记录、站点经纬度、站点容量与调度车辆数量。
+问题一要求估计各站点在早晚高峰的车辆缺口。问题二要求给出调度路线与装卸数量，使加权缺口尽量小。
+
+\section{问题分析}
+
+问题一的核心是把骑行记录换算成站点层面的净流。半小时粒度能反映潮汐方向，也便于与调度周期对齐。
+问题二的约束来自三处：调度车辆容量、站点容量上限、调度员工作时长。目标是缺口加权和，权重按站点辐射范围设定。
+两个问题存在依赖关系，缺口估计误差会沿调度方案放大。
+
+\section{模型假设}
+
+\begin{table}[H]
+\centering
+\caption{模型假设}
+\label{tab:assumptions}
+\begin{tabularx}{\textwidth}{c X X}
+\toprule
+编号 & \multicolumn{1}{c}{假设内容} & \multicolumn{1}{c}{合理性说明} \\
+\midrule
+1 & 假设半小时内站点需求平稳 & 调度周期与签到周期一致，短时波动可并入下一周期 \\
+2 & 假设调度车辆匀速行驶 & 城区限速稳定，路线长度可近似换算为时间 \\
+3 & 假设站点容量在调度期内不变 & 早高峰前不新增停车桩，容量由运营方维护记录确定 \\
+4 & 假设天气修正系数按城市整体取值 & 同一时刻各区降雨差异小，站点级系数缺少样本支撑 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+假设 1 把连续需求切成半小时片段，模型因此可以用整数变量描述装卸数量。假设 2 让路线时间成为可加量，便于把调度员工作时长写成线性约束。
+假设 3 排除容量动态变化，站点上限在模型中保持常数。假设 4 用城市级天气系数替代站点级系数，减少参数数量。
+
+如表 1 所示，四条假设都限定了模型适用范围。超出这些范围时，需要重新估计参数，不能直接套用本文结论。
+
+\section{符号说明}
+
+\begin{table}[H]
+\centering
+\caption{符号说明}
+\begin{tabular}{lll}
+\toprule
+符号 & 说明 & 单位 \\
+\midrule
+$d_i$ & 站点 $i$ 的净需求 & 辆 \\
+$c_i$ & 站点 $i$ 的容量 & 辆 \\
+$x_{ij}$ & 从站点 $i$ 调到站点 $j$ 的车辆数 & 辆 \\
+$w_i$ & 站点 $i$ 的缺口权重 & 无量纲 \\
+$Q$ & 调度车辆容量 & 辆 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{模型建立与求解}
+
+\subsection{缺口估计}
+
+设站点 $i$ 在时段 $t$ 的流入量为 $a_{it}$，流出量为 $b_{it}$，则净需求为
+\begin{equation}
+d_i=\sum_{t\in T}\left(b_{it}-a_{it}\right)\cdot \kappa_t ,
+\end{equation}
+其中 $\kappa_t$ 是天气与工作日修正系数。系数按当日标签从历史同日记录中取中位数，避免极端值干扰。
+
+\subsection{调度模型}
+
+以缺口加权和最小为目标，建立整数规划
+\begin{equation}
+\min \sum_i w_i \left| d_i+\sum_j x_{ji}-\sum_j x_{ij}\right|
+\end{equation}
+约束包括车辆容量、站点容量与调度时长。绝对值项用辅助变量线性化，求解器规模保持在千级变量以内。模型按半小时滚动求解，每个周期只重算受影响站点。
+
+\subsection{求解算法}
+
+本文用贪心算法生成初始路线，再用两阶段交换改进。每个调度员负责一片相邻区域，区域边界按站点聚类确定。
+第一阶段按缺口从大到小装车，第二阶段在相邻站点间做成对交换。算法在 3 分钟内给出可行解，适合比赛现场的时间限制。路线输出按调度员分组，每组附装卸清单与预计到达时刻，并留出人工改线接口。
+
+\section{模型检验}
+
+\subsection{误差分析}
+
+把缺口估计值与次日实测值对比，平均绝对误差为 3.42 辆。误差较大的站点集中在换乘枢纽，客流受地铁班次影响明显。
+
+\subsection{灵敏度分析}
+
+缺口权重上下浮动 20\% 时，调度方案的服务站点集合不变，装卸数量变化不超过 6.10\%。容量约束收紧 10\% 后，加权缺口升到 14.80，仍在可接受范围。
+图 1 给出残差随预测缺口的变化。残差在缺口较大时略微偏负，说明模型对极端站点的估计偏保守。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/final/fig1_residual.png}
+\caption{缺口预测残差}
+\label{fig:residual}
+\end{figure}
+
+\section{模型评价与改进}
+
+\subsection{模型的优点}
+
+模型规模可控，贪心算法在普通笔记本上 3 分钟内收敛。缺口权重把运营经验写进目标函数，一线调度员更容易接受调度结果。
+
+\subsection{模型的局限}
+
+本文把调度车辆视为同质车队，未考虑不同车型的装卸效率。天气系数按城市整体取值，局部降雨时误差会放大。
+
+\subsection{模型改进}
+
+后续可以把车型与装卸时间纳入约束，并用滚动时域方法处理临时需求。若站点数据足够，还可把需求预测换成时空图神经网络。
+
+\section{AI 使用声明}
+
+本文的演示稿由 mathmodel-studio 的样例流水线生成，用于验证排版与门禁链路。文字与数值均为演示数据，不对应真实赛事论文。
+
+\newpage
+\renewcommand{\refname}{参考文献}
+\begin{thebibliography}{99}
+\bibitem{ref1} 姜启源, 谢金星, 叶俊. 数学模型[M]. 5版. 北京: 高等教育出版社, 2018.
+\bibitem{ref2} 司守奎, 孙玺菁. 数学建模算法与应用[M]. 3版. 北京: 国防工业出版社, 2021.
+\end{thebibliography}
+
+\newpage
+\section*{附录}
+
+\subsection*{附录 A 支撑材料清单}
+
+\begin{itemize}
+\item paper.tex：论文源文件
+\item figures/final/fig1\_residual.png：残差图
+\item dispatch.py：贪心调度示例代码
+\end{itemize}
+
+\subsection*{附录 B 核心代码}
+
+\begin{lstlisting}[language=Python]
+def greedy_dispatch(demand, capacity, fleet):
+    plan = []
+    for station in sorted(demand, key=abs, reverse=True):
+        load = min(abs(demand[station]), capacity[station])
+        if load and fleet:
+            plan.append((station, load))
+            fleet -= 1
+    return plan
+\end{lstlisting}
+
+\end{document}

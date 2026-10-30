@@ -87,12 +87,34 @@ npmmirror 可用——镜像本身也会挂，超时不等于配置错了。
 | 依赖 | 用途 | 检测命令 | 本机实测 | 缺件时 |
 | --- | --- | --- | --- | --- |
 | Node.js | 桌面壳 | `node -v` | v24.18.1 | 装 LTS |
-| xelatex | 论文排版（M5） | `xelatex --version` | MiKTeX-XeTeX 4.16（MiKTeX 25.12） | 装 TeX Live 或 MiKTeX，系统级安装，pip 装不上 |
-| pandoc | LaTeX→Word，公式转 OMML | `pandoc --version` | **command not found** | Windows：`winget install --id JohnMacFarlane.Pandoc` |
+| xelatex | 论文排版（M5） | `xelatex --version` | MiKTeX-XeTeX 4.16（MiKTeX 25.12） | 装 TeX Live 或 MiKTeX，系统级安装，pip 装不上；可用 `MMS_XELATEX` 指定路径 |
+| pandoc | LaTeX→Word，公式转 OMML | `pandoc --version` | pandoc 3.13，`%LOCALAPPDATA%\mms-tools\pandoc.exe`（2026-10-30） | Windows：官方 zip 解出 `pandoc.exe`（`winget install --id JohnMacFarlane.Pandoc` 也可） |
 | 中文字体 | CJK 排版与出图 | 见下 | 未单独核对 | `xeCJK` 需要 SimHei/SimSun 在场；matplotlib 缺字体会画成方框，上游 `plot_style.pick_cjk_font` 有回退 |
 | Electron 链接器 | 若改用 Tauri 才需要 | `where link.exe` + `link --version` | 命中的是 GNU coreutils 8.32，**不是 MSVC 链接器**；无 Visual Studio、无 `Windows Kits\10\Lib` | 本仓库选 Electron 正是因为这里没有可用链接器 |
 
 最后一条值得记住：`where link.exe` 有结果**不代表有链接器**。用它找工具链组件时，一律再跑一次 `--version` 认身份。
+
+**pandoc 的查找顺序**：`PATH` → `MMS_PANDOC` → `%LOCALAPPDATA%\mms-tools\pandoc.exe`。三处都没有时论文页列出缺件并禁用构建按钮，G10 退出 1；只有显式 `MMS_PAPER_SKIP=1` 才跳过，且会打印「未验证 G10」。
+
+本机 2026-10-30 的装法（github.com:443 被挡、api 通道可用）：
+
+```bash
+gh release download 3.13 --repo jgm/pandoc --pattern "pandoc-3.13-windows-x86_64.zip" --dir /tmp/pandoc
+unzip /tmp/pandoc/pandoc-3.13-windows-x86_64.zip
+mkdir -p "$LOCALAPPDATA/mms-tools"
+cp /tmp/pandoc/pandoc-3.13/pandoc.exe "$LOCALAPPDATA/mms-tools/pandoc.exe"
+"$LOCALAPPDATA/mms-tools/pandoc.exe" --version
+```
+
+单文件 exe 约 239 MB，是静态链接的完整包；仓库不收录它，也不在运行时自动下载。
+
+TeX 侧需要的是 xelatex 与中文支持（ctex/xeCJK）。Linux CI 用 apt：
+
+```bash
+sudo apt-get install -y pandoc texlive-xetex texlive-lang-chinese texlive-latex-extra
+```
+
+Windows 上装 MiKTeX 后 `xelatex` 进入 PATH 即可，本机没有再设置 `MMS_XELATEX`。
 
 ## 6 写脚本时的 Windows 坑
 
@@ -108,7 +130,7 @@ npm run gate
 
 全绿即脚手架自洽。其中只有 `typecheck`、`build`、`smoke:dist` 需要 `npm install` 成功；
 `check:registry`、`check:registry:negative`、`check:contracts`、`check:channel` 只吃标准库（契约校验缺 `jsonschema` 时降级）；
-`check:cli` 与 `check:workbench` 需要 `requirements.txt` 里的科学计算包。这是刻意设计，方便你在任何机器上验证注册表与通道没漂。
+`check:cli` 与 `check:workbench` 需要 `requirements.txt` 里的科学计算包；`check:paper` 还需要 xelatex 与 pandoc。这是刻意设计，方便你在任何机器上验证注册表与通道没漂。
 
 想看界面就两条路：`npm run dev` 起开发窗口；或先 `npm run build` 再 `npm run smoke:window`，
 它会 `require` 生产入口真起一次窗口、拉起 Python 通道、用离线 provider 走完 K2→K3→解释→换一批→选择，再重启 runtime 确认待选卡还在；接着真渲一张图、换主题重渲、并排 diff、回滚，再看评分五维/扣分定位/熔断与一票否决（53 条），

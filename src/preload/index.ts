@@ -56,6 +56,10 @@ const studioApi = {
       ipcRenderer.invoke('workbench:render', { template, theme }),
     rollback: (version: string): Promise<WorkbenchResult> =>
       ipcRenderer.invoke('workbench:rollback', { version })
+  },
+
+  paper: {
+    build: (): Promise<WorkbenchResult> => ipcRenderer.invoke('paper:build')
   }
 }
 

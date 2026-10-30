@@ -207,14 +207,31 @@ function imageDataUrl(path: unknown): string | null {
   }
 }
 
+function pdfDataUrl(path: unknown): string | null {
+  if (typeof path !== 'string' || !path) return null
+  try {
+    const bytes = readFileSync(path)
+    if (!bytes.length || bytes.length > 12 * 1024 * 1024) return null
+    return `data:application/pdf;base64,${bytes.toString('base64')}`
+  } catch {
+    return null
+  }
+}
+
 function withImages(raw: Record<string, unknown>): WorkbenchState {
   const figure = (raw['figure'] ?? {}) as Record<string, unknown>
+  const paper = (raw['paper'] ?? {}) as Record<string, unknown>
+  const artifacts = (paper['artifacts'] ?? {}) as Record<string, { path?: string }>
   return {
     ...(raw as unknown as WorkbenchState),
     figure: {
       ...(figure as unknown as WorkbenchState['figure']),
       activeImage: imageDataUrl(figure['active_png']),
       previousImage: imageDataUrl(figure['previous_png'])
+    },
+    paper: {
+      ...(paper as unknown as WorkbenchState['paper']),
+      pdfData: pdfDataUrl(artifacts.pdf?.path)
     }
   }
 }
@@ -236,6 +253,11 @@ ipcMain.handle('workbench:rollback', async (_event, raw: unknown): Promise<Workb
   const version = (raw as Record<string, unknown>).version
   if (typeof version !== 'string' || !version) throw new Error('缺少版本 id')
   const data = await channel.rollbackFigure(version)
+  return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
+})
+
+ipcMain.handle('paper:build', async (): Promise<WorkbenchResult> => {
+  const data = await channel.buildPaper()
   return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
 })
 

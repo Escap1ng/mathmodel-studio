@@ -27,7 +27,7 @@ from urllib.parse import parse_qs, urlparse
 from . import __version__, orchestrator
 from .invoke import list_templates
 from .store import SessionStore, data_dir, snapshot
-from . import workbench_figure, workbench_score
+from . import paper_build, workbench_figure, workbench_score
 from .provider import (
     CancelledError,
     ProviderError,
@@ -434,6 +434,9 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/workbench/rollback":
             self._rollback_figure()
             return
+        if parsed.path == "/workbench/paper/build":
+            self._build_paper()
+            return
         if parsed.path.startswith("/chats/") and parsed.path.endswith("/cancel"):
             chat_id = parsed.path[len("/chats/") : -len("/cancel")].strip("/")
             with self.server.sessions_lock:
@@ -496,7 +499,24 @@ class Handler(BaseHTTPRequestHandler):
                 ),
             },
         ]
-        return {"ok": True, "figure": figure, "score": score, "chapter": chapter, "gate": gate}
+        paper = paper_build.state(self.server.store.path.parent, self.server.root)
+        artifacts = paper.get("artifacts") or {}
+        paper_ok = bool(paper.get("ok")) and {"pdf", "docx"} <= set(artifacts)
+        if paper_ok:
+            paper_detail = f"PDF {artifacts['pdf']['size'] // 1024} KB · DOCX {artifacts['docx']['size'] // 1024} KB"
+        elif paper.get("builtAt"):
+            paper_detail = paper.get("error") or "上次构建未全绿"
+        else:
+            paper_detail = "尚未构建论文"
+        gate.append({"id": "paper", "label": "论文排版", "ok": paper_ok, "detail": paper_detail})
+        return {
+            "ok": True,
+            "figure": figure,
+            "score": score,
+            "chapter": chapter,
+            "paper": paper,
+            "gate": gate,
+        }
 
     def _render_figure(self) -> None:
         body = self._body()
@@ -524,6 +544,23 @@ class Handler(BaseHTTPRequestHandler):
             self._error(404, "figure", str(result.get("error") or "没有这个版本"))
             return
         self._json(200, {"ok": True, "state": self._workbench()})
+
+    def _build_paper(self) -> None:
+        body = self._body()
+        if body is None:
+            return
+        code, result = paper_build.build(
+            self.server.store.path.parent, self.server.root
+        )
+        self._json(
+            200,
+            {
+                "ok": bool(result.get("ok")),
+                "code": code,
+                "paper": result,
+                "state": self._workbench(),
+            },
+        )
 
     def _start_chat(self) -> None:
         body = self._body()
