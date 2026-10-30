@@ -51,12 +51,58 @@ export interface ChatMessageInput {
 export interface ChatStartInput {
   providerId: string
   model: string
+  mode?: 'chat' | 'workflow'
   messages: ChatMessageInput[]
 }
 
 export interface ChatStartResult {
   ok: true
   chatId: string
+}
+
+export type DecisionAction = 'confirm' | 'reroll' | 'choose'
+
+export interface ResumeInput {
+  sessionId: string
+  action: DecisionAction
+  choice?: string
+}
+
+export interface InterruptCard {
+  card: string
+  payload: Record<string, unknown>
+  resolved?: string
+}
+
+export interface SessionMessage {
+  role: 'user' | 'assistant'
+  content: string
+  interrupt?: InterruptCard
+}
+
+export type PhaseStatus = 'idle' | 'running' | 'waiting' | 'passed' | 'failed'
+
+export interface SessionPhase {
+  phase: number
+  status: PhaseStatus
+  name: string
+}
+
+export interface SessionSnapshot {
+  id: string
+  provider: string
+  model: string
+  problem: string
+  updatedAt: number
+  phases: SessionPhase[]
+  pending: InterruptCard | null
+  messages: SessionMessage[]
+  batch: number
+}
+
+export interface SessionLatest {
+  ok: true
+  session: SessionSnapshot | null
 }
 
 export interface ChatEvent {

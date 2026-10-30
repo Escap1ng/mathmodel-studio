@@ -1,4 +1,4 @@
-import type { ChatEvent } from '../../../shared/api'
+import type { ChatEvent, InterruptCard } from '../../../shared/api'
 
 // 一条助手回复由若干段组成：文字与工具卡按发生顺序排列，
 // 这样「先说一句 → 调工具 → 再总结」在界面上不会被打乱成两段。
@@ -24,6 +24,7 @@ export interface ChatEntry {
   streaming: boolean
   error?: string
   doneReason?: string
+  interrupt?: InterruptCard
 }
 
 /** 送给模型的助手文本：只保留文字段，工具卡本身由 runtime 的历史负责。 */
@@ -85,6 +86,11 @@ export function applyChatEvent(entry: ChatEntry, event: ChatEvent): ChatEntry {
       const message = typeof data.message === 'string' ? data.message : '运行时返回了一个错误'
       return { ...entry, error: message, streaming: false }
     }
+    case 'interrupt': {
+      const card = typeof data.card === 'string' ? data.card : ''
+      const payload = isRecord(data.payload) ? data.payload : {}
+      return card ? { ...entry, interrupt: { card, payload } } : entry
+    }
     case 'done': {
       return {
         ...entry,
@@ -93,7 +99,7 @@ export function applyChatEvent(entry: ChatEntry, event: ChatEvent): ChatEntry {
       }
     }
     default:
-      // gate / artifact / interrupt 留给后面的里程碑；未知事件不能打断当前流。
+      // gate / artifact 留给后面的里程碑；未知事件不能打断当前流。
       return entry
   }
 }

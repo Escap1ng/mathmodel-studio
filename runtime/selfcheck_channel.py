@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import http.client
@@ -31,7 +33,7 @@ for _stream in (sys.stdout, sys.stderr):
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = ROOT / "schemas" / "chat-events.schema.json"
 SENTINEL = "sk-test-SENTINEL-DO-NOT-LEAK"
-EVENT_TYPES = {"token", "reasoning", "tool_call", "artifact", "interrupt", "gate", "error", "done"}
+EVENT_TYPES = {"token", "reasoning", "tool_call", "artifact", "interrupt", "gate", "phase", "error", "done"}
 results: list[dict] = []
 
 
@@ -66,11 +68,16 @@ def lint_event(ev) -> list[str]:
             problems.append("tool_call.status 非法")
         if "duration_ms" in data and not isinstance(data["duration_ms"], int):
             problems.append("tool_call.duration_ms 必须是整数")
+    elif event == "phase":
+        if not isinstance(data.get("phase"), int) or not 0 <= data["phase"] <= 6:
+            problems.append("phase 必须是 0..6 的整数")
+        if data.get("status") not in ("idle", "running", "waiting", "passed", "failed"):
+            problems.append("phase.status 非法")
     elif event == "error":
         if not isinstance(data.get("message"), str) or not data.get("message"):
             problems.append("error 缺 message")
     elif event == "done":
-        if data.get("reason") not in ("stop", "error", "cancelled", "max_tool_rounds"):
+        if data.get("reason") not in ("stop", "error", "cancelled", "max_tool_rounds", "waiting"):
             problems.append("done.reason 非法")
     return problems
 
@@ -519,6 +526,160 @@ def tests() -> None:
         upstream.shutdown()
         upstream.server_close()
 
+    # M3 编排闭环：暂停、恢复、换一批、选择，以及跨进程恢复
+    workdir = tempfile.mkdtemp(prefix="mms-workflow-")
+    try:
+        wf = Channel(fake=True, env_extra={"MMS_DATA_DIR": workdir})
+        try:
+            problem = "问题1 预测未来三个月的销量。\n问题2 给出补货建议。"
+            status, started = wf.start_chat(
+                {
+                    "providerId": "fake",
+                    "model": "fake-stream",
+                    "mode": "workflow",
+                    "messages": [{"role": "user", "content": problem}],
+                }
+            )
+            sid = started.get("chatId", "")
+            events, raw = wf.events(sid)
+            problems, how = schema_validate(events)
+            statuses = {e["data"]["phase"]: e["data"]["status"] for e in events if e["event"] == "phase"}
+            card = next((e["data"] for e in events if e["event"] == "interrupt"), {})
+            questions = card.get("payload", {}).get("questions", [])
+            check(
+                "C12 新赛题停在 K2，事件符合契约",
+                status == 200 and not problems and events[-1]["data"].get("reason") == "waiting",
+                f"HTTP {status}；{problems[:2]}；最后事件 {events[-1]['event'] if events else None}",
+            )
+            check(
+                "C12 阶段 0 已过、阶段 1 等你确认",
+                statuses.get(0) == "passed" and statuses.get(1) == "waiting",
+                f"阶段状态 {statuses}",
+            )
+            check(
+                "C12 K2 卡带子问题与附件缺口",
+                card.get("card") == "problem-confirm"
+                and len(questions) >= 2
+                and isinstance(card.get("payload", {}).get("attachments"), list)
+                and "附件" in card.get("payload", {}).get("warning", ""),
+                f"card={card.get('card')} questions={len(questions)}",
+            )
+            check("C12 K2 的 SSE 不含密钥", SENTINEL not in raw, "已扫描整条 SSE")
+
+            status, latest = wf.json("GET", "/sessions/latest")
+            check(
+                "C12 /sessions/latest 能读出待决卡",
+                status == 200 and latest.get("session", {}).get("pending", {}).get("card") == "problem-confirm",
+                f"HTTP {status} pending={(latest.get('session') or {}).get('pending', {}).get('card')}",
+            )
+
+            status, _ = wf.json("POST", f"/sessions/{sid}/resume", {"action": "confirm"})
+            k3, _ = wf.events(sid)
+            k3_card = next((e["data"] for e in k3 if e["event"] == "interrupt"), {})
+            candidates = k3_card.get("payload", {}).get("candidates", [])
+            k3_statuses = {e["data"]["phase"]: e["data"]["status"] for e in k3 if e["event"] == "phase"}
+            check(
+                "C12 确认后到 K3，三张候选且至少一项创新性高",
+                status == 200
+                and k3[-1]["data"].get("reason") == "waiting"
+                and k3_card.get("card") == "model-choice"
+                and len(candidates) == 3
+                and any(c.get("innovation") == "高" for c in candidates),
+                f"HTTP {status} candidates={len(candidates)} innovations={[c.get('innovation') for c in candidates]}",
+            )
+            check("C12 阶段 3 停在等你选", k3_statuses.get(3) == "waiting", f"阶段状态 {k3_statuses}")
+
+            status, _ = wf.json("POST", f"/sessions/{sid}/resume", {"action": "reroll"})
+            k3b, _ = wf.events(sid)
+            card_b = next((e["data"] for e in k3b if e["event"] == "interrupt"), {})
+            candidates_b = card_b.get("payload", {}).get("candidates", [])
+            check(
+                "C12 换一批返回新候选，待选不消失",
+                status == 200
+                and card_b.get("payload", {}).get("batch") == 2
+                and candidates_b
+                and candidates_b[0].get("name") != candidates[0].get("name")
+                and k3b[-1]["data"].get("reason") == "waiting",
+                f"batch={card_b.get('payload', {}).get('batch')} 首项 {candidates_b[0].get('name') if candidates_b else None}",
+            )
+
+            pick = candidates_b[0]["id"]
+            status, _ = wf.json("POST", f"/sessions/{sid}/resume", {"action": "choose", "choice": pick})
+            chosen, _ = wf.events(sid)
+            chosen_statuses = {e["data"]["phase"]: e["data"]["status"] for e in chosen if e["event"] == "phase"}
+            status, latest = wf.json("GET", "/sessions/latest")
+            session = latest.get("session") or {}
+            last_text = session.get("messages", [{}])[-1].get("content", "") if session.get("messages") else ""
+            check(
+                "C12 选择后阶段 3 过、阶段 4 进入，待决清空",
+                status == 200
+                and chosen_statuses.get(3) == "passed"
+                and chosen_statuses.get(4) == "running"
+                and session.get("pending") is None
+                and chosen[-1]["data"].get("reason") == "stop"
+                and "已选择" in last_text,
+                f"状态 {chosen_statuses} pending={session.get('pending')} 文本={last_text[:60]}",
+            )
+            check(
+                "C12 K3 的历史消息标了已选，K2 标了已确认",
+                [m for m in session.get("messages", []) if m.get("interrupt") and m["interrupt"].get("resolved")]
+                and all(
+                    m["interrupt"].get("resolved")
+                    for m in session.get("messages", [])
+                    if m.get("interrupt")
+                ),
+                f"resolved={[m.get('interrupt', {}).get('resolved') for m in session.get('messages', []) if m.get('interrupt')]}",
+            )
+            status, out = wf.json("POST", f"/sessions/{sid}/resume", {"action": "confirm"})
+            check("C12 没有待决时恢复被拒", status == 409, f"HTTP {status} {out}")
+        finally:
+            wf.stop()
+
+        # 跨进程：换一个服务器进程，仍然读得到上一次的待选
+        wf2 = Channel(fake=True, env_extra={"MMS_DATA_DIR": workdir})
+        try:
+            status, started = wf2.start_chat(
+                {
+                    "providerId": "fake",
+                    "model": "fake-stream",
+                    "mode": "workflow",
+                    "messages": [{"role": "user", "content": "问题1 给某城市做公交调度优化。"}],
+                }
+            )
+            sid2 = started.get("chatId", "")
+            wf2.events(sid2)
+        finally:
+            wf2.stop()
+
+        wf3 = Channel(fake=True, env_extra={"MMS_DATA_DIR": workdir})
+        try:
+            status, latest = wf3.json("GET", "/sessions/latest")
+            session = latest.get("session") or {}
+            check(
+                "C13 服务器重启后仍停在原来的 K2",
+                status == 200
+                and session.get("id") == sid2
+                and session.get("pending", {}).get("card") == "problem-confirm",
+                f"id={session.get('id')} pending={(session.get('pending') or {}).get('card')}",
+            )
+            check(
+                "C13 会话表里没有哨兵密钥",
+                SENTINEL not in json.dumps(session, ensure_ascii=False),
+                "已扫描快照",
+            )
+            status, _ = wf3.json("POST", f"/sessions/{sid2}/resume", {"action": "confirm"})
+            after, _ = wf3.events(sid2)
+            check(
+                "C13 重启后仍能确认并进入 K3",
+                status == 200
+                and any(e["event"] == "interrupt" and e["data"].get("card") == "model-choice" for e in after),
+                f"HTTP {status} 事件 {[e['event'] for e in after][:6]}",
+            )
+        finally:
+            wf3.stop()
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
     failed = [r for r in results if not r["ok"]]
     for row in results:
         print(f"{'PASS' if row['ok'] else 'FAIL'} {row['name']}\n       {row['detail']}")
@@ -536,6 +697,9 @@ def selftest() -> None:
         ("token 缺 text", {"id": "1", "event": "token", "data": {}}, False),
         ("tool_call 状态非法", {"id": "1", "event": "tool_call", "data": {"id": "c", "name": "n", "status": "done"}}, False),
         ("done 原因非法", {"id": "1", "event": "done", "data": {"reason": "ok"}}, False),
+        ("phase 状态非法", {"id": "1", "event": "phase", "data": {"phase": 3, "status": "done"}}, False),
+        ("phase 越界", {"id": "1", "event": "phase", "data": {"phase": 7, "status": "running"}}, False),
+        ("done.waiting 合法", {"id": "1", "event": "done", "data": {"reason": "waiting"}}, True),
     ]
     rows = []
     for label, ev, want_pass in cases:

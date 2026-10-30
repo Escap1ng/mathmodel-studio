@@ -22,6 +22,6 @@ export const STATE_TEXT: Record<PhaseState, string> = {
   idle: '未开始',
   running: '进行中',
   waiting: '等你确认',
-  passed: '已过门禁',
+  passed: '已完成',
   failed: '未过'
 }

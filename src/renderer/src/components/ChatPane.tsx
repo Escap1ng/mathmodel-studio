@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ProviderView, RuntimeStatus } from '../../../shared/api'
+import type { DecisionAction, ProviderView, RuntimeStatus } from '../../../shared/api'
 import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
+import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
+import DecisionCard, { type ModelCandidate } from './DecisionCard'
 
 interface Props {
   runtime: RuntimeStatus
@@ -9,8 +11,15 @@ interface Props {
   streaming: boolean
   canSend: boolean
   notice: string | null
+  phases: Record<number, PhaseState>
+  currentPhase?: number
+  mode: 'workflow' | 'chat'
+  pending: boolean
+  onModeChange: (mode: 'workflow' | 'chat') => void
   onSend: (text: string) => void
   onStop: () => void
+  onDecision: (action: DecisionAction, choice?: string) => void
+  onExplain: (candidate: ModelCandidate) => void
   onOpenSettings: () => void
   onRestart: () => void
 }
@@ -74,7 +83,15 @@ function ToolCardView({ tool }: { tool: ToolCard }) {
   )
 }
 
-function EntryView({ entry }: { entry: ChatEntry }) {
+function EntryView({
+  entry,
+  onDecision,
+  onExplain
+}: {
+  entry: ChatEntry
+  onDecision: (action: DecisionAction, choice?: string) => void
+  onExplain: (candidate: ModelCandidate) => void
+}) {
   if (entry.role === 'user') {
     return (
       <article className="msg msg--user">
@@ -111,8 +128,19 @@ function EntryView({ entry }: { entry: ChatEntry }) {
       {entry.streaming && entry.parts.length > 0 && last?.kind === 'tool' ? (
         <span className="cursor cursor--block" aria-hidden="true" />
       ) : null}
+      {entry.interrupt ? (
+        <DecisionCard
+          card={entry.interrupt}
+          busy={entry.streaming}
+          onDecision={onDecision}
+          onExplain={onExplain}
+        />
+      ) : null}
       {entry.error ? <div className="msg__error">{entry.error}</div> : null}
       {entry.doneReason === 'cancelled' ? <div className="msg__note">已停止</div> : null}
+      {entry.doneReason === 'waiting' && !entry.interrupt?.resolved ? (
+        <div className="msg__note">已暂停，等你做出选择。</div>
+      ) : null}
       {entry.doneReason === 'max_tool_rounds' ? (
         <div className="msg__note">工具调用轮数已用尽，这一轮先停在这里。</div>
       ) : null}
@@ -127,14 +155,27 @@ export default function ChatPane({
   streaming,
   canSend,
   notice,
+  phases,
+  currentPhase,
+  mode,
+  pending,
+  onModeChange,
   onSend,
   onStop,
+  onDecision,
+  onExplain,
   onOpenSettings,
   onRestart
 }: Props) {
   const [draft, setDraft] = useState('')
   const streamRef = useRef<HTMLDivElement>(null)
   const ready = runtime.state === 'ready'
+  const phaseDef = PHASES.find((p) => p.num === currentPhase)
+  const phaseText = phaseDef
+    ? `阶段${phaseDef.label} · ${STATE_TEXT[phases[phaseDef.num] ?? 'idle']}`
+    : '阶段零 · 待开始'
+  const blocked = mode === 'workflow' && pending
+  const sendDisabled = !canSend || blocked
 
   useEffect(() => {
     const el = streamRef.current
@@ -143,7 +184,7 @@ export default function ChatPane({
 
   const submit = (): void => {
     const text = draft.trim()
-    if (!text || !canSend || streaming) return
+    if (!text || !canSend || streaming || blocked) return
     setDraft('')
     onSend(text)
   }
@@ -156,7 +197,11 @@ export default function ChatPane({
       ? '先在模型设置里选择一个服务商'
       : !canSend
         ? '这个服务商还没有保存 API Key'
-        : '描述这道题，或粘贴题目正文'
+        : blocked
+          ? '上面的决策卡还在等你的选择'
+          : mode === 'workflow'
+            ? '粘贴赛题正文，先确认题面与附件'
+            : '描述这道题，或粘贴题目正文'
 
   return (
     <section className="chat" aria-label="对话">
@@ -172,7 +217,12 @@ export default function ChatPane({
           ) : (
             <div className="messages" aria-live="polite">
               {entries.map((entry) => (
-                <EntryView key={entry.id} entry={entry} />
+                <EntryView
+                  key={entry.id}
+                  entry={entry}
+                  onDecision={onDecision}
+                  onExplain={onExplain}
+                />
               ))}
             </div>
           )}
@@ -209,6 +259,26 @@ export default function ChatPane({
             }}
           />
           <div className="composer__bar">
+            <div className="mode-switch" role="group" aria-label="输入模式">
+              <button
+                type="button"
+                className="mode-switch__btn"
+                data-mode="workflow"
+                aria-pressed={mode === 'workflow'}
+                onClick={() => onModeChange('workflow')}
+              >
+                建模
+              </button>
+              <button
+                type="button"
+                className="mode-switch__btn"
+                data-mode="chat"
+                aria-pressed={mode === 'chat'}
+                onClick={() => onModeChange('chat')}
+              >
+                问答
+              </button>
+            </div>
             <button
               type="button"
               className="pill pill--button pill--model"
@@ -218,14 +288,22 @@ export default function ChatPane({
             >
               {provider ? `${provider.display} · ${provider.model}` : '未选择模型'}
             </button>
-            <span className="pill">阶段零 · 待开始</span>
+            <span className="pill" data-role="phase-pill">
+              {phaseText}
+            </span>
             {streaming ? (
               <button type="button" className="pill pill--send pill--stop" onClick={onStop}>
                 停止
               </button>
             ) : (
-              <button type="button" className="pill pill--send" disabled={!canSend} onClick={submit}>
-                发送
+              <button
+                type="button"
+                className="pill pill--send"
+                data-mode={mode}
+                disabled={sendDisabled}
+                onClick={submit}
+              >
+                {mode === 'workflow' ? '开始建模' : '发送'}
               </button>
             )}
           </div>

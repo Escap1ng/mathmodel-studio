@@ -4,8 +4,10 @@ import type {
   ChatStartInput,
   ChatStartResult,
   ProviderList,
+  ResumeInput,
   RuntimeStatus,
   SaveProviderPayload,
+  SessionLatest,
   StudioMeta
 } from '../shared/api'
 
@@ -33,12 +35,17 @@ const studioApi = {
 
   chat: {
     start: (input: ChatStartInput): Promise<ChatStartResult> => ipcRenderer.invoke('chat:start', input),
+    resume: (input: ResumeInput): Promise<ChatStartResult> => ipcRenderer.invoke('chat:resume', input),
     cancel: (chatId: string): Promise<{ ok: true }> => ipcRenderer.invoke('chat:cancel', chatId),
     onEvent: (cb: (event: ChatEvent) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, payload: ChatEvent): void => cb(payload)
       ipcRenderer.on('chat:event', handler)
       return () => ipcRenderer.removeListener('chat:event', handler)
     }
+  },
+
+  session: {
+    latest: (): Promise<SessionLatest> => ipcRenderer.invoke('session:latest')
   }
 }
 
