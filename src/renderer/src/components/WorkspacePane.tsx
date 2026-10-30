@@ -10,6 +10,7 @@ import type {
   WorkbenchState
 } from '../../../shared/api'
 import FilesPanel from './FilesPanel'
+import SelectMenu from './SelectMenu'
 
 GlobalWorkerOptions.workerSrc = pdfWorker
 
@@ -109,26 +110,20 @@ function FigurePanel({
       </div>
 
       <div className="figure-controls">
-        <label className="control">
-          <span>模板</span>
-          <select data-role="figure-template" value={template} onChange={(e) => onTemplate(e.target.value)}>
-            {figure.templates.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="control">
-          <span>主题</span>
-          <select data-role="figure-theme" value={theme} onChange={(e) => onTheme(e.target.value)}>
-            {figure.themes.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectMenu
+          label="模板"
+          value={template}
+          options={figure.templates}
+          dataRole="figure-template"
+          onChange={onTemplate}
+        />
+        <SelectMenu
+          label="主题"
+          value={theme}
+          options={figure.themes}
+          dataRole="figure-theme"
+          onChange={onTheme}
+        />
         <button
           type="button"
           className="btn btn--primary btn--sm"
