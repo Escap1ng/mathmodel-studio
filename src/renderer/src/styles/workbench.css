@@ -165,6 +165,8 @@
 
 .control {
   display: grid;
+  /* 显式 minmax(0,1fr)：长文案的 max-content 不能把内部列撑出外层 1fr 轨道 */
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   min-width: 0;
 }
@@ -174,7 +176,10 @@
   font-size: 10.5px;
 }
 
-.control select {
+.select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   height: 28px;
   padding: 0 6px;
@@ -184,6 +189,66 @@
   color: var(--text);
   font-family: var(--font-cjk);
   font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.select-trigger__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-trigger__chevron {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-right: 1.5px solid var(--text-3);
+  border-bottom: 1.5px solid var(--text-3);
+  transform: rotate(45deg);
+}
+
+.select-trigger[aria-expanded='true'] .select-trigger__chevron {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.select-popup {
+  position: fixed;
+  z-index: 30;
+  width: max-content;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.select-popup__option {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-cjk);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.select-popup__option[data-active='true'] {
+  background: var(--surface-2);
+}
+
+.select-popup__option[aria-selected='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .figure-shot {

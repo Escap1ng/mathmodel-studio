@@ -947,12 +947,16 @@ async function main() {
     `图片就绪=${figureReady} active=${firstVersion} 版本数=${figState?.figure?.versions?.length}`
   )
 
-  await win.webContents.executeJavaScript(`(() => {
-    const select = document.querySelector('[data-role="figure-theme"]')
-    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
-    setter.call(select, 'studio-ink')
-    select.dispatchEvent(new Event('change', { bubbles: true }))
+  // 主题选择器是自绘下拉（弹层用圆角卡片，原生 select 的方角弹层改不到），按按钮 → 选项两步点
+  await win.webContents.executeJavaScript(`document.querySelector('[data-role="figure-theme"]')?.click()`)
+  await sleep(200)
+  const themePicked = await win.webContents.executeJavaScript(`(() => {
+    const option = document.querySelector('[data-role="figure-theme-menu"] [data-value="studio-ink"]')
+    if (!option) return false
+    option.click()
+    return true
   })()`)
+  record('G7-8 主题下拉可选到 studio-ink', themePicked, `弹层选项命中=${themePicked}`)
   await sleep(120)
   await win.webContents.executeJavaScript(`document.querySelector('[data-action="render-figure"]')?.click()`)
   const reRendered = await waitFor(
