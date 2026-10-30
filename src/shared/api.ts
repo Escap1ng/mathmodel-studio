@@ -271,6 +271,53 @@ export interface WorkbenchResult {
   state: WorkbenchState
 }
 
+export interface StagedFile {
+  id: string
+  name: string
+  size: number
+  ext: string
+  kind: 'pdf' | 'doc' | 'sheet' | 'image' | 'text' | 'other'
+  path: string
+}
+
+export interface StageRejection {
+  name: string
+  reason: string
+}
+
+export interface StageResult {
+  ok: true
+  files: StagedFile[]
+  rejected: StageRejection[]
+  folder: string
+}
+
+export type FileKind = 'dir' | StagedFile['kind']
+
+export interface WorkspaceInfo {
+  path: string
+  defaultPath: string
+  isDefault: boolean
+}
+
+export interface WorkspaceEntry {
+  name: string
+  rel: string
+  dir: string
+  size: number
+  mtime: number
+  ext: string
+  kind: FileKind
+}
+
+export interface WorkspaceListing {
+  ok: true
+  info: WorkspaceInfo
+  entries: WorkspaceEntry[]
+  totalSize: number
+  truncated: boolean
+}
+
 export interface ChatEvent {
   chatId: string
   id: string

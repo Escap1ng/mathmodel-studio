@@ -1,8 +1,35 @@
 import { useEffect, useRef, useState } from 'react'
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent
+} from 'react'
 import type { DecisionAction, ProviderView, RuntimeStatus } from '../../../shared/api'
 import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
 import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
 import DecisionCard, { type ModelCandidate } from './DecisionCard'
+import DropZone from './DropZone'
+
+const COMPOSER_MIN = 132
+const COMPOSER_STORAGE_KEY = 'mms.composerHeight'
+
+function clampComposerHeight(height: number, chat: HTMLElement | null): number {
+  const max = Math.max(
+    COMPOSER_MIN + 40,
+    Math.round((chat?.getBoundingClientRect().height ?? 640) * 0.72)
+  )
+  return Math.round(Math.min(max, Math.max(COMPOSER_MIN, height)))
+}
+
+function readComposerHeight(): number | null {
+  try {
+    const raw = window.localStorage.getItem(COMPOSER_STORAGE_KEY)
+    const value = raw ? Number(raw) : Number.NaN
+    return Number.isFinite(value) && value > 0 ? value : null
+  } catch {
+    return null
+  }
+}
 
 interface Props {
   runtime: RuntimeStatus
@@ -169,6 +196,10 @@ export default function ChatPane({
 }: Props) {
   const [draft, setDraft] = useState('')
   const streamRef = useRef<HTMLDivElement>(null)
+  const chatRef = useRef<HTMLElement>(null)
+  const composerRef = useRef<HTMLDivElement>(null)
+  const [composerHeight, setComposerHeight] = useState<number | null>(readComposerHeight)
+  const [resizingComposer, setResizingComposer] = useState(false)
   const ready = runtime.state === 'ready'
   const phaseDef = PHASES.find((p) => p.num === currentPhase)
   const phaseText = phaseDef
@@ -181,6 +212,66 @@ export default function ChatPane({
     const el = streamRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [entries])
+
+  useEffect(() => {
+    try {
+      if (composerHeight == null) window.localStorage.removeItem(COMPOSER_STORAGE_KEY)
+      else window.localStorage.setItem(COMPOSER_STORAGE_KEY, String(composerHeight))
+    } catch {
+      /* 本地存储不可用时只保留本次会话 */
+    }
+  }, [composerHeight])
+
+  useEffect(() => {
+    if (composerHeight == null) return
+    setComposerHeight((value) =>
+      value == null ? value : clampComposerHeight(value, chatRef.current)
+    )
+    const onResize = (): void =>
+      setComposerHeight((value) =>
+        value == null ? value : clampComposerHeight(value, chatRef.current)
+      )
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [composerHeight == null])
+
+  const startComposerResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    const startY = event.clientY
+    const startHeight = composerRef.current?.getBoundingClientRect().height ?? 140
+    setResizingComposer(true)
+    document.body.style.userSelect = 'none'
+    const move = (moveEvent: PointerEvent): void => {
+      setComposerHeight(
+        clampComposerHeight(startHeight - (moveEvent.clientY - startY), chatRef.current)
+      )
+    }
+    const stop = (): void => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      document.body.style.userSelect = ''
+      setResizingComposer(false)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+  }
+
+  const nudgeComposer = (delta: number): void => {
+    const height = composerRef.current?.getBoundingClientRect().height ?? 140
+    setComposerHeight(clampComposerHeight(height + delta, chatRef.current))
+  }
+
+  const onComposerKey = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      nudgeComposer(16)
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      nudgeComposer(-16)
+    }
+  }
 
   const submit = (): void => {
     const text = draft.trim()
@@ -204,16 +295,11 @@ export default function ChatPane({
             : '描述这道题，或粘贴题目正文'
 
   return (
-    <section className="chat" aria-label="对话">
+    <section className="chat" aria-label="对话" ref={chatRef}>
       <div className="chat__stream" ref={streamRef}>
         <div className="chat__column">
           {entries.length === 0 ? (
-            <div className="chat__empty">
-              <p className="chat__lead">把赛题丢进来，或者粘贴题目正文。</p>
-              <p>
-                对话流、选模卡、门禁结果与评分明细都会出现在这一列；右侧工作台放图、论文、代码与日志。
-              </p>
-            </div>
+            <DropZone />
           ) : (
             <div className="messages" aria-live="polite">
               {entries.map((entry) => (
@@ -243,7 +329,29 @@ export default function ChatPane({
         </div>
       ) : null}
 
-      <div className="chat__composer">
+      <div
+        className="chat__composer"
+        ref={composerRef}
+        data-resized={composerHeight != null ? 'true' : 'false'}
+        style={
+          composerHeight != null
+            ? ({ height: `${composerHeight}px` } as CSSProperties)
+            : undefined
+        }
+      >
+        <div
+          className="splitter splitter--row"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="调整输入框高度"
+          aria-valuenow={Math.round(composerHeight ?? composerRef.current?.getBoundingClientRect().height ?? 140)}
+          tabIndex={0}
+          data-splitter="composer"
+          data-dragging={resizingComposer ? 'true' : undefined}
+          onPointerDown={startComposerResize}
+          onDoubleClick={() => setComposerHeight(null)}
+          onKeyDown={onComposerKey}
+        />
         <div className="composer">
           <textarea
             className="composer__input"

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import type {
   ChatEvent,
   ChatStartInput,
@@ -8,9 +8,11 @@ import type {
   RuntimeStatus,
   SaveProviderPayload,
   SessionLatest,
+  StageResult,
   StudioMeta,
   WorkbenchResult,
-  WorkbenchState
+  WorkbenchState,
+  WorkspaceListing
 } from '../shared/api'
 
 // 渲染层只能看到这几条窄接口：主进程的 runtime 端口、token 与 API Key 都不经过这里。
@@ -48,6 +50,23 @@ const studioApi = {
 
   session: {
     latest: (): Promise<SessionLatest> => ipcRenderer.invoke('session:latest')
+  },
+
+  files: {
+    pick: (): Promise<StageResult | null> => ipcRenderer.invoke('files:pick'),
+    stage: (paths: string[]): Promise<StageResult> => ipcRenderer.invoke('files:stage', paths),
+    discard: (path: string): Promise<void> => ipcRenderer.invoke('files:discard', path),
+    reveal: (): Promise<void> => ipcRenderer.invoke('files:reveal'),
+    // 沙箱渲染层拿不到 File.path，路径只能由 preload 里的 webUtils 换出来。
+    pathFor: (file: File): string => webUtils.getPathForFile(file)
+  },
+
+  workspace: {
+    get: (): Promise<WorkspaceListing> => ipcRenderer.invoke('workspace:get'),
+    choose: (): Promise<WorkspaceListing | null> => ipcRenderer.invoke('workspace:choose'),
+    reset: (): Promise<WorkspaceListing> => ipcRenderer.invoke('workspace:reset'),
+    reveal: (): Promise<void> => ipcRenderer.invoke('workspace:reveal'),
+    open: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:open', rel)
   },
 
   workbench: {

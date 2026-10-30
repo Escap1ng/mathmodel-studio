@@ -23,8 +23,12 @@
 
   --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
   --shadow-2: 0 8px 24px rgba(16, 24, 40, 0.08);
+
+  /* 圆角只此四档：弹层 / 卡片 / 控件 / 胶囊。组件里不写裸数值。 */
+  --radius-lg: 14px;
   --radius: 10px;
   --radius-sm: 6px;
+  --radius-pill: 999px;
 
   --font-ui: 'Segoe UI', 'HarmonyOS Sans SC', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-cjk: 'HarmonyOS Sans SC', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;

@@ -13,6 +13,7 @@ interface StoredProvider {
 interface SettingsFile {
   version: 1
   activeProvider?: string
+  workspace?: string
   providers: Record<string, StoredProvider>
 }
 
@@ -40,6 +41,7 @@ export function loadSettings(): SettingsFile {
     cache = {
       version: 1,
       activeProvider: typeof raw.activeProvider === 'string' ? raw.activeProvider : undefined,
+      workspace: typeof raw.workspace === 'string' && raw.workspace ? raw.workspace : undefined,
       providers
     }
   } catch {
@@ -125,4 +127,17 @@ export function apiKeyFor(id: string): string | null {
   } catch {
     return null
   }
+}
+
+/** 用户自选的工作区目录；未设置时用桌面的「赛题」。 */
+export function savedWorkspace(): string | undefined {
+  return loadSettings().workspace
+}
+
+export function saveWorkspace(path: string | undefined): void {
+  const file = loadSettings()
+  const next: SettingsFile = { ...file }
+  if (path) next.workspace = path
+  else delete next.workspace
+  persist(next)
 }

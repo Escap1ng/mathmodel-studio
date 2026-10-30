@@ -7,6 +7,7 @@
 
 M5 论文页：右栏「论文」能真跑 **xelatex 两遍 → pandoc 转 DOCX → Word 版式微调 → 去 AI 措辞 / 结构指标 / 章节结构三道门禁**，并用 pdf.js 做页级预览。本机演示稿真编 7 页（PDF 284 KB、DOCX 151 KB），三道门禁全绿；门禁条变成图表 / 评分 / 章节 / 论文排版四项。
 **论文构建是工作台动作，不是阶段机的第五阶段**：阶段五不会因构建成功自动标为已过，K1 环境预检卡也没接；编译的是仓库里的演示稿，不会替你写正文。里程碑见 [../PLAN.md](../PLAN.md) §7。
+**附件拖放只做暂存**：文件复制到工作区（默认桌面「赛题」），右栏「文件」页可查看与切换工作区；不解析、不随消息发送，解析留到下一步。
 
 三句必须保留的限制：
 
@@ -42,11 +43,11 @@ python runtime/selfcheck_paper.py               # 10/10 条论文断言（真编
 需要显示器的部分：
 
 ```bash
-npm run smoke:window   # 真起窗口，57/57，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png、figure.png、score.png、paper.png
+npm run smoke:window   # 真起窗口，74/74，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png、figure.png、score.png、paper.png、dropzone.png、files.png
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
 
-`smoke:window` 自己设置 `MMS_FAKE_PROVIDER=1`，并把 Electron `userData` 指到临时目录，所以它不会用你已保存的真实 provider，也不会带着哨兵 Key 发请求；图表版本、论文工作区与日志也都写在这个临时目录。G7-9 会真编一遍演示稿，因此跑 G7 的机器必须有 xelatex 与 pandoc。
+`smoke:window` 自己设置 `MMS_FAKE_PROVIDER=1`，并把 Electron `userData` 指到临时目录，所以它不会用你已保存的真实 provider，也不会带着哨兵 Key 发请求；图表版本、论文工作区与日志也都写在这个临时目录。它还设 `MMS_WORKSPACE` 指向临时目录，避免在真实桌面建「赛题」；正常启动时默认工作区是桌面「赛题」，附件落在 `<工作区>/附件/日期/`。G7-9 会真编一遍演示稿，因此跑 G7 的机器必须有 xelatex 与 pandoc。
 跑完可以直接看 `screenshots/paper.png`；断言通过不等于观感合格。
 
 一把梭：`npm run gate`（顺序见 `package.json` 的 scripts；G7 不在 gate 里，因为它要显示器和 Electron 二进制）。
@@ -68,7 +69,7 @@ gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
 | 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消 | `selfcheck_channel.py` 46/46（本机 Windows） | 强（本机） |
 | 编排闭环：K2→K3→换一批→选择→阶段四 | 同上的 C12，事件与快照双向核对 | 强（本机） |
 | 跨进程恢复：换一个服务器进程仍停在 K2 | 同上的 C13 | 强（本机） |
-| 界面端到端：57 条，含论文构建与预览 | G7 57/57，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
+| 界面端到端：74 条，含论文构建、预览、可拖拽布局、附件拖放与工作区文件页 | G7 74/74，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
 | 图表工作台：真渲两版、换主题、并排 diff、回滚 | G9 W2–W4；G7 工作台段 | 强（本机） |
 | 评分卡：三轮、五维、扣分定位、熔断、一票否决 | G9 W6；G7 评分段；演示数据 | 强（演示数据，非真实论文） |
 | 论文排版：xelatex 两遍、pandoc DOCX、Word 后处理 | G10 P2/P3/P5；G7-9；本机真编 7 页 | 强（演示稿） |
@@ -127,7 +128,7 @@ M5 新增：
 3. 三道门禁按 JSON 解析成门禁条；缺件、坏稿、坏 TeX、缺稿件都有反向覆盖。
 4. 通道 `/workbench/paper/build`、`paper` 状态、门禁条第四项；主进程下发 PDF data URL，渲染层不碰路径。
 5. 论文页：构建按钮、步骤、门禁、日志、pdf.js 预览。
-6. G10 10 条、G7 57 条、G6b 下限 57 与 21 条关键断言；CI 装 TeX/pandoc。
+6. G10 10 条、G7 74 条、G6b 下限 74 与 37 条关键断言；CI 装 TeX/pandoc。
 7. 文档：README/README_EN、CHANGELOG 0.5.0、HANDOFF、env-setup。
 
 仍欠：
@@ -152,6 +153,10 @@ M5 新增：
 **`check_phrasing.py` 会扫注释**：模板里的写作提示（「随着…的发展」）会被当成命中。样例稿的注释也要避开词表。`transition-abuse` 的 `max_per_document` 是 1，全文用一次「综上所述」算合规，反例要注入两次。
 
 **G7 新增断言要同步三处**：`tests/window-smoke.cjs` 的断言、`scripts/check-window-smoke.mjs` 的 `MIN_ASSERTIONS` 与 `REQUIRED_ASSERTIONS`、以及文档里的条数。门禁条从三项变四项时，G7 的 gate 断言也要改。
+
+**窗口 resize 时的夹取要防抖**：从 1440 拉到 2400 的过程中会触发多次中间尺寸的 resize，立刻按当前 innerWidth 夹取会把用户保存的宽度永久压到最小值（G7 曾读到右栏 380px）。现在等 180ms 尺寸稳定后再夹，测试也在断言前等右栏 >800px。
+
+**分隔条高亮用 CSS 变量定位**：`--grip-y` 由 pointermove/pointerenter 写在工作台栏边界上，`::after` 用 `radial-gradient(... at 50% var(--grip-y))` 当遮罩，光带以指针为中心向两端渐隐；不要固定 50%，也不要在 pointerleave 清空它（淡出时会闪回中点）。拖拽时窗口级 pointermove 也要继续更新它。输入框上沿的空心描边长条固定居中、不跟随鼠标，只随 hover/拖拽变色；左栏固定 240px，没有分隔条。
 
 **CI 的排版依赖是硬依赖**：gates 的 ubuntu job 装 `pandoc` 与 `texlive-xetex/texlive-lang-chinese/texlive-latex-extra`；window-smoke job 同样要装，否则 G7-9 会红。Windows gates 没有 TeX，G10 用 `MMS_PAPER_SKIP=1` 显式跳过，跳过必须打印「未验证」，不能算通过。
 
@@ -197,7 +202,7 @@ src/renderer/src/
   lib/phases.ts             阶段名与状态文案
   styles/workbench.css      M4 工作台与 M5 论文页样式
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
-tests/window-smoke.cjs      真启动断言（57 条）+ 截图与 JSON 结论
+tests/window-smoke.cjs      真启动断言（74 条）+ 截图与 JSON 结论
 .github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu，装图表与排版依赖）
 ```
 

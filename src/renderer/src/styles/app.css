@@ -25,11 +25,109 @@ button {
 }
 
 .shell {
+  --pane-w: clamp(460px, 38vw, 1100px);
+  position: relative;
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--pane-w);
   grid-template-rows: minmax(0, 1fr) 30px;
   height: 100%;
   background: var(--bg);
+}
+
+/* —— 分隔条：拖拽改宽度/高度，键盘方向键也能调 —— */
+.splitter {
+  position: absolute;
+  z-index: 6;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  touch-action: none;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  opacity: 0;
+  /* 位置跟着指针即时走；只有透明度做淡入淡出，离开时原地消失、不回中间 */
+  transition: opacity 140ms ease-out;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after,
+.splitter[data-dragging='true']::after {
+  opacity: 1;
+}
+
+.splitter--col {
+  top: 0;
+  bottom: 30px;
+  right: calc(var(--pane-w) - 4px);
+  width: 8px;
+  cursor: col-resize;
+}
+
+/* 竖条：贯穿分隔线，指针处最实、向两端渐隐，横向也羽化，像一道融进背景的光带 */
+.splitter--col::after {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 8px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 20%, transparent) 38%,
+    var(--accent) 50%,
+    color-mix(in srgb, var(--accent) 20%, transparent) 62%,
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 60% 200px at 50% var(--grip-y, 50%),
+    #000 0%,
+    rgba(0, 0, 0, 0.4) 55%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 60% 200px at 50% var(--grip-y, 50%),
+    #000 0%,
+    rgba(0, 0, 0, 0.4) 55%,
+    transparent 100%
+  );
+}
+
+/* 骑在 .composer 顶边框上：容器有 1px 上边框 + 12px 内边距，8px 高的条居中于 12px 处 */
+.splitter--row {
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 8px;
+  cursor: row-resize;
+}
+
+/* 输入框上沿：常显一条居中的空心长条（描边胶囊），拖拽时描边变成强调色 */
+.splitter--row::after {
+  left: 50%;
+  top: 0;
+  width: 84px;
+  height: 8px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  /* 用页面底色盖住下面的输入框边框线，长条内部保持空心、不被线穿过 */
+  background: var(--bg);
+  opacity: 1;
+  transition: border-color 140ms ease-out, opacity 140ms ease-out;
+}
+
+.splitter--row:hover::after,
+.splitter--row:focus-visible::after,
+.splitter--row[data-dragging='true']::after {
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.shell[data-resizing='col'] {
+  cursor: col-resize;
+  user-select: none;
 }
 
 /* —— 左栏：会话 + 阶段轨道 —— */
@@ -136,18 +234,252 @@ button {
   color: var(--text-2);
 }
 
-.chat__lead {
-  font-family: var(--font-cjk);
-  font-size: 16px;
-  line-height: 1.75;
-  color: var(--text);
-  margin: 0 0 6px;
-}
-
+/* —— 空状态：把文件拖进来 —— */
 .chat__empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
   color: var(--text-2);
   font-size: 13.5px;
   line-height: 1.75;
+}
+
+.dropzone {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 320px;
+  max-height: 460px;
+  padding: 30px 32px 44px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  transition: border-color var(--t), background var(--t);
+}
+
+.dropzone:hover {
+  border-color: var(--text-3);
+  background: var(--surface);
+}
+
+.dropzone[data-drag='true'] {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* 整框可点，但文字层不挡命中：只有控件和文件清单接收指针。 */
+.dropzone__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dropzone__hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.dropzone > :not(.dropzone__hit) {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.dropzone__plus {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin-bottom: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-3);
+  transition: color var(--t), background var(--t), border-color var(--t), transform var(--t);
+}
+
+.dropzone:hover .dropzone__plus {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dropzone[data-drag='true'] .dropzone__plus {
+  color: var(--on-accent);
+  border-color: var(--accent);
+  background: var(--accent);
+  transform: scale(1.06);
+}
+
+.dropzone[data-busy='true'] .dropzone__plus {
+  opacity: 0.6;
+}
+
+.dropzone__title {
+  margin: 0;
+  font-family: var(--font-cjk);
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.dropzone[data-drag='true'] .dropzone__title {
+  color: var(--accent);
+}
+
+.dropzone__hint,
+.dropzone__sub {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+.dropzone__sub {
+  font-size: 11.5px;
+}
+
+.dropzone__files {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+  max-height: 128px;
+  overflow: auto;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dropzone > .dropzone__files,
+.dropzone > .dropzone__reject {
+  pointer-events: auto;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 5px 6px 5px 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.file-chip__kind {
+  flex: none;
+  min-width: 30px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.file-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+  font-family: var(--font-cjk);
+}
+
+.file-chip__size {
+  flex: none;
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.file-chip__remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background var(--t), color var(--t);
+}
+
+.file-chip__remove:hover {
+  background: var(--surface-2);
+  color: var(--fail);
+}
+
+.dropzone__reject {
+  margin: 8px 0 0;
+  color: var(--fail);
+  font-size: 12px;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.dropzone > .dropzone__foot {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  pointer-events: none;
+}
+
+.dropzone__link {
+  border: 0;
+  padding: 2px 0;
+  background: none;
+  color: var(--text-2);
+  font-family: var(--font-cjk);
+  font-size: 11.5px;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color var(--t), text-decoration-color var(--t);
+}
+
+.dropzone__link:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+.chat__empty-note {
+  margin: 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-3);
 }
 
 /* —— 消息流 —— */
@@ -369,10 +701,22 @@ button {
 }
 
 .chat__composer {
+  position: relative;
   border-top: 1px solid var(--line);
   padding: 12px 24px 14px;
   display: flex;
   justify-content: center;
+}
+
+.chat__composer[data-resized='true'] .composer {
+  height: 100%;
+  grid-template-rows: minmax(52px, 1fr) auto;
+}
+
+.chat__composer[data-resized='true'] .composer__input {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
 }
 
 .composer {
@@ -409,7 +753,7 @@ button {
 .pill {
   border: 1px solid var(--line-strong);
   background: var(--bg);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 4px 11px;
   font-size: 12px;
   color: var(--text-2);
@@ -477,33 +821,50 @@ button:disabled {
 
 .tabs {
   display: flex;
-  gap: 2px;
-  padding: 8px 8px 0;
+  gap: 4px;
+  padding: 8px;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
   overflow-x: auto;
+  /* 窄栏里宁可横向滑动，也不要出现一条压住标签的滚动条 */
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
-  border: 0;
-  border-bottom: 2px solid transparent;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
   background: transparent;
-  padding: 6px 10px 8px;
+  padding: 4px 12px;
   color: var(--text-2);
   font-family: var(--font-cjk);
   font-size: 13px;
+  line-height: 1.6;
   white-space: nowrap;
-  transition: color var(--t), border-color var(--t);
+  cursor: pointer;
+  transition: background var(--t), color var(--t), border-color var(--t);
 }
 
 .tab:hover {
+  background: var(--surface);
   color: var(--text);
 }
 
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 选中态与轮次、版本、服务商等胶囊选择器保持同一套：淡底 + 主色字。
+   不改字重，切换标签时文字宽度不变，标签不会左右跳。 */
 .tab[aria-selected='true'] {
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
   color: var(--accent);
-  border-bottom-color: var(--accent);
-  font-weight: 600;
 }
 
 .workspace__body {
@@ -512,6 +873,9 @@ button:disabled {
   padding: 18px;
   color: var(--text-2);
   font-size: 13px;
+  /* 右栏宽度可拖拽，版式按容器宽度而不是视口宽度切 */
+  container-type: inline-size;
+  container-name: pane;
 }
 
 .card {
@@ -627,7 +991,7 @@ button:disabled {
   overflow: auto;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-2);
 }
 
@@ -664,7 +1028,7 @@ button:disabled {
   gap: 7px;
   padding: 5px 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg);
   color: var(--text-2);
   font-family: var(--font-cjk);
@@ -718,7 +1082,7 @@ button:disabled {
 
 .field__badge {
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 10.5px;
@@ -857,7 +1221,7 @@ button:disabled {
   display: inline-flex;
   padding: 2px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
 }
 
@@ -865,7 +1229,7 @@ button:disabled {
   height: 24px;
   padding: 0 10px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-3);
   font-size: 11.5px;
@@ -1041,7 +1405,7 @@ button:disabled {
   flex: none;
   margin-left: auto;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent);
   font-size: 10px;

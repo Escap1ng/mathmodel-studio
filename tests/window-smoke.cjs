@@ -24,7 +24,7 @@
  * 退出码：0 全部通过 / 1 任一断言失败 / 2 环境错误（没有构建产物或窗口没起来）
  */
 const { app, BrowserWindow, Menu, safeStorage } = require('electron')
-const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
+const { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
 
@@ -40,6 +40,8 @@ process.env.MMS_FAKE_DELAY_MS = process.env.MMS_FAKE_DELAY_MS || '20'
 
 const userDataDir = mkdtempSync(join(tmpdir(), 'mms-g7-userdata-'))
 app.setPath('userData', userDataDir)
+// 工作区默认是桌面「赛题」；冒烟指到临时目录，不在真实桌面留目录。
+process.env.MMS_WORKSPACE = join(userDataDir, 'workspace')
 
 app.commandLine.appendSwitch('disable-dev-shm-usage')
 app.disableHardwareAcceleration()
@@ -209,7 +211,7 @@ async function main() {
     process.platform === 'darwin' || appMenu === null,
     `platform=${process.platform}，应用菜单=${appMenu === null ? 'null' : 'still set'}`
   )
-  record('G7-4 工作台 6 个标签', dom.tabs === 6, `实得 ${dom.tabs}`)
+  record('G7-4 工作台 7 个标签', dom.tabs === 7, `实得 ${dom.tabs}`)
   record(
     'G7-4 输入区在 runtime 就绪后可用',
     ready && dom.sendDisabled === false && dom.inputDisabled === false,
@@ -224,6 +226,197 @@ async function main() {
     `getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()`
   )
   record('G7-4 切到 B 案靛蓝生效', accentB.toLowerCase() === '#2b4c7e', `实得 ${accentB}`)
+
+  // —— G7-4b 附件拖拽区：大框、拖拽高亮、暂存与移除 ——
+  // 拖拽用合成 DataTransfer 触发真实的 dragenter/dragleave，验的是 React 侧的状态切换；
+  // 暂存走 window.studio.files → preload → ipcMain → 磁盘，验的是整条落盘链路。
+  const drop = await win.webContents.executeJavaScript(`(async () => {
+    const area = document.querySelector('.chat__empty')
+    const box = document.querySelector('.dropzone')
+    if (!area || !box) return { found: false }
+    const b = box.getBoundingClientRect()
+    const p = box.querySelector('.dropzone__plus')?.getBoundingClientRect()
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    const dt = new DataTransfer()
+    dt.items.add(new File(['smoke'], 'problem.pdf', { type: 'application/pdf' }))
+    area.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    await frame()
+    const active = document.querySelector('.dropzone')
+    const dragOn = active?.dataset.drag === 'true'
+    const borderStyle = getComputedStyle(active).borderStyle
+    area.dispatchEvent(new DragEvent('dragleave', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    await frame()
+    return {
+      found: true,
+      hasPlus: Boolean(box.querySelector('.dropzone__plus svg path')),
+      hitLabel: box.querySelector('.dropzone__hit')?.getAttribute('aria-label') || '',
+      w: Math.round(b.width),
+      h: Math.round(b.height),
+      dx: p ? Math.round(Math.abs((p.left + p.right) / 2 - (b.left + b.right) / 2)) : -1,
+      dragOn,
+      borderStyle,
+      dragCleared: document.querySelector('.dropzone')?.dataset.drag !== 'true'
+    }
+  })()`)
+  record(
+    'G7-4 空状态大框与加号居中',
+    drop.found && drop.hasPlus && drop.hitLabel === '选择赛题或数据文件' && drop.w >= 560 && drop.h >= 280 && drop.dx <= 2,
+    `框 ${drop.w}x${drop.h}，加号偏移 ${drop.dx}px，命中区=${JSON.stringify(drop.hitLabel)}`
+  )
+  record(
+    'G7-4 拖入文件时大框高亮',
+    drop.dragOn === true && drop.borderStyle === 'solid' && drop.dragCleared === true,
+    `drag=${drop.dragOn}，边框=${drop.borderStyle}，离开后复位=${drop.dragCleared}`
+  )
+
+  const samplePath = join(userDataDir, 'sample-problem.txt')
+  writeFileSync(samplePath, 'mock problem\n', 'utf8')
+
+  // CDP 注入的是「带真实路径」的拖放：渲染层会走 webUtils.getPathForFile → IPC → 落盘，
+  // 和用鼠标从资源管理器拖进来是同一条路径；合成 File 没有本地路径，验不到这一段。
+  const dragPath = join(userDataDir, 'drag-problem.csv')
+  writeFileSync(dragPath, 'x,y\n1,2\n', 'utf8')
+  let dragUi = { ok: false, detail: 'CDP 不可用' }
+  let filesUi = { ok: false, detail: '未执行' }
+  try {
+    const dbg = win.webContents.debugger
+    if (!dbg.isAttached()) dbg.attach('1.3')
+    const point = await win.webContents.executeJavaScript(`(() => {
+      const b = document.querySelector('.dropzone').getBoundingClientRect()
+      return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }
+    })()`)
+    const data = { items: [], files: [dragPath], dragOperationsMask: 1 }
+    const send = (type) =>
+      dbg.sendCommand('Input.dispatchDragEvent', { type, x: point.x, y: point.y, data })
+    await send('dragEnter')
+    await send('dragOver')
+    await sleep(200)
+    const hot = await win.webContents.executeJavaScript(
+      `document.querySelector('.dropzone')?.dataset.drag === 'true'`
+    )
+    await send('drop')
+    await sleep(900)
+    const listed = await win.webContents.executeJavaScript(`({
+      chips: [...document.querySelectorAll('.file-chip__name')].map((n) => n.textContent),
+      foot: document.querySelector('.dropzone__foot')?.textContent?.trim() ?? ''
+    })`)
+    const stagedName = join(userDataDir, 'workspace', '附件')
+    const landed = existsSync(stagedName) && readdirSync(stagedName, { recursive: true }).some(
+      (p) => String(p).includes('drag-problem.csv')
+    )
+    const shot = await win.webContents.capturePage()
+    writeFileSync(join(OUT_DIR, 'dropzone.png'), shot.toPNG())
+
+    // 文件页：切过去应当看到工作区路径，并在列表里看到刚拖进来的文件；
+    // 移除并刷新后，条目要跟着消失（列表读的是磁盘，不是缓存）。
+    await win.webContents.executeJavaScript(
+      `document.querySelector('.tab[data-tab="files"]')?.click()`
+    )
+    const sawFiles = await waitFor(
+      win,
+      `[...document.querySelectorAll('.file-row__name')].some((n) => n.textContent === 'drag-problem.csv')`,
+      6000
+    )
+    const filesView = await win.webContents.executeJavaScript(`({
+      path: document.querySelector('.files__path code')?.textContent?.trim() ?? '',
+      names: [...document.querySelectorAll('.file-row__name')].map((n) => n.textContent),
+      meta: document.querySelector('.panel[data-panel="files"] .panel__meta')?.textContent?.trim() ?? ''
+    })`)
+    const filesShot = await win.webContents.capturePage()
+    writeFileSync(join(OUT_DIR, 'files.png'), filesShot.toPNG())
+
+    await win.webContents.executeJavaScript(`document.querySelector('.file-chip__remove')?.click()`)
+    await sleep(400)
+    await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll('.files__actions .btn')].find((b) => b.textContent.trim() === '刷新')?.click()`
+    )
+    const rowGone = await waitFor(
+      win,
+      `![...document.querySelectorAll('.file-row__name')].some((n) => n.textContent === 'drag-problem.csv')`,
+      6000
+    )
+    const filesOk =
+      sawFiles &&
+      rowGone &&
+      filesView.path === join(userDataDir, 'workspace') &&
+      filesView.meta.includes('1 个文件')
+    filesUi = { ok: filesOk, detail: JSON.stringify({ sawFiles, rowGone, ...filesView }) }
+    const gone = !readdirSync(stagedName, { recursive: true }).some((p) =>
+      String(p).includes('drag-problem.csv')
+    )
+    const chipsAfter = await win.webContents.executeJavaScript(
+      `document.querySelectorAll('.file-chip').length`
+    )
+    dragUi = {
+      ok:
+        hot &&
+        listed.chips.includes('drag-problem.csv') &&
+        listed.foot.includes('已暂存 1 个文件') &&
+        landed &&
+        gone &&
+        chipsAfter === 0,
+      detail: JSON.stringify({ hot, ...listed, landed, gone, chipsAfter })
+    }
+    dbg.detach()
+  } catch (err) {
+    dragUi = { ok: false, detail: `CDP 拖放异常: ${err instanceof Error ? err.message : String(err)}` }
+  }
+  record('G7-4 真拖放走完暂存与移除', dragUi.ok, dragUi.detail)
+  record('G7-4 文件页列出工作区文件', filesUi.ok, filesUi.detail)
+
+  // 默认工作区是桌面的「赛题」；冒烟用 MMS_WORKSPACE 指走，所以这里只核对默认路径的形状。
+  const wsInfo = await win.webContents.executeJavaScript(`window.studio.workspace.get()`)
+  record(
+    'G7-4 默认工作区在桌面「赛题」',
+    Boolean(wsInfo?.info) &&
+      String(wsInfo.info.defaultPath).endsWith('赛题') &&
+      wsInfo.info.path === join(userDataDir, 'workspace') &&
+      wsInfo.info.isDefault === false,
+    `path=${wsInfo?.info?.path}，default=${wsInfo?.info?.defaultPath}`
+  )
+
+  const staged = await win.webContents.executeJavaScript(
+    `window.studio.files.stage([${JSON.stringify(samplePath)}])`
+  )
+  const stagedFile = staged && staged.ok && staged.files && staged.files[0]
+  const stagedOnDisk = stagedFile ? existsSync(stagedFile.path) : false
+  const stagedInside = stagedFile
+    ? stagedFile.path.startsWith(join(userDataDir, 'workspace', '附件'))
+    : false
+  const stagedBody = stagedOnDisk ? readFileSync(stagedFile.path, 'utf8') : ''
+  record(
+    'G7-4 附件暂存到工作区',
+    Boolean(stagedFile) &&
+      stagedFile.name === 'sample-problem.txt' &&
+      stagedFile.kind === 'text' &&
+      stagedFile.size === 13 &&
+      stagedInside &&
+      stagedOnDisk &&
+      stagedBody === 'mock problem\n',
+    `落盘=${stagedInside && stagedOnDisk}，内容=${JSON.stringify(stagedBody)}，路径=${stagedFile?.path ?? '无'}`
+  )
+
+  const badStage = await win.webContents.executeJavaScript(
+    `window.studio.files.stage([${JSON.stringify(join(userDataDir, 'missing', 'nope.csv'))}])`
+  )
+  record(
+    'G7-4 坏文件给出可读原因',
+    Boolean(badStage) &&
+      badStage.files.length === 0 &&
+      badStage.rejected.length === 1 &&
+      typeof badStage.rejected[0].reason === 'string' &&
+      badStage.rejected[0].reason.length > 0,
+    `rejected=${JSON.stringify(badStage?.rejected)}`
+  )
+
+  await win.webContents.executeJavaScript(
+    `window.studio.files.discard(${JSON.stringify(stagedFile ? stagedFile.path : '')})`
+  )
+  record(
+    'G7-4 移除只删暂存副本',
+    Boolean(stagedFile) && !existsSync(stagedFile.path) && existsSync(samplePath),
+    `副本还在=${stagedFile ? existsSync(stagedFile.path) : '无副本'}，原文件还在=${existsSync(samplePath)}`
+  )
 
   // 中文字体可用性。不能再用 document.fonts.check(具名族)：
   // Chromium 在有回退字体时对任何族名都返回 true，包括根本没装的族。
@@ -562,6 +755,10 @@ async function main() {
   )
 
   // —— M4：工作台图表、主题、回滚、评分与门禁 ——
+  // 前面的文件页检查会把右栏留在「文件」，这里显式切回「图表」。
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.tab[data-tab="figure"]')?.click()`
+  )
   await waitFor(
     win,
     `!!document.querySelector('[data-role="figure-image"]') || !!document.querySelector('[data-action="render-first"]')`,
@@ -810,6 +1007,214 @@ async function main() {
     convoShot.ratio >= MIN_INK_RATIO,
     `非白像素 ${(convoShot.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
   )
+
+  // —— 布局：宽屏比例与两处分隔条 ——
+  win.setContentSize(2400, 1200)
+  await waitFor(
+    win,
+    `Math.round(document.querySelector('.workspace').getBoundingClientRect().width) > 800`,
+    5000
+  )
+  await sleep(250)
+  const wide = await win.webContents.executeJavaScript(`(() => {
+    const pane = document.querySelector('.workspace').getBoundingClientRect()
+    const chat = document.querySelector('.chat').getBoundingClientRect()
+    const rail = document.querySelector('.rail').getBoundingClientRect()
+    const shell = getComputedStyle(document.querySelector('.shell'))
+    return {
+      inner: innerWidth,
+      pane: Math.round(pane.width),
+      chat: Math.round(chat.width),
+      rail: Math.round(rail.width),
+      paneVar: shell.getPropertyValue('--pane-w').trim(),
+      railVar: shell.getPropertyValue('--rail-w').trim(),
+      storedPane: localStorage.getItem('mms.paneWidth'),
+      storedRail: localStorage.getItem('mms.railWidth')
+    }
+  })()`)
+  record(
+    'G7-10 宽屏右栏按比例放宽',
+    wide.inner >= 2200 && wide.pane > 800 && wide.chat > 600,
+    JSON.stringify(wide)
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="paper"]')?.click()`)
+  const paperWide = await waitFor(
+    win,
+    `(() => {
+      const l = document.querySelector('[data-panel="paper"] .paper-layout')
+      return !!l && getComputedStyle(l).gridTemplateColumns.split(' ').length === 2
+    })()`,
+    5000
+  )
+  const paperWideInfo = await win.webContents.executeJavaScript(`(() => {
+    const l = document.querySelector('[data-panel="paper"] .paper-layout')
+    const preview = document.querySelector('[data-panel="paper"] .paper-preview')
+    const side = document.querySelector('[data-panel="paper"] .paper-layout__side')
+    return {
+      columns: getComputedStyle(l).gridTemplateColumns,
+      preview: Math.round(preview.getBoundingClientRect().width),
+      side: Math.round(side.getBoundingClientRect().width)
+    }
+  })()`)
+  record(
+    'G7-10 宽屏论文页两栏且预览限宽',
+    paperWide && paperWideInfo.preview <= 700 && paperWideInfo.side >= 250,
+    JSON.stringify(paperWideInfo)
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="score"]')?.click()`)
+  const scoreWide = await waitFor(
+    win,
+    `(() => {
+      const l = document.querySelector('[data-panel="score"] .score-layout')
+      return !!l && getComputedStyle(l).gridTemplateColumns.split(' ').length === 2
+    })()`,
+    5000
+  )
+  const scoreWideInfo = await win.webContents.executeJavaScript(`(() => {
+    const l = document.querySelector('[data-panel="score"] .score-layout')
+    const main = document.querySelector('[data-panel="score"] .score-layout__main')
+    const side = document.querySelector('[data-panel="score"] .score-layout__side')
+    return {
+      columns: getComputedStyle(l).gridTemplateColumns,
+      main: Math.round(main.getBoundingClientRect().width),
+      side: Math.round(side.getBoundingClientRect().width)
+    }
+  })()`)
+  record(
+    'G7-10 宽屏评分页两栏',
+    scoreWide && scoreWideInfo.main >= 250 && scoreWideInfo.side >= 300,
+    JSON.stringify(scoreWideInfo)
+  )
+
+  const grip = await win.webContents.executeJavaScript(`(() => {
+    const s = document.querySelector('[data-splitter="pane"]')
+    const r = s.getBoundingClientRect()
+    s.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: r.left + 4, clientY: r.top + 300, pointerId: 3 }))
+    const after = getComputedStyle(s, '::after')
+    return {
+      variable: s.style.getPropertyValue('--grip-y').trim(),
+      mask: after.webkitMaskImage || after.maskImage,
+      height: Math.round(r.height),
+      afterHeight: after.height
+    }
+  })()`)
+  record(
+    'G7-10 握把高亮跟随指针',
+    grip.variable === '300px' &&
+      grip.mask.includes('300px') &&
+      parseFloat(grip.afterHeight) > 600 &&
+      grip.height > 600,
+    JSON.stringify(grip)
+  )
+
+  const dragSplitter = (selector, dx, dy) =>
+    win.webContents.executeJavaScript(`(() => {
+      const s = document.querySelector(${JSON.stringify(selector)})
+      const r = s.getBoundingClientRect()
+      const x = r.left + r.width / 2
+      const y = r.top + Math.min(120, r.height / 2)
+      s.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: x, clientY: y, pointerId: 11 }))
+      window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: x + ${dx}, clientY: y + ${dy}, pointerId: 11 }))
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: x + ${dx}, clientY: y + ${dy}, pointerId: 11 }))
+      return true
+    })()`)
+
+  const railState = await win.webContents.executeJavaScript(`({
+    splitter: !!document.querySelector('[data-splitter="rail"]'),
+    width: Math.round(document.querySelector('.rail').getBoundingClientRect().width),
+    stored: localStorage.getItem('mms.railWidth')
+  })`)
+  record(
+    'G7-10 左栏固定不可拖拽',
+    railState.splitter === false && railState.width === 240 && railState.stored === null,
+    JSON.stringify(railState)
+  )
+
+  const paneBefore = wide.pane
+  await dragSplitter('[data-splitter="pane"]', -140, 0)
+  await sleep(300)
+  const paneAfter = await win.webContents.executeJavaScript(
+    `Math.round(document.querySelector('.workspace').getBoundingClientRect().width)`
+  )
+  record(
+    'G7-10 中/右分隔条可拖拽',
+    paneAfter - paneBefore >= 100,
+    `${paneBefore} → ${paneAfter}`
+  )
+
+  const gripStay = await win.webContents.executeJavaScript(`(() => {
+    const s = document.querySelector('[data-splitter="pane"]')
+    const after = () => getComputedStyle(s, '::after')
+    const before = s.style.getPropertyValue('--grip-y').trim()
+    const maskBefore = after().webkitMaskImage || after().maskImage
+    s.dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body, pointerId: 11 }))
+    return {
+      before,
+      maskBefore,
+      after: s.style.getPropertyValue('--grip-y').trim(),
+      maskAfter: after().webkitMaskImage || after().maskImage
+    }
+  })()`)
+  record(
+    'G7-10 离开分隔条后握把保持在指针处',
+    gripStay.before !== '' &&
+      gripStay.after === gripStay.before &&
+      gripStay.maskAfter === gripStay.maskBefore &&
+      gripStay.maskBefore.includes(gripStay.before),
+    JSON.stringify(gripStay)
+  )
+
+  const composerBefore = await win.webContents.executeJavaScript(
+    `Math.round(document.querySelector('.chat__composer').getBoundingClientRect().height)`
+  )
+  await dragSplitter('[data-splitter="composer"]', 0, -90)
+  await sleep(300)
+  const composerAfter = await win.webContents.executeJavaScript(
+    `Math.round(document.querySelector('.chat__composer').getBoundingClientRect().height)`
+  )
+  record(
+    'G7-10 输入框上沿可拖拽',
+    composerAfter - composerBefore >= 60,
+    `${composerBefore} → ${composerAfter}`
+  )
+
+  const composerGrip = await win.webContents.executeJavaScript(`(() => {
+    const s = document.querySelector('[data-splitter="composer"]')
+    const card = document.querySelector('.composer')
+    const after = getComputedStyle(s, '::after')
+    const box = s.getBoundingClientRect()
+    return {
+      width: after.width,
+      left: after.left,
+      half: Math.round(box.width / 2),
+      border: after.borderTopWidth,
+      background: after.backgroundColor,
+      shellBg: getComputedStyle(document.querySelector('.shell')).backgroundColor,
+      centerY: Math.round(box.top + parseFloat(after.top) + parseFloat(after.height) / 2),
+      cardTop: Math.round(card.getBoundingClientRect().top)
+    }
+  })()`)
+  record(
+    'G7-10 输入框上沿空心长条居中骑在框线',
+    parseFloat(composerGrip.width) >= 60 &&
+      Math.abs(parseFloat(composerGrip.left) - composerGrip.half) <= 1 &&
+      composerGrip.border === '1px' &&
+      composerGrip.background === composerGrip.shellBg &&
+      Math.abs(composerGrip.centerY - composerGrip.cardTop) <= 1,
+    JSON.stringify(composerGrip)
+  )
+
+  // 双击恢复默认，再把窗口还原，避免影响后续人工看图
+  await win.webContents.executeJavaScript(
+    `document.querySelector('[data-splitter="pane"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`
+  )
+  await win.webContents.executeJavaScript(
+    `document.querySelector('[data-splitter="composer"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`
+  )
+  win.setContentSize(1440, 900)
+  await sleep(300)
 
   // 结论落盘：CI 的通过与否由 scripts/check-window-smoke.mjs 读这份 JSON 判定，
   // 不依赖 Electron 的退出码管道——上一版就是 app.exit(1) 被生产入口的

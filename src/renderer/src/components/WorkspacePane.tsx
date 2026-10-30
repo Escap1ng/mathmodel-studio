@@ -9,6 +9,7 @@ import type {
   ScoreRound,
   WorkbenchState
 } from '../../../shared/api'
+import FilesPanel from './FilesPanel'
 
 GlobalWorkerOptions.workerSrc = pdfWorker
 
@@ -18,7 +19,8 @@ const TABS = [
   { id: 'code', label: '代码' },
   { id: 'score', label: '评分' },
   { id: 'gate', label: '门禁' },
-  { id: 'log', label: '日志' }
+  { id: 'log', label: '日志' },
+  { id: 'files', label: '文件' }
 ] as const
 type TabId = (typeof TABS)[number]['id']
 
@@ -28,6 +30,11 @@ interface Props {
 
 function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
+}
+
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
 function findVersion(state: WorkbenchState | null, id: string | null): FigureVersion | undefined {
@@ -163,7 +170,12 @@ function FigurePanel({
         )
       ) : (
         <div className="panel__empty">
-          <p>还没有图表产物。先渲染一张样例图，之后可以换主题重渲并回滚。</p>
+          <p>还没有图表产物。</p>
+          <ol className="empty-steps">
+            <li>选模板与主题</li>
+            <li>渲染出首版 PNG/PDF/SVG</li>
+            <li>换主题重渲，可并排比对或回滚</li>
+          </ol>
           <button type="button" className="btn btn--primary btn--sm" data-action="render-first" disabled={rendering} onClick={onRender}>
             渲染样例图
           </button>
@@ -261,73 +273,80 @@ function ScorePanel({
         </div>
       ) : null}
 
-      <div className="score-total" data-role="score-total">
-        <strong>{round.total}</strong>
-        <span>/ 100</span>
-        <small>{round.pass ? `≥ ${round.pass_score} 达标` : `低于 ${round.pass_score}`}</small>
-      </div>
-
-      <div className="score-bars">
-        {round.dimensions.map((dim) => (
-          <div className="score-row" key={dim.id} data-dim={dim.id}>
-            <span className="score-row__label">{dim.label}</span>
-            <span className="score-row__bar">
-              <i style={{ width: `${Math.max(0, Math.min(100, (dim.score / dim.max) * 100))}%` }} />
-            </span>
-            <span className="score-row__num">
-              {dim.score}/{dim.max}
-            </span>
+      <div className="score-layout">
+        <div className="score-layout__main">
+          <div className="score-total" data-role="score-total">
+            <strong>{round.total}</strong>
+            <span>/ 100</span>
+            <small>{round.pass ? `≥ ${round.pass_score} 达标` : `低于 ${round.pass_score}`}</small>
           </div>
-        ))}
+
+          <div className="score-bars">
+            {round.dimensions.map((dim) => (
+              <div className="score-row" key={dim.id} data-dim={dim.id}>
+                <span className="score-row__label">{dim.label}</span>
+                <span className="score-row__bar">
+                  <i style={{ width: `${Math.max(0, Math.min(100, (dim.score / dim.max) * 100))}%` }} />
+                </span>
+                <span className="score-row__num">
+                  {dim.score}/{dim.max}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {changes.length ? (
+            <div className="score-changes">
+              <span>较上一轮：</span>
+              {changes.map((change) => (
+                <span key={change.dim} className={change.delta > 0 ? 'is-up' : 'is-down'}>
+                  {change.dim} {change.from}→{change.to}（{change.delta > 0 ? '+' : ''}
+                  {change.delta}）
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="score-layout__side">
+          <div className="deductions">
+            <div className="deductions__head">
+              <span>扣分明细</span>
+              <small>{round.deductions.length} 项</small>
+            </div>
+            {round.deductions.map((item, index) => (
+              <button
+                key={`${item.dim_id}-${index}`}
+                type="button"
+                className="deduction"
+                data-deduction={index}
+                data-picked={deduction === item ? 'true' : 'false'}
+                onClick={() => onDeduction(deduction === item ? null : item)}
+              >
+                <span className="deduction__dim">{DIM_SHORT[item.dim_id] ?? item.dim}</span>
+                <span className="deduction__item">{item.item}</span>
+                <span className="deduction__penalty">-{item.penalty}</span>
+              </button>
+            ))}
+          </div>
+
+          {deduction ? (
+            <div className="deduction-detail" data-role="deduction-detail">
+              <div className="deduction-detail__target">定位：{deduction.target}</div>
+              <p>{deduction.suggestion}</p>
+              {deduction.note ? <small>{deduction.note}</small> : null}
+            </div>
+          ) : (
+            <p className="panel__hint">点一条扣分项，看它落在正文哪一处、该怎么改。</p>
+          )}
+        </div>
       </div>
-
-      {changes.length ? (
-        <div className="score-changes">
-          <span>较上一轮：</span>
-          {changes.map((change) => (
-            <span key={change.dim} className={change.delta > 0 ? 'is-up' : 'is-down'}>
-              {change.dim} {change.from}→{change.to}（{change.delta > 0 ? '+' : ''}
-              {change.delta}）
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="deductions">
-        <div className="deductions__head">
-          <span>扣分明细</span>
-          <small>{round.deductions.length} 项</small>
-        </div>
-        {round.deductions.map((item, index) => (
-          <button
-            key={`${item.dim_id}-${index}`}
-            type="button"
-            className="deduction"
-            data-deduction={index}
-            data-picked={deduction === item ? 'true' : 'false'}
-            onClick={() => onDeduction(deduction === item ? null : item)}
-          >
-            <span className="deduction__dim">{DIM_SHORT[item.dim_id] ?? item.dim}</span>
-            <span className="deduction__item">{item.item}</span>
-            <span className="deduction__penalty">-{item.penalty}</span>
-          </button>
-        ))}
-      </div>
-
-      {deduction ? (
-        <div className="deduction-detail" data-role="deduction-detail">
-          <div className="deduction-detail__target">定位：{deduction.target}</div>
-          <p>{deduction.suggestion}</p>
-          {deduction.note ? <small>{deduction.note}</small> : null}
-        </div>
-      ) : (
-        <p className="panel__hint">点一条扣分项，看它落在正文哪一处、该怎么改。</p>
-      )}
     </div>
   )
 }
 
 function GatePanel({ state }: { state: WorkbenchState }) {
+  const passed = state.gate.filter((row) => row.ok).length
   return (
     <div className="panel" data-panel="gate">
       <div className="panel__head">
@@ -335,6 +354,9 @@ function GatePanel({ state }: { state: WorkbenchState }) {
           <div className="panel__kicker">工作台 · 门禁</div>
           <h2 className="panel__title">当前交付检查</h2>
         </div>
+        <span className="panel__meta" data-role="gate-summary">
+          {passed}/{state.gate.length} 通过
+        </span>
       </div>
       <div className="gate-list">
         {state.gate.map((row) => (
@@ -346,13 +368,13 @@ function GatePanel({ state }: { state: WorkbenchState }) {
         ))}
       </div>
       <p className="panel__hint">
-        章节结构来自 mathmodel-score 的样例 `chapter-sample.tex`；图表门禁检查 PNG/PDF/SVG 三件产物是否齐全。
+        章节结构来自 mathmodel-score 的 chapter-sample.tex；图表门禁检查 PNG/PDF/SVG 三件产物是否齐全。
       </p>
     </div>
   )
 }
 
-function CodePanel({ state }: { state: WorkbenchState }) {
+function CodePanel({ state, onGoto }: { state: WorkbenchState; onGoto: (tab: TabId) => void }) {
   const active = findVersion(state, state.figure.active)
   return (
     <div className="panel" data-panel="code">
@@ -363,7 +385,7 @@ function CodePanel({ state }: { state: WorkbenchState }) {
         </div>
       </div>
       {active ? (
-        <>
+        <div className="code-layout">
           <pre className="code-block" data-role="figure-command">{active.command}</pre>
           <div className="path-list">
             {Object.entries(active.outputs).map(([kind, path]) => (
@@ -373,15 +395,20 @@ function CodePanel({ state }: { state: WorkbenchState }) {
               </div>
             ))}
           </div>
-        </>
+        </div>
       ) : (
-        <p className="panel__hint">先在图表页渲染一张图，这里会显示它实际执行的命令与产物路径。</p>
+        <div className="panel__empty">
+          <p>还没有可复现的命令。渲染过图表后，这里会显示实际执行的命令与产物路径。</p>
+          <button type="button" className="btn btn--primary btn--sm" data-action="goto-figure" onClick={() => onGoto('figure')}>
+            去图表页渲染
+          </button>
+        </div>
       )}
     </div>
   )
 }
 
-function LogPanel({ state }: { state: WorkbenchState }) {
+function LogPanel({ state, onGoto }: { state: WorkbenchState; onGoto: (tab: TabId) => void }) {
   const active = findVersion(state, state.figure.active)
   return (
     <div className="panel" data-panel="log">
@@ -397,7 +424,12 @@ function LogPanel({ state }: { state: WorkbenchState }) {
           {active.stderr ? <pre className="code-block code-block--error">{active.stderr}</pre> : null}
         </>
       ) : (
-        <p className="panel__hint">还没有渲染记录。</p>
+        <div className="panel__empty">
+          <p>还没有渲染记录。</p>
+          <button type="button" className="btn btn--primary btn--sm" data-action="goto-figure" onClick={() => onGoto('figure')}>
+            去图表页渲染
+          </button>
+        </div>
       )}
     </div>
   )
@@ -412,7 +444,7 @@ function pdfBytes(dataUrl: string): Uint8Array {
   return bytes
 }
 
-function PdfPreview({ data }: { data: string }) {
+function PdfPreview({ data, onPages }: { data: string; onPages?: (pages: number) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const docRef = useRef<PDFDocumentProxy | null>(null)
   const taskRef = useRef<PDFDocumentLoadingTask | null>(null)
@@ -424,6 +456,7 @@ function PdfPreview({ data }: { data: string }) {
     let alive = true
     setPage(1)
     setPages(0)
+    onPages?.(0)
     setError(null)
     let task: PDFDocumentLoadingTask
     try {
@@ -439,6 +472,7 @@ function PdfPreview({ data }: { data: string }) {
         if (!alive) return
         docRef.current = doc
         setPages(doc.numPages)
+        onPages?.(doc.numPages)
       })
       .catch((err: unknown) => {
         if (alive) setError(errorText(err))
@@ -449,7 +483,7 @@ function PdfPreview({ data }: { data: string }) {
       taskRef.current = null
       docRef.current = null
     }
-  }, [data])
+  }, [data, onPages])
 
   useEffect(() => {
     const doc = docRef.current
@@ -509,6 +543,11 @@ function PaperPanel({
 }) {
   const paper: PaperState = state.paper
   const built = Boolean(paper.builtAt)
+  const [pdfPages, setPdfPages] = useState(0)
+  const pdfSize = paper.artifacts.pdf?.size
+  const summary = built
+    ? [pdfPages ? `${pdfPages} 页` : null, pdfSize ? formatSize(pdfSize) : null].filter(Boolean).join(' · ')
+    : ''
   return (
     <div className="panel" data-panel="paper">
       <div className="panel__head">
@@ -516,15 +555,18 @@ function PaperPanel({
           <div className="panel__kicker">工作台 · 论文</div>
           <h2 className="panel__title">排版与预览</h2>
         </div>
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          data-action="build-paper"
-          disabled={building || !paper.env.ok}
-          onClick={onBuild}
-        >
-          {building ? '编译中…' : built ? '重新构建' : '构建论文'}
-        </button>
+        <div className="panel__actions">
+          {summary ? <span className="panel__meta" data-role="paper-summary">{summary}</span> : null}
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            data-action="build-paper"
+            disabled={building || !paper.env.ok}
+            onClick={onBuild}
+          >
+            {building ? '编译中…' : built ? '重新构建' : '构建论文'}
+          </button>
+        </div>
       </div>
 
       {paper.env.ok ? (
@@ -542,53 +584,79 @@ function PaperPanel({
       {error ? <div className="panel__error" role="alert">{error}</div> : null}
       {paper.error ? <div className="panel__error" role="alert" data-role="paper-error">{paper.error}</div> : null}
 
-      {paper.pdfData ? (
-        <PdfPreview data={paper.pdfData} />
-      ) : built ? (
-        <p className="panel__hint">上次构建的 PDF 不在了，重新构建一次。</p>
-      ) : (
-        <div className="panel__empty">
-          <p>还没有论文产物。点击「构建论文」会编译演示稿，并跑去 AI 措辞、结构指标与章节门禁。</p>
+      <div className="paper-layout">
+        <div className="paper-layout__preview">
+          {paper.pdfData ? (
+            <PdfPreview data={paper.pdfData} onPages={setPdfPages} />
+          ) : built ? (
+            <div className="panel__empty">
+              <p>上次构建的 PDF 不在了，重新构建一次。</p>
+            </div>
+          ) : (
+            <div className="panel__empty">
+              <p>还没有论文产物。</p>
+              <ol className="empty-steps">
+                <li>把 paper.tex 放进工作区</li>
+                <li>xelatex 编 PDF，pandoc 转 DOCX</li>
+                <li>三道门禁：去 AI 措辞、结构指标、章节骨架</li>
+              </ol>
+              <p className="panel__hint">点右上角「构建论文」开始；缺工具时上方会写明安装位置。</p>
+            </div>
+          )}
         </div>
-      )}
 
-      {paper.steps.length ? (
-        <ul className="paper-steps" data-role="paper-steps">
-          {paper.steps.map((step) => (
-            <li key={step.id} data-ok={step.ok ? 'true' : 'false'} data-step={step.id}>
-              <span className="paper-steps__dot" aria-hidden="true" />
-              <span className="paper-steps__label">{step.label}</span>
-              <span className="paper-steps__detail">{step.detail}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+        <div className="paper-layout__side">
+          {paper.steps.length ? (
+            <ul className="paper-steps" data-role="paper-steps">
+              {paper.steps.map((step) => (
+                <li key={step.id} data-ok={step.ok ? 'true' : 'false'} data-step={step.id}>
+                  <span className="paper-steps__dot" aria-hidden="true" />
+                  <span className="paper-steps__label">{step.label}</span>
+                  <span className="paper-steps__detail">{step.detail}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
-      {paper.gates.length ? (
-        <div className="paper-gates" data-role="paper-gates">
-          {paper.gates.map((gate) => (
-            <span
-              key={gate.id}
-              className="paper-gate"
-              data-gate={gate.id}
-              data-ok={gate.ok ? 'true' : 'false'}
-              title={gate.detail}
-            >
-              <span className="paper-gate__dot" aria-hidden="true" />
-              {gate.label} · {gate.detail}
-            </span>
-          ))}
+          {paper.gates.length ? (
+            <div className="paper-gates" data-role="paper-gates">
+              {paper.gates.map((gate) => (
+                <span
+                  key={gate.id}
+                  className="paper-gate"
+                  data-gate={gate.id}
+                  data-ok={gate.ok ? 'true' : 'false'}
+                  title={gate.detail}
+                >
+                  <span className="paper-gate__dot" aria-hidden="true" />
+                  {gate.label} · {gate.detail}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {Object.keys(paper.artifacts).length ? (
+            <div className="paper-artifacts" data-role="paper-artifacts">
+              {Object.entries(paper.artifacts).map(([kind, file]) => (
+                <div className="paper-artifact" key={kind}>
+                  <span>{kind.toUpperCase()}</span>
+                  <code title={file.path}>{file.path.split(/[\\/]/).pop()}</code>
+                  <span>{formatSize(file.size)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {built ? <p className="panel__meta">构建于 {paper.builtAt}</p> : null}
+
+          {paper.logTail ? (
+            <details className="paper-log">
+              <summary>编译日志尾部</summary>
+              <pre className="code-block code-block--log">{paper.logTail}</pre>
+            </details>
+          ) : null}
         </div>
-      ) : null}
-
-      {built ? <p className="panel__meta">构建于 {paper.builtAt}</p> : null}
-
-      {paper.logTail ? (
-        <details className="paper-log">
-          <summary>编译日志尾部</summary>
-          <pre className="code-block code-block--log">{paper.logTail}</pre>
-        </details>
-      ) : null}
+      </div>
     </div>
   )
 }
@@ -688,8 +756,13 @@ export default function WorkspacePane({ runtimeReady }: Props) {
       {state ? <GateBar rows={state.gate} onPick={pickGate} /> : null}
 
       <div className="workspace__body" role="tabpanel">
-        {!state && !error ? <div className="card">运行时准备好后载入工作台…</div> : null}
-        {error && active !== 'figure' ? <div className="panel__error" role="alert">{error}</div> : null}
+        {!state && !error && active !== 'files' ? (
+          <div className="card">运行时准备好后载入工作台…</div>
+        ) : null}
+        {error && active !== 'figure' && active !== 'files' ? (
+          <div className="panel__error" role="alert">{error}</div>
+        ) : null}
+        {active === 'files' ? <FilesPanel /> : null}
         {state && active === 'figure' ? (
           <FigurePanel
             state={state}
@@ -738,8 +811,8 @@ export default function WorkspacePane({ runtimeReady }: Props) {
           />
         ) : null}
         {state && active === 'gate' ? <GatePanel state={state} /> : null}
-        {state && active === 'code' ? <CodePanel state={state} /> : null}
-        {state && active === 'log' ? <LogPanel state={state} /> : null}
+        {state && active === 'code' ? <CodePanel state={state} onGoto={setActive} /> : null}
+        {state && active === 'log' ? <LogPanel state={state} onGoto={setActive} /> : null}
         {state && active === 'paper' ? (
           <PaperPanel state={state} building={building} error={error} onBuild={() => void buildPaper()} />
         ) : null}

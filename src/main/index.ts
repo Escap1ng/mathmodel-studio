@@ -2,6 +2,15 @@ import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from 'elec
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
+import { discardStaged, pickFiles, revealStaged, stageFiles } from './files'
+import {
+  chooseWorkspace,
+  ensureWorkspace,
+  listWorkspace,
+  openWorkspaceEntry,
+  resetWorkspace,
+  revealWorkspace
+} from './workspace'
 import type {
   ChatStartInput,
   ProviderList,
@@ -196,6 +205,26 @@ ipcMain.handle('session:latest', async (): Promise<SessionLatest> => ({
   session: (await channel.latestSession()) as SessionLatest['session']
 }))
 
+ipcMain.handle('files:pick', (event) => pickFiles(BrowserWindow.fromWebContents(event.sender)))
+
+ipcMain.handle('files:stage', (_event, raw: unknown) => stageFiles(raw))
+
+ipcMain.handle('files:discard', (_event, raw: unknown) => discardStaged(raw))
+
+ipcMain.handle('files:reveal', () => revealStaged())
+
+ipcMain.handle('workspace:get', () => listWorkspace())
+
+ipcMain.handle('workspace:choose', (event) =>
+  chooseWorkspace(BrowserWindow.fromWebContents(event.sender))
+)
+
+ipcMain.handle('workspace:reset', () => resetWorkspace())
+
+ipcMain.handle('workspace:reveal', () => revealWorkspace())
+
+ipcMain.handle('workspace:open', (_event, raw: unknown) => openWorkspaceEntry(raw))
+
 function imageDataUrl(path: unknown): string | null {
   if (typeof path !== 'string' || !path) return null
   try {
@@ -325,6 +354,10 @@ app.on('web-contents-created', (_event, contents) => {
 app.whenReady().then(() => {
   // Windows/Linux 上默认的英文 File/Edit/View 菜单没有用武之地；中文界面不挂它。
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
+  // 默认工作区（桌面「赛题」）在首启就建出来，用户打开桌面就能看到。
+  void ensureWorkspace().catch((err: unknown) => {
+    console.error('[workspace] 创建失败:', err instanceof Error ? err.message : err)
+  })
   void channel.start().catch((err: unknown) => {
     console.error('[runtime] 启动失败:', err instanceof Error ? err.message : err)
   })

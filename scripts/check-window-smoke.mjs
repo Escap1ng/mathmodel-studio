@@ -20,13 +20,20 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 57
+const MIN_ASSERTIONS = 74
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
 // 这里点名 M2 闭环最关键的几条，少一条就判失败。
 const REQUIRED_ASSERTIONS = [
   'G7-3 runtime 通过握手就绪',
+  'G7-4 空状态大框与加号居中',
+  'G7-4 拖入文件时大框高亮',
+  'G7-4 附件暂存到工作区',
+  'G7-4 真拖放走完暂存与移除',
+  'G7-4 文件页列出工作区文件',
+  'G7-4 默认工作区在桌面「赛题」',
+  'G7-4 移除只删暂存副本',
   'G7-5 中文按真字形渲染（不是空心方框）',
   'G7-5 工具卡完成并给出结构化结果',
   'G7-5 回复文本含模板总数',
@@ -46,7 +53,16 @@ const REQUIRED_ASSERTIONS = [
   'G7-9 论文页打开且构建按钮可用',
   'G7-9 论文构建出 PDF 与 DOCX',
   'G7-9 去 AI 与章节门禁全绿',
-  'G7-9 论文 PDF 预览渲染且截图非空'
+  'G7-9 论文 PDF 预览渲染且截图非空',
+  'G7-10 宽屏右栏按比例放宽',
+  'G7-10 宽屏论文页两栏且预览限宽',
+  'G7-10 宽屏评分页两栏',
+  'G7-10 握把高亮跟随指针',
+  'G7-10 左栏固定不可拖拽',
+  'G7-10 中/右分隔条可拖拽',
+  'G7-10 离开分隔条后握把保持在指针处',
+  'G7-10 输入框上沿可拖拽',
+  'G7-10 输入框上沿空心长条居中骑在框线'
 ]
 
 const problems = []
