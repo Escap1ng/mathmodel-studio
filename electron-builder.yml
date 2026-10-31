@@ -54,10 +54,13 @@ win:
     - target: nsis
       arch:
         - x64
-  # 图标先挂起：build/ 下不放 icon.ico/png，electron-builder 会回落到 Electron 默认图标。
-  # 定稿后在这里加回 icon: build/icon.ico（由 scripts/make-icon.mjs 从 build/icon.svg 生成）。
+  # 使用 electron.exe 自带的默认图标（从 electron.exe 提取，非自绘）；安装器与应用保持一致。
+  icon: build/electron-default.ico
 
 nsis:
+  installerIcon: build/electron-default.ico
+  uninstallerIcon: build/electron-default.ico
+  installerHeaderIcon: build/electron-default.ico
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
