@@ -21,7 +21,7 @@
 ---
 
 <p align="center">
-  <img src="docs/images/workbench.png" alt="MathModel Studio 工作台" width="920">
+  <img src="docs/images/workbench.png" alt="MathModel Studio 工作台：左侧阶段轨道、中间决策卡、右侧工作台" width="100%">
 </p>
 
 > **设计原则**：可自动校验的环节交由门禁，需要判断的环节留给人，并将判断点落实为界面。

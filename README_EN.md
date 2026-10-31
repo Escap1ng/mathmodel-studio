@@ -21,7 +21,7 @@
 ---
 
 <p align="center">
-  <img src="docs/images/workbench.png" alt="MathModel Studio workspace" width="920">
+  <img src="docs/images/workbench.png" alt="MathModel Studio workspace: phase rail on the left, decision cards in the middle, workbench on the right" width="100%">
 </p>
 
 > **Design principle**: anything a machine can verify goes to a gate; anything that requires judgement stays with the user, with each decision point rendered as UI.
