@@ -16,6 +16,16 @@ export interface RuntimeStatus {
   fake?: boolean
 }
 
+export type ThinkingDepth = 'medium' | 'high' | 'max'
+
+export interface ReasoningSpec {
+  param: string
+  map: Partial<Record<ThinkingDepth, string>>
+  models?: string[]
+  fallback?: Record<string, unknown>
+  note?: string
+}
+
 export interface ProviderView {
   id: string
   display: string
@@ -26,6 +36,16 @@ export interface ProviderView {
   toolCalling: boolean
   custom: boolean
   configured: boolean
+  /** 界面选定的上下文预算（token），只影响历史回放，不改变模型本身的上限。 */
+  contextLimit: number
+  /** 该服务商模型的上下文上限，用来提示选择是否超出。 */
+  contextMax: number
+  /** 个别模型与预设最大上下文不同时的覆盖值。 */
+  modelContexts?: Record<string, number>
+  thinkingDepth: ThinkingDepth
+  /** 自定义端点默认不发送思考参数，避免给不兼容的端点塞字段。 */
+  sendThinking: boolean
+  reasoning?: ReasoningSpec
   note?: string
 }
 
@@ -41,6 +61,9 @@ export interface SaveProviderPayload {
   model: string
   apiKey?: string
   baseUrl?: string
+  contextTokens?: number
+  thinkingDepth?: ThinkingDepth
+  sendThinking?: boolean
 }
 
 export interface ChatMessageInput {
@@ -53,6 +76,9 @@ export interface ChatStartInput {
   model: string
   mode?: 'chat' | 'workflow'
   messages: ChatMessageInput[]
+  thinking?: ThinkingDepth
+  contextTokens?: number
+  sendThinking?: boolean
 }
 
 export interface ChatStartResult {
@@ -101,6 +127,27 @@ export interface SessionSnapshot {
 }
 
 export interface SessionLatest {
+  ok: true
+  session: SessionSnapshot | null
+}
+
+export interface SessionSummary {
+  id: string
+  created: number
+  updatedAt: number
+  provider: string
+  model: string
+  problem: string
+  phases: SessionPhase[]
+  pending: boolean
+}
+
+export interface SessionList {
+  ok: true
+  sessions: SessionSummary[]
+}
+
+export interface SessionGet {
   ok: true
   session: SessionSnapshot | null
 }

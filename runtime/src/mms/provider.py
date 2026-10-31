@@ -76,6 +76,27 @@ def strip_reasoning(messages: list[dict]) -> list[dict]:
     return [{k: v for k, v in m.items() if k in HISTORY_KEYS} for m in messages]
 
 
+def apply_reasoning(payload: dict, provider: dict, model: str, depth: str) -> dict:
+    """把界面的「中/高/最大」翻成各服务商认识的思考参数。
+
+    预设里写清楚哪一档映射到什么值；不认识的模型名走 fallback（例如 Kimi K2.x
+    只认 thinking.type）。自定义端点由调用方决定是否发送，避免给不支持的端点塞参数。
+    """
+    spec = provider.get("reasoning") or {}
+    if not depth or not spec:
+        return payload
+    patterns = [str(p) for p in (spec.get("models") or [])]
+    if patterns and not any(model.startswith(p) for p in patterns):
+        fallback = spec.get("fallback") or {}
+        if isinstance(fallback, dict):
+            payload.update(fallback)
+        return payload
+    value = (spec.get("map") or {}).get(depth)
+    if value:
+        payload[str(spec.get("param") or "reasoning_effort")] = value
+    return payload
+
+
 def chat_url(base_url: str) -> str:
     base = validate_base_url(base_url)
     if base.endswith("/chat/completions"):
@@ -136,6 +157,7 @@ def stream_completion(
     tools: list[dict] | None,
     on_delta,
     should_stop,
+    depth: str = "",
 ) -> Completion:
     """跑一次流式补全。on_delta(kind, text) 会收到 token 或 reasoning。"""
     base = provider.get("base_url") or ""
@@ -147,6 +169,7 @@ def stream_completion(
     }
     if tools:
         payload["tools"] = tools
+    apply_reasoning(payload, provider, model, depth)
 
     completion = Completion()
     tool_slots: dict[int, dict] = {}

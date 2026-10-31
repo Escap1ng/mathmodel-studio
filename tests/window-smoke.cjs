@@ -108,6 +108,24 @@ async function waitFor(win, expression, ms) {
 }
 
 // 重渲染后 capturePage 可能拿到上一帧；先请求一次整页重绘再截。
+// Windows 上窗口被遮挡时 Chromium 会抛 UnknownVizError，属于合成器偶发失败，重试即可。
+async function capture(win, tries = 4) {
+  let last = null
+  for (let i = 0; i < tries; i++) {
+    try {
+      win.show()
+      win.focus()
+      win.webContents.invalidate()
+      await sleep(200)
+      return await win.webContents.capturePage()
+    } catch (err) {
+      last = err
+      await sleep(400)
+    }
+  }
+  throw last
+}
+
 async function freshShot(win) {
   try {
     win.show()
@@ -118,9 +136,9 @@ async function freshShot(win) {
   }
   await sleep(250)
   // 第一次 capture 常拿到切换标签前的那一帧；丢弃后再取一次。
-  await win.webContents.capturePage()
+  await capture(win)
   await sleep(350)
-  return win.webContents.capturePage()
+  return capture(win)
 }
 
 function measureInk(image) {
@@ -160,7 +178,7 @@ async function main() {
   record('G7-1 内容尺寸 = 1440x900', w === 1440 && h === 900, `实得 ${w}x${h}`)
   record('G7-1 窗口标题', win.getTitle() === 'mathmodel-studio', `实得「${win.getTitle()}」`)
 
-  const img = await win.webContents.capturePage()
+  const img = await capture(win)
   const { width: iw, height: ih } = img.getSize()
   const shot = measureInk(img)
   record('G7-2 截图面非空', iw > 0 && ih > 0 && img.toBitmap().length >= iw * ih * 4, `捕获 ${iw}x${ih}`)
@@ -327,7 +345,7 @@ async function main() {
     const landed = existsSync(stagedName) && readdirSync(stagedName, { recursive: true }).some(
       (p) => String(p).includes('drag-problem.csv')
     )
-    const shot = await win.webContents.capturePage()
+    const shot = await capture(win)
     writeFileSync(join(OUT_DIR, 'dropzone.png'), shot.toPNG())
 
     // 文件页：切过去应当看到工作区路径，并在列表里看到刚拖进来的文件；
@@ -345,7 +363,7 @@ async function main() {
       names: [...document.querySelectorAll('.file-row__name')].map((n) => n.textContent),
       meta: document.querySelector('.panel[data-panel="files"] .panel__meta')?.textContent?.trim() ?? ''
     })`)
-    const filesShot = await win.webContents.capturePage()
+    const filesShot = await capture(win)
     writeFileSync(join(OUT_DIR, 'files.png'), filesShot.toPNG())
 
     await win.webContents.executeJavaScript(`document.querySelector('.file-chip__remove')?.click()`)
@@ -569,12 +587,80 @@ async function main() {
     settings.open && settings.chips.length >= 4 && settings.chips.some((c) => c.includes('离线演示')),
     `chips=${JSON.stringify(settings.chips)}`
   )
-  writeFileSync(join(OUT_DIR, 'settings.png'), (await win.webContents.capturePage()).toPNG())
+  record(
+    'G7-6 设置页含四家预设与 OpenAI 格式',
+    ['DeepSeek', '通义千问', 'Kimi', '智谱 GLM', 'OpenAI 格式'].every((name) =>
+      settings.chips.some((chip) => chip.includes(name))
+    ),
+    `chips=${JSON.stringify(settings.chips)}`
+  )
+
+  const presetModels = await win.webContents.executeJavaScript(`(async () => {
+    const click = (name) => {
+      [...document.querySelectorAll('.provider-chip')].find((b) => b.textContent.includes(name))?.click()
+    }
+    const wait = () => new Promise((resolve) => setTimeout(resolve, 90))
+    const out = { models: {} }
+    for (const name of ['通义千问', 'Kimi', '智谱 GLM']) {
+      click(name)
+      await wait()
+      out.models[name] = [...document.querySelectorAll('.model-chip')].map((b) => b.textContent.trim())
+    }
+    click('OpenAI 格式')
+    await wait()
+    out.openai = {
+      base: !!document.querySelector('.settings__body input[placeholder^="https://example"]'),
+      toggle: !!document.querySelector('.field--check input[type="checkbox"]'),
+      models: document.querySelectorAll('.model-chip').length
+    }
+    return out
+  })()`)
+  record(
+    'G7-6 四家预设模型名来自官方文档',
+    presetModels.models['通义千问']?.includes('qwen3.8-max') &&
+      presetModels.models['Kimi']?.includes('kimi-k3.1-pro') &&
+      presetModels.models['智谱 GLM']?.includes('glm-5.3'),
+    JSON.stringify(presetModels.models)
+  )
+  record(
+    'G7-6 OpenAI 格式可填端点与开关',
+    presetModels.openai.base && presetModels.openai.toggle && presetModels.openai.models === 0,
+    JSON.stringify(presetModels.openai)
+  )
 
   await win.webContents.executeJavaScript(
     `[...document.querySelectorAll('.provider-chip')].find((b) => b.textContent.includes('DeepSeek'))?.click()`
   )
   await sleep(150)
+  const tuning = await win.webContents.executeJavaScript(`({
+    context: [...document.querySelectorAll('.seg__btn[data-value]')].filter((b) => ['200000','400000','1000000'].includes(b.dataset.value)).length,
+    depth: [...document.querySelectorAll('.seg__btn[data-value]')].filter((b) => ['medium','high','max'].includes(b.dataset.value)).length,
+    models: [...document.querySelectorAll('.model-chip')].map((b) => b.textContent.trim()),
+    modelInput: document.querySelector('.settings input')?.value ?? ''
+  })`)
+  record(
+    'G7-6 预设模型与上下文/深度选择器',
+    tuning.context === 3 &&
+      tuning.depth === 3 &&
+      tuning.models.includes('deepseek-flash') &&
+      tuning.modelInput.length > 0,
+    JSON.stringify(tuning)
+  )
+  await win.webContents.executeJavaScript(`
+    document.querySelector('.seg__btn[data-value="400000"]')?.click()
+    document.querySelector('.seg__btn[data-value="max"]')?.click()
+  `)
+  await sleep(150)
+  const pickedTuning = await win.webContents.executeJavaScript(`({
+    context: document.querySelector('.seg__btn[data-value="400000"]')?.getAttribute('aria-pressed'),
+    depth: document.querySelector('.seg__btn[data-value="max"]')?.getAttribute('aria-pressed')
+  })`)
+  record(
+    'G7-6 上下文与深度可切换',
+    pickedTuning.context === 'true' && pickedTuning.depth === 'true',
+    JSON.stringify(pickedTuning)
+  )
+  writeFileSync(join(OUT_DIR, 'settings.png'), (await capture(win)).toPNG())
   const keyEcho = await win.webContents.executeJavaScript(`(() => {
     const input = document.querySelector('.settings input[type="password"]')
     return input ? { present: true, value: input.value, placeholder: input.placeholder } : { present: false }
@@ -603,13 +689,15 @@ async function main() {
 
   const encryptionAvailable = safeStorage.isEncryptionAvailable()
   const settingsPath = join(userDataDir, 'settings.json')
-  let disk = { exists: false, hasPlain: false, hasKey: false }
+  let disk = { exists: false, hasPlain: false, hasKey: false, context400: false, depthMax: false }
   try {
     const raw = readFileSync(settingsPath, 'utf8')
     disk = {
       exists: true,
       hasPlain: raw.includes(sentinel),
-      hasKey: /"key"\s*:\s*"[A-Za-z0-9+/=]{16,}"/.test(raw)
+      hasKey: /"key"\s*:\s*"[A-Za-z0-9+/=]{16,}"/.test(raw),
+      context400: /"context"\s*:\s*400000/.test(raw),
+      depthMax: /"depth"\s*:\s*"max"/.test(raw)
     }
   } catch {
     /* 拒绝保存时文件可能根本不存在 */
@@ -631,6 +719,11 @@ async function main() {
       ? disk.exists && !disk.hasPlain && disk.hasKey
       : refused && !disk.exists,
     `safeStorage 可用=${encryptionAvailable}，文件存在=${disk.exists}，含明文=${disk.hasPlain}，含密文字段=${disk.hasKey}，明确拒绝=${refused}`
+  )
+  record(
+    'G7-6 上下文与深度随设置落盘',
+    !encryptionAvailable || (disk.exists && disk.context400 && disk.depthMax),
+    `context400=${disk.context400}，depthMax=${disk.depthMax}，safeStorage 可用=${encryptionAvailable}`
   )
 
   await win.webContents.executeJavaScript(
@@ -728,7 +821,7 @@ async function main() {
   })`)
   const k2Stored = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
   const storedProblem = String(k2Stored?.session?.problem ?? '')
-  const attachShot = await win.webContents.capturePage()
+  const attachShot = await capture(win)
   writeFileSync(join(OUT_DIR, 'attachments.png'), attachShot.toPNG())
   record(
     'G7-7 附件随消息送给模型',
@@ -822,7 +915,7 @@ async function main() {
     `抽屉=${drawerOpen} 卡片仍在=${explainState.cardStill} 阶段3=${explainState.phase3} 小节=${explainState.sections}`
   )
   await sleep(300)
-  const drawerShot = await win.webContents.capturePage()
+  const drawerShot = await capture(win)
   const drawerInk = measureInk(drawerShot)
   writeFileSync(join(OUT_DIR, 'drawer.png'), drawerShot.toPNG())
   record(
@@ -873,7 +966,7 @@ async function main() {
     `[...document.querySelectorAll('.decision[data-card="model-choice"]')].find((c) => !c.querySelector('.decision__resolved'))?.scrollIntoView({ block: 'start' })`
   )
   await sleep(250)
-  const decisionShot = await win.webContents.capturePage()
+  const decisionShot = await capture(win)
   const decisionInk = measureInk(decisionShot)
   writeFileSync(join(OUT_DIR, 'decision.png'), decisionShot.toPNG())
   record(
@@ -961,19 +1054,18 @@ async function main() {
   await win.webContents.executeJavaScript(`document.querySelector('[data-action="render-figure"]')?.click()`)
   const reRendered = await waitFor(
     win,
-    `document.querySelectorAll('.version-chip').length >= 2 && !!document.querySelector('[data-role="figure-diff"]') && (document.querySelector('[data-role="figure-image"]')?.naturalWidth || 0) > 0`,
+    `document.querySelectorAll('.version-chip').length >= 2 && !document.querySelector('[data-role="figure-diff"]') && document.querySelectorAll('[data-role="figure-image"]').length === 1 && (document.querySelector('[data-role="figure-image"]')?.naturalWidth || 0) > 0`,
     90000
   )
   const fig2 = await win.webContents.executeJavaScript(`window.studio.workbench.state()`)
   const secondVersion = fig2?.figure?.active
   record(
-    'G7-8 换主题重渲出第二版并并排 diff',
+    'G7-8 换主题重渲出第二版，只显示当前图',
     reRendered &&
       Boolean(secondVersion) &&
       secondVersion !== firstVersion &&
       fig2.figure.previous === firstVersion &&
-      fig2.figure.activeImage !== firstImage &&
-      Boolean(fig2.figure.previousImage),
+      fig2.figure.activeImage !== firstImage,
     `v1=${firstVersion} v2=${secondVersion} previous=${fig2?.figure?.previous} 图像变化=${fig2?.figure?.activeImage !== firstImage}`
   )
   const figureShot = await freshShot(win)
@@ -985,7 +1077,9 @@ async function main() {
     `非白像素 ${(figureInk.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
   )
 
-  await win.webContents.executeJavaScript(`document.querySelector('[data-action="rollback"]')?.click()`)
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.version-chip[data-version=${JSON.stringify(firstVersion)}]')?.click()`
+  )
   const rolledBack = await waitFor(
     win,
     `document.querySelector('.version-chip[data-active="true"]')?.getAttribute('data-version') === ${JSON.stringify(firstVersion)}`,
@@ -1098,6 +1192,15 @@ async function main() {
     gateRows && gateState.length === 4 && gateState.every((row) => row.ok),
     JSON.stringify(gateState)
   )
+  const headGate = await win.webContents.executeJavaScript(`({
+    text: document.querySelector('.gate-summary')?.textContent ?? '',
+    dots: document.querySelectorAll('.gate-summary__dot').length
+  })`)
+  record(
+    'G7-8 门禁摘要并入栏头',
+    headGate.dots === 4 && headGate.text.includes('4/4'),
+    JSON.stringify(headGate)
+  )
 
   // —— M2 回归：自由问答仍能流式出字并显示工具卡 ——
   await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="chat"]')?.click()`)
@@ -1166,7 +1269,7 @@ async function main() {
     `结束=${finished}，光标=${chat.cursor}，按钮=${JSON.stringify(chat.sendText)} disabled=${chat.sendDisabled}`
   )
 
-  const convo = await win.webContents.capturePage()
+  const convo = await capture(win)
   const convoShot = measureInk(convo)
   writeFileSync(join(OUT_DIR, 'conversation.png'), convo.toPNG())
   record(
@@ -1174,6 +1277,55 @@ async function main() {
     convoShot.ratio >= MIN_INK_RATIO,
     `非白像素 ${(convoShot.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
   )
+
+  // —— 多对话：历史列表、切换与删除 ——
+  const convState = await win.webContents.executeJavaScript(`({
+    newButton: !!document.querySelector('[data-action="new-chat"]'),
+    items: [...document.querySelectorAll('.conv')].map((n) => ({
+      kind: n.dataset.kind,
+      title: n.querySelector('.conv__title')?.textContent ?? ''
+    }))
+  })`)
+  record(
+    'G7-7 问答会话进入历史列表',
+    convState.newButton && convState.items.some((item) => item.kind === 'chat'),
+    JSON.stringify(convState.items)
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="new-chat"]')?.click()`)
+  const cleared = await waitFor(
+    win,
+    `document.querySelectorAll('.msg').length === 0 && (document.querySelector('.chat__head-title')?.textContent || '').includes('新对话')`,
+    5000
+  )
+  record('G7-7 新对话清空当前消息', cleared, `清空=${cleared}`)
+
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.conv[data-kind="chat"] .conv__main')?.click()`
+  )
+  const restoredChat = await waitFor(
+    win,
+    `[...document.querySelectorAll('.msg--user')].some((n) => n.textContent.includes('模板清单怎么用'))`,
+    5000
+  )
+  record('G7-7 切换历史会话恢复消息', restoredChat, `恢复=${restoredChat}`)
+
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.conv[data-kind="chat"] .conv__del')?.click()`
+  )
+  await sleep(180)
+  const armed = await win.webContents.executeJavaScript(
+    `document.querySelector('.conv[data-kind="chat"] .conv__del')?.dataset.confirm === 'true'`
+  )
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.conv[data-kind="chat"] .conv__del')?.click()`
+  )
+  const removedChat = await waitFor(
+    win,
+    `document.querySelectorAll('.conv[data-kind="chat"]').length === 0`,
+    5000
+  )
+  record('G7-7 删除历史会话', armed && removedChat, `二次确认=${armed}，删除=${removedChat}`)
 
   // —— 布局：宽屏比例与两处分隔条 ——
   win.setContentSize(2400, 1200)
@@ -1405,6 +1557,65 @@ async function main() {
       barGap.sameLeft &&
       barGap.sameWidth,
     JSON.stringify(barGap)
+  )
+
+  // —— 右栏收起：只留图标与门禁点；点图标展开并切到对应页 ——
+  await win.webContents.executeJavaScript(`document.querySelector('.workspace__toggle')?.click()`)
+  await sleep(260)
+  const collapsedPane = await win.webContents.executeJavaScript(`({
+    pane: Math.round(document.querySelector('.workspace').getBoundingClientRect().width),
+    icons: document.querySelectorAll('.workspace-icon').length,
+    tabs: document.querySelectorAll('.tab').length,
+    splitter: getComputedStyle(document.querySelector('[data-splitter="pane"]')).display,
+    gateDots: document.querySelectorAll('.workspace__gate-dots i').length,
+    stored: localStorage.getItem('mms.workspaceCollapsed')
+  })`)
+  record(
+    'G7-10 右栏可收起为图标条',
+    collapsedPane.pane <= 60 &&
+      collapsedPane.icons === 7 &&
+      collapsedPane.tabs === 0 &&
+      collapsedPane.splitter === 'none' &&
+      collapsedPane.gateDots === 4 &&
+      collapsedPane.stored === '1',
+    JSON.stringify(collapsedPane)
+  )
+
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.workspace-icon[data-tab="paper"]')?.click()`
+  )
+  await sleep(260)
+  const reopenedPane = await win.webContents.executeJavaScript(`({
+    pane: Math.round(document.querySelector('.workspace').getBoundingClientRect().width),
+    tabs: document.querySelectorAll('.tab').length,
+    paper: !!document.querySelector('[data-panel="paper"]'),
+    selected: document.querySelector('.tab[data-tab="paper"]')?.getAttribute('aria-selected')
+  })`)
+  record(
+    'G7-10 点图标展开并切到对应页',
+    reopenedPane.pane > 800 &&
+      reopenedPane.tabs === 7 &&
+      reopenedPane.paper &&
+      reopenedPane.selected === 'true',
+    JSON.stringify(reopenedPane)
+  )
+
+  // —— 清空历史：二次确认后列表与阶段一起复位 ——
+  await win.webContents.executeJavaScript(`document.querySelector('.rail__clear')?.click()`)
+  await sleep(180)
+  const clearArmed = await win.webContents.executeJavaScript(
+    `document.querySelector('.rail__clear')?.dataset.confirm === 'true'`
+  )
+  await win.webContents.executeJavaScript(`document.querySelector('.rail__clear')?.click()`)
+  const historyCleared = await waitFor(
+    win,
+    `document.querySelectorAll('.conv').length === 0 && document.querySelectorAll('.phase[data-state="passed"]').length === 0`,
+    5000
+  )
+  record(
+    'G7-7 清空历史后列表与阶段复位',
+    clearArmed && historyCleared,
+    `二次确认=${clearArmed}，清空=${historyCleared}`
   )
 
   // 双击恢复默认，再把窗口还原，避免影响后续人工看图

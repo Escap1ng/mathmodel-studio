@@ -15,6 +15,8 @@ M5 论文页：右栏「论文」能真跑 **xelatex 两遍 → pandoc 转 DOCX 
 - **论文样例不是对真实赛题的解答。** 内容是演示稿，评分卡也是演示数据；PDF/Word 一致性核对没有自动化。
 - 仓库仍是 **private**。转公开需要维护者点头；转公开之前先读 §3 的拓扑计划。
 
+**0.6.0 界面批次（2026-10-31，未跑 CI）**：左栏变成会话列表（建模会话从 SQLite 读，问答会话进 `localStorage`），支持新建、切换、单条删除与清空；中栏顶部显示会话标题与上下文用量，发送前按 200k/400k/1m 预算截断回放历史。设置页改为左侧服务商列表，预设 DeepSeek / 通义千问 / Kimi / 智谱 GLM / OpenAI 格式（模型名按官网 2026-10 核对），并提供上下文与思维深度选择器；深度按各家映射到 `reasoning_effort` 或 `thinking.type`。右栏可收成 56px 图标条，标签按产出/评审/资料分组，门禁摘要并入栏头。本机 G7 97/97、G6b 核验一致；CI 尚未跑这一批。
+
 ## 1 怎么验（命令 → 期望）
 
 需要先装两侧依赖：`npm install`（可加 `ELECTRON_SKIP_BINARY_DOWNLOAD=1`，CI 不启动窗口时用）与
@@ -32,7 +34,7 @@ node scripts/check-skills.mjs --self            # 7/7 条自检通过（含基�
 node scripts/check-window-smoke.mjs --selftest  # 12/12 条核验自测                  → exit 0
 python scripts/validate_contracts.py            # 9/9 项通过（jsonschema）         → exit 0
 python runtime/selfcheck.py                     # 13/13 条 CLI 断言，含真渲一张图  → exit 0
-python runtime/selfcheck_channel.py             # 46/46 条通道断言（含 M3 恢复）  → exit 0
+python runtime/selfcheck_channel.py             # 52/52 条通道断言（含 M3 恢复与 0.6.0 思考深度/上下文截断）  → exit 0
 python runtime/selfcheck_channel.py --selftest  # 10/10 条坏事件被拒                → exit 0
 python runtime/selfcheck_workbench.py           # 13/13 条工作台断言（真渲两版）  → exit 0
 python runtime/selfcheck_paper.py               # 10/10 条论文断言（真编 PDF/DOCX）→ exit 0
@@ -43,7 +45,7 @@ python runtime/selfcheck_paper.py               # 10/10 条论文断言（真编
 需要显示器的部分：
 
 ```bash
-npm run smoke:window   # 真起窗口，82/82，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png、figure.png、score.png、paper.png、dropzone.png、files.png、attachments.png
+npm run smoke:window   # 真起窗口，97/97，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png、figure.png、score.png、paper.png、dropzone.png、files.png、attachments.png
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
 
@@ -66,10 +68,10 @@ gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
 | 结论 | 证据来源 | 强度 |
 | --- | --- | --- |
 | 注册表、技能规范、契约与 CLI 仍自洽 | 本机 gate + CI 双平台（M1 起） | 强 |
-| 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消 | `selfcheck_channel.py` 47/47（本机 Windows） | 强（本机） |
+| 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消；0.6.0 思考深度与上下文截断 | `selfcheck_channel.py` 52/52（本机 Windows） | 强（本机） |
 | 编排闭环：K2→K3→换一批→选择→阶段四 | 同上的 C12，事件与快照双向核对 | 强（本机） |
 | 跨进程恢复：换一个服务器进程仍停在 K2 | 同上的 C13 | 强（本机） |
-| 界面端到端：82 条，含论文构建、预览、可拖拽布局、附件拖放与正文送入、工作区文件页、按钮行固定、粘贴截图 | G7 82/82，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
+| 界面端到端：97 条，含论文构建、预览、可拖拽布局、附件拖放与正文送入、工作区文件页、按钮行固定、粘贴截图；0.6.0 追加多对话历史/切换/删除/清空、五家预设与上下文/深度选择器、右栏收起与分组 | G7 97/97，本机 Windows 真启动 + 人看截图 | 强（本机 Windows） |
 | 图表工作台：真渲两版、换主题、并排 diff、回滚 | G9 W2–W4；G7 工作台段 | 强（本机） |
 | 评分卡：三轮、五维、扣分定位、熔断、一票否决 | G9 W6；G7 评分段；演示数据 | 强（演示数据，非真实论文） |
 | 论文排版：xelatex 两遍、pandoc DOCX、Word 后处理 | G10 P2/P3/P5；G7-9；本机真编 7 页 | 强（演示稿） |
@@ -83,7 +85,7 @@ gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
 | PDF 与 Word 版式一致性 | 未自动化；只做 docx 生成与后处理 | **未证** |
 | 阶段五由构建驱动 / K1 环境预检 | 未接；论文页构建不推进阶段机 | **未证** |
 | 论文 PDF/Word 之外的正文自动生成 | 未做；只编演示稿 | **未证** |
-| 真实 DeepSeek / Kimi 联网对话 | 无 Key，未跑 | **未证** |
+| 真实 DeepSeek / 通义千问 / Kimi / GLM 联网对话 | 无 Key，未跑 | **未证** |
 | Linux 桌面 `safeStorage` 可用分支 | 只证了「不可用就拒绝保存」 | **未证** |
 | Windows CI 真起窗 | 无 | **未证**；Windows 证据来自本机 |
 | 便携 Python / TeX / pandoc 打包 | 未做；M6 | **未证** |
@@ -129,7 +131,7 @@ M5 新增：
 3. 三道门禁按 JSON 解析成门禁条；缺件、坏稿、坏 TeX、缺稿件都有反向覆盖。
 4. 通道 `/workbench/paper/build`、`paper` 状态、门禁条第四项；主进程下发 PDF data URL，渲染层不碰路径。
 5. 论文页：构建按钮、步骤、门禁、日志、pdf.js 预览。
-6. G10 10 条、G7 82 条、G6b 下限 82 与 45 条关键断言；CI 装 TeX/pandoc。
+6. G10 10 条、G7 97 条、G6b 下限 97 与 59 条关键断言；CI 装 TeX/pandoc。
 7. 文档：README/README_EN、CHANGELOG 0.5.0、HANDOFF、env-setup。
 
 仍欠：
@@ -163,6 +165,14 @@ M5 新增：
 
 **上一轮的坑仍然有效**：SSE 流要显式 `Connection: close`；事件可能比 `chat.start` 返回值先到；G7 的假 provider 必须在 `require` 生产入口之前设；`app.exit(1)` 会被 `window-all-closed` 顶掉，结论必须落 JSON 由 G6b 独立判；Windows 控制台 cp1252 会因中文崩溃，入口要 reconfigure UTF-8；本机 shell 可能带 `ELECTRON_RUN_AS_NODE=1`；safeStorage 的「不可用」是正常分支；`git` 通道会瞬时断，先探本机代理端口并重试，不要改 remote。
 
+**0.6.0 新增的坑**：
+
+- `capturePage()` 在窗口被遮挡时会抛 `UnknownVizError`，G7 的截图全部走 `capture(win)` 重试封装；不要退回裸调用。
+- 会话列表有两套来源：`GET /sessions` 只返回建模会话的摘要，问答会话在渲染层 `localStorage`（`mms.chatConversations.v1`）。清空历史必须两边一起删，否则列表会「复活」。
+- 上下文估算在 TS（`lib/context.ts`）与 Python（`server.py` 的 `estimate_tokens`）各有一份；改公式必须两边同步，G4 的 C14 用 200k 预算下的截断验证 Python 侧。
+- 左栏宽度仍是 240px，`.tab` 仍是 7 个；右栏分组只加 `.tabs__group`/`.tabs__label`，不要把标签并成 6 个，G6b 点名了标签数量与左栏固定。
+- 面板标题与门禁条已并入栏头/面板内 `.panel__bar`；G7 不再有 `.gatebar` 断言，但门禁页的 `[data-gate-row]` 仍必须 4 条。
+
 ## 7 结构速查
 
 ```
@@ -179,7 +189,7 @@ runtime/src/mms/
   demo_scores.json          三轮演示评分卡
   themes/                   studio-ink / studio-amber 主题
   provider.py               OpenAI 兼容流式客户端 + 离线假 provider
-  providers.json            DeepSeek / Kimi / 自定义端点预设
+  providers.json            DeepSeek / 通义千问 / Kimi / 智谱 GLM / OpenAI 格式预设与思考参数映射
   registry.py / invoke.py   技能注册表与 subprocess 调用
   cli.py                    serve / templates / invoke
 runtime/cli.py              开发期入口（npm run mms）
@@ -203,7 +213,7 @@ src/renderer/src/
   lib/phases.ts             阶段名与状态文案
   styles/workbench.css      M4 工作台与 M5 论文页样式
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
-tests/window-smoke.cjs      真启动断言（82 条）+ 截图与 JSON 结论
+tests/window-smoke.cjs      真启动断言（97 条）+ 截图与 JSON 结论
 .github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu，装图表与排版依赖）
 ```
 

@@ -3,6 +3,34 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
 
+## 未发布 - 2026-10-31
+
+多对话、五家模型预设与可收起的右栏。
+
+### 新增
+
+- **多对话与历史**：左栏上半变成会话列表。建模会话从 SQLite 的 `/sessions` 读取，问答会话写入 `mms.chatConversations.v1`；支持新建、切换、单条删除（二次确认）与清空全部。切换问答会话会恢复消息、附件胶囊与上下文全文；切换建模会话会恢复阶段、待决卡与历史消息。中栏顶部显示当前会话标题、估算上下文用量与「清空当前」。
+- **AI 设置页重做**：左侧服务商列表、右侧表单；预设 DeepSeek（`deepseek-flash`、`deepseek-v4-pro`）、通义千问（`qwen3.8-max`、`qwen3.7-plus`、`qwen3.8-flash`）、Kimi（`kimi-k3.1-pro`、`kimi-k3`、`kimi-k2.7-code`、`kimi-k2.6`）、智谱 GLM（`glm-5.3`、`glm-5.3-flash`、`glm-4.7`）与 OpenAI 格式端点。模型名按各家官网 2026-10 核对，仍可手填。
+- **上下文预算 200k / 400k / 1m**：按粗估 token 从最新消息往回装，装不下的旧历史不回放；runtime 按同一预算再截一次。输入条显示「预算 · 深度」，中栏顶部显示已用估算。
+- **思维深度 中 / 高 / 最大**：DeepSeek、Kimi K3、GLM-5.3 映射为 `low / high / max`，Qwen 映射为 `medium / high / max`；Kimi K2.x 与 GLM-4.x 改用 `thinking.type`。OpenAI 格式端点默认不发思考参数，需显式勾选「发送思考深度」。
+- **右栏收起与分组**：工作台可收成 56px 图标条（保留 7 个页签与 4 个门禁点），点图标展开并切到对应页；展开时标签按「产出 / 评审 / 资料」分组，门禁摘要并入栏头，面板重复标题与独立门禁条移除。状态记在 `mms.workspaceCollapsed`。
+
+### 备份 / 迁移
+
+- `settings.json` 每个服务商新增可选 `context`（200000/400000/1000000）与 `depth`（medium/high/max），自定义端点另有 `sendThinking`。旧文件不含这些键时按 200k / 高 / 预设默认处理，不需要迁移。
+- 会话表结构未变；只新增 `GET /sessions`、`DELETE /sessions/{id}` 与 `DELETE /sessions`。
+
+### 门禁
+
+- G7 新增 15 条：五家预设与官方模型名、OpenAI 格式端点与开关、上下文/深度可切换并落盘、问答会话进入列表、新建清空、切换恢复、单条删除、清空历史、门禁摘要并入栏头、右栏收起与图标展开；总数 82 → 97，G6b 下限与点名同步 97 / 59 条。
+- G4 新增 4 条（C14）：思维深度写入 `reasoning_effort`、关闭开关时不带字段、上下文预算截断最早历史、截断后仍能跑完；总数 47 → 52。
+- G7 的截图统一走重试封装，避免 Windows 遮挡时 `capturePage()` 的 `UnknownVizError` 把整轮判成脚本异常。
+
+### 验证（本机 Windows，2026-10-31）
+
+- `npm run typecheck`、`npm run build` 通过；`python runtime/selfcheck_channel.py` 52/52；G7 真启动 97/97，G6b 独立核验一致（内容尺寸 1440x900，非白像素 4.09%）。
+- **这一批尚未跑 CI**，也未用真实 DeepSeek / Qwen / Kimi / GLM Key 联网；模型名来自官网 2026-10，参数效果不在证据里。
+
 ## 0.5.3 - 2026-10-30
 
 输入区的操作行从卡片里拿出来，固定在窗口底部。

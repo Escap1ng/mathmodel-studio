@@ -39,11 +39,12 @@ from .provider import (
 )
 from .registry import EnvError
 
-MAX_BODY = 1 << 20
-MAX_MESSAGES = 64
-MAX_TOTAL_CHARS = 200_000
+MAX_BODY = 16 << 20
+MAX_MESSAGES = 200
+MAX_TOTAL_CHARS = 1_600_000
 TOOL_ROUNDS = 4
 PING_SECONDS = 15
+DEPTHS = ("medium", "high", "max")
 
 SYSTEM_PROMPT = (
     "你是 mathmodel-studio 的数学建模助手。工具返回的数据以工具结果为准，不要编造没有运行过的结果；"
@@ -137,15 +138,68 @@ def normalize_messages(raw) -> list[dict]:
     return out
 
 
+def estimate_tokens(text: str) -> int:
+    """粗估 token：CJK 按 1 字 1 token，其余按 3.5 字符 1 token。
+
+    只用于上下文预算与「已用」显示，不追求与任何分词器逐 token 对齐；
+    宁可高估，避免把超出窗口的历史送出去。
+    """
+    cjk = 0
+    for ch in text:
+        code = ord(ch)
+        if 0x2E80 <= code <= 0x9FFF or 0x3000 <= code <= 0x303F or 0xFF00 <= code <= 0xFFEF:
+            cjk += 1
+    other = max(0, len(text) - cjk)
+    return int(cjk + other / 3.5 + 0.999)
+
+
+def trim_history(messages: list[dict], budget: int | None) -> list[dict]:
+    """按界面选定的上下文预算丢掉最早的历史，保留系统提示与最新一问。"""
+    if not budget or budget <= 0 or len(messages) <= 2:
+        return messages
+    limit = int(budget * 0.9)
+    total = sum(estimate_tokens(str(m.get("content") or "")) for m in messages)
+    if total <= limit:
+        return messages
+    kept: list[dict] = []
+    used = 0
+    for message in reversed(messages):
+        if message.get("role") == "system":
+            continue
+        cost = estimate_tokens(str(message.get("content") or ""))
+        if kept and used + cost > limit:
+            break
+        kept.append(message)
+        used += cost
+    kept.reverse()
+    # 截断后不要以 assistant 开头；保留系统提示，再拼最新的一段。
+    while kept and kept[0].get("role") != "user":
+        kept.pop(0)
+    head = [m for m in messages if m.get("role") == "system"]
+    return head + kept if kept else messages
+
+
 class ChatSession:
     """一次对话：后台线程写事件，SSE 订阅者按 id 续读。"""
 
-    def __init__(self, chat_id: str, provider: dict, api_key: str, model: str, messages: list[dict]):
+    def __init__(
+        self,
+        chat_id: str,
+        provider: dict,
+        api_key: str,
+        model: str,
+        messages: list[dict],
+        depth: str = "",
+        context_tokens: int | None = None,
+        send_thinking: bool = True,
+    ):
         self.id = chat_id
         self.provider = provider
         self.api_key = api_key
         self.model = model
         self.messages = messages
+        self.depth = depth if send_thinking else ""
+        self.context_tokens = context_tokens
         self.events: list[dict] = []
         self.cond = threading.Condition()
         self.done = False
@@ -193,6 +247,7 @@ class ChatSession:
 
     def _run(self) -> None:
         tools = TOOLS if self.provider.get("tool_calling") else None
+        self.messages = trim_history(self.messages, self.context_tokens)
         try:
             for _round in range(TOOL_ROUNDS):
                 if self.cancelled:
@@ -213,6 +268,7 @@ class ChatSession:
                         tools,
                         deltas,
                         self.should_stop,
+                        depth=self.depth,
                     )
                 if not completion.tool_calls:
                     self.finish("stop", completion.usage)
@@ -400,6 +456,9 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/sessions/latest":
             self._json(200, {"ok": True, "session": snapshot(self.server.store.latest())})
             return
+        if parsed.path == "/sessions":
+            self._json(200, {"ok": True, "sessions": self.server.store.list_summaries()})
+            return
         if parsed.path == "/workbench/state":
             self._json(200, self._workbench())
             return
@@ -446,6 +505,23 @@ class Handler(BaseHTTPRequestHandler):
                 return
             session.cancel()
             self._json(200, {"ok": True, "chatId": chat_id})
+            return
+        self._error(404, "not_found", "没有这个端点")
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        if not self._guard():
+            return
+        parsed = urlparse(self.path)
+        if parsed.path == "/sessions":
+            removed = self.server.store.clear()
+            self._json(200, {"ok": True, "removed": removed})
+            return
+        if parsed.path.startswith("/sessions/") and parsed.path.count("/") == 2:
+            session_id = parsed.path[len("/sessions/") :]
+            if not self.server.store.delete(session_id):
+                self._error(404, "session", "没有这个会话")
+                return
+            self._json(200, {"ok": True, "id": session_id})
             return
         self._error(404, "not_found", "没有这个端点")
 
@@ -574,6 +650,18 @@ class Handler(BaseHTTPRequestHandler):
             return
         model = str(body.get("model") or "").strip()
         api_key = str(body.get("apiKey") or "")
+        depth = str(body.get("thinking") or "")
+        if depth and depth not in DEPTHS:
+            self._error(400, "thinking", f"未知思维深度: {depth}")
+            return
+        context_tokens: int | None = None
+        raw_context = body.get("contextTokens")
+        if isinstance(raw_context, (int, float)) and not isinstance(raw_context, bool):
+            context_tokens = int(raw_context)
+            if context_tokens < 50_000 or context_tokens > 2_000_000:
+                self._error(400, "context", "上下文预算必须在 50k–2M 之间")
+                return
+        send_thinking = body.get("sendThinking") is not False
 
         if provider_id == "fake":
             if not self.server.fake:
@@ -616,7 +704,16 @@ class Handler(BaseHTTPRequestHandler):
             record = self.server.store.create(chat_id, provider_id, model, problem)
             session: ChatSession = WorkflowSession(chat_id, self.server.store, record, "start", "")
         else:
-            session = ChatSession(chat_id, provider, api_key, model, messages)
+            session = ChatSession(
+                chat_id,
+                provider,
+                api_key,
+                model,
+                messages,
+                depth=depth,
+                context_tokens=context_tokens,
+                send_thinking=send_thinking,
+            )
         with self.server.sessions_lock:
             self.server.sessions[chat_id] = session
         session.start()

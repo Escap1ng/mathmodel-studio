@@ -2,12 +2,14 @@
 #
 # 版本下限与上游技能 v2.0.1 的 requirements.txt 一致（见 skills/VENDOR.md），
 # 只给下限、不锁死；需要完全可复现的环境时在此基础上自行 pip freeze。
-# 安装（大陆镜像）：
-#   python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/
+# 安装（大陆镜像；npmmirror 的 PyPI 代理 2026-10-31 起 404）：
+#   python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 
 matplotlib>=3.7          # 数据图表与学术示意图
 numpy>=1.24              # 同上
 seaborn>=0.12            # plot_style.py 与热图模板
 python-docx>=1.1         # mathmodel-paper：Word 版式微调
-PyMuPDF>=1.23            # mathmodel-deai：PDF 不可见字符清理
+# PyMuPDF 2.0 起强依赖 onnxruntime/networkx 等约 170MB 附加包；1.28 起 import fitz 会向
+# stdout 打印弃用警告（会混进技能的 --json 输出）。代码只用 fitz.open 等基础 API。
+PyMuPDF>=1.23,<1.28     # mathmodel-deai：PDF 不可见字符清理
 jsonschema>=4.20         # 契约校验；缺席时降级

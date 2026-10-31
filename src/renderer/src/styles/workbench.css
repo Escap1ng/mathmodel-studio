@@ -1,45 +1,4 @@
 /* —— M4：工作台 —— */
-/* 与 .tabs 同左内缩（8px）、同带高（46.8 = 8*2 内缩 + 4*2 胶囊内距 + 1*2 描边 + 13px*1.6），
-   两行读作一对平行带，而不是第二组标签。 */
-.gatebar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 46.8px;
-  padding: 8px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.gatebar::-webkit-scrollbar {
-  display: none;
-}
-
-.gatebar__label {
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-3);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.gatebar__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--bg);
-  color: var(--text-2);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.gatebar__dot,
 .gate-row__dot {
   width: 6px;
   height: 6px;
@@ -47,12 +6,10 @@
   background: var(--text-3);
 }
 
-.gatebar__chip[data-ok="true"] .gatebar__dot,
 .gate-row--ok .gate-row__dot {
   background: var(--ok);
 }
 
-.gatebar__chip[data-ok="false"] .gatebar__dot,
 .gate-row--bad .gate-row__dot {
   background: var(--fail);
 }
@@ -69,40 +26,11 @@
   padding: 14px;
 }
 
-.panel__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.panel__kicker {
-  color: var(--accent);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-}
-
-.panel__title {
-  margin: 3px 0 0;
-  font-family: var(--font-cjk);
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-}
-
 .panel__meta {
   color: var(--text-3);
   font-size: 11px;
   text-align: right;
   white-space: nowrap;
-}
-
-.panel__actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .panel__error {
@@ -273,12 +201,6 @@
   color: var(--text-3);
   font-size: 10.5px;
   line-height: 1.5;
-}
-
-.figure-diff {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
 }
 
 .linkbtn {
@@ -992,10 +914,6 @@
 
   .figure-shot--single {
     max-width: 700px;
-  }
-
-  .figure-diff {
-    max-width: 980px;
   }
 
   .gate-list {

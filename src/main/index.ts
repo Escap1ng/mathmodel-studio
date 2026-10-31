@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from 'electron'
+import { APP_ROOT, runtimePython } from './runtime-env'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
@@ -17,7 +18,10 @@ import type {
   ProviderList,
   ProviderView,
   ResumeInput,
+  SessionGet,
   SessionLatest,
+  SessionList,
+  ThinkingDepth,
   WorkbenchResult,
   WorkbenchState
 } from '../shared/api'
@@ -32,8 +36,7 @@ import {
 
 // 开发时 electron-vite 会注入 ELECTRON_RENDERER_URL；打包后走 out/renderer/index.html。
 const DEV_SERVER_URL = process.env['ELECTRON_RENDERER_URL']
-const ROOT = process.env['MMS_HOME'] || join(__dirname, '..', '..')
-const channel = new Channel(ROOT, app.getPath('userData'))
+const channel = new Channel(APP_ROOT, runtimePython(), app.getPath('userData'))
 const activeStreams = new Map<string, AbortController>()
 
 type ChatInput = ChatStartInput
@@ -63,6 +66,12 @@ async function providerViews(): Promise<ProviderList> {
       toolCalling: Boolean(row.tool_calling),
       custom: Boolean(row.custom),
       configured: isFake || Boolean(stored?.configured),
+      contextLimit: stored?.context ?? 200_000,
+      contextMax: row.context_len ?? 1_000_000,
+      modelContexts: row.model_context,
+      thinkingDepth: stored?.depth ?? 'high',
+      sendThinking: stored?.sendThinking ?? !row.custom,
+      reasoning: row.reasoning,
       note: row.note
     }
   })
@@ -82,11 +91,22 @@ function parseSaveInput(raw: unknown): SaveProviderInput {
   const model = typeof obj.model === 'string' ? obj.model.trim() : ''
   if (!id) throw new Error('缺少服务商')
   if (!model) throw new Error('缺少模型名')
+  const contextTokens =
+    typeof obj.contextTokens === 'number' && Number.isFinite(obj.contextTokens)
+      ? obj.contextTokens
+      : undefined
+  const thinkingDepth =
+    obj.thinkingDepth === 'medium' || obj.thinkingDepth === 'high' || obj.thinkingDepth === 'max'
+      ? (obj.thinkingDepth as ThinkingDepth)
+      : undefined
   return {
     id,
     model,
     apiKey: typeof obj.apiKey === 'string' ? obj.apiKey : undefined,
-    baseUrl: typeof obj.baseUrl === 'string' ? obj.baseUrl : undefined
+    baseUrl: typeof obj.baseUrl === 'string' ? obj.baseUrl : undefined,
+    contextTokens,
+    thinkingDepth,
+    sendThinking: typeof obj.sendThinking === 'boolean' ? obj.sendThinking : undefined
   }
 }
 
@@ -98,7 +118,7 @@ function parseChatInput(raw: unknown): ChatInput {
   const list = obj.messages
   if (!providerId) throw new Error('没有选择服务商')
   if (!Array.isArray(list) || list.length === 0) throw new Error('消息为空')
-  if (list.length > 64) throw new Error('消息过多')
+  if (list.length > 200) throw new Error('消息过多')
   const messages: ChatInput['messages'] = []
   let total = 0
   for (const item of list) {
@@ -107,10 +127,26 @@ function parseChatInput(raw: unknown): ChatInput {
     if (m.role !== 'user' && m.role !== 'assistant') throw new Error('消息角色不合法')
     if (typeof m.content !== 'string') throw new Error('消息内容必须是文本')
     total += m.content.length
-    if (total > 200_000) throw new Error('消息总长度超过上限')
+    if (total > 1_600_000) throw new Error('消息总长度超过上限')
     messages.push({ role: m.role, content: m.content })
   }
-  return { providerId, model, mode: obj.mode === 'workflow' ? 'workflow' : 'chat', messages }
+  const thinking =
+    obj.thinking === 'medium' || obj.thinking === 'high' || obj.thinking === 'max'
+      ? (obj.thinking as ThinkingDepth)
+      : undefined
+  const contextTokens =
+    typeof obj.contextTokens === 'number' && Number.isFinite(obj.contextTokens)
+      ? obj.contextTokens
+      : undefined
+  return {
+    providerId,
+    model,
+    mode: obj.mode === 'workflow' ? 'workflow' : 'chat',
+    messages,
+    thinking,
+    contextTokens,
+    sendThinking: typeof obj.sendThinking === 'boolean' ? obj.sendThinking : undefined
+  }
 }
 
 function parseResumeInput(raw: unknown): ResumeInput {
@@ -188,7 +224,10 @@ ipcMain.handle('chat:start', async (event, raw: unknown) => {
     mode: input.mode,
     apiKey,
     baseUrl: view.custom ? view.baseUrl : undefined,
-    messages: input.messages
+    messages: input.messages,
+    thinking: view.sendThinking ? input.thinking ?? view.thinkingDepth : '',
+    contextTokens: input.contextTokens ?? view.contextLimit,
+    sendThinking: view.sendThinking
   })
   attachStream(chatId, event.sender)
   return { ok: true, chatId }
@@ -204,6 +243,29 @@ ipcMain.handle('chat:resume', async (event, raw: unknown) => {
 ipcMain.handle('session:latest', async (): Promise<SessionLatest> => ({
   ok: true,
   session: (await channel.latestSession()) as SessionLatest['session']
+}))
+
+ipcMain.handle('session:list', async (): Promise<SessionList> => ({
+  ok: true,
+  sessions: (await channel.listSessions()) as unknown as SessionList['sessions']
+}))
+
+ipcMain.handle('session:get', async (_event, raw: unknown): Promise<SessionGet> => {
+  const id = typeof raw === 'string' ? raw.trim() : ''
+  if (!id) throw new Error('缺少会话 id')
+  return { ok: true, session: (await channel.getSession(id)) as SessionGet['session'] }
+})
+
+ipcMain.handle('session:delete', async (_event, raw: unknown) => {
+  const id = typeof raw === 'string' ? raw.trim() : ''
+  if (!id) throw new Error('缺少会话 id')
+  await channel.deleteSession(id)
+  return { ok: true }
+})
+
+ipcMain.handle('session:clear', async () => ({
+  ok: true,
+  removed: await channel.clearSessions()
 }))
 
 ipcMain.handle('files:pick', (event) => pickFiles(BrowserWindow.fromWebContents(event.sender)))

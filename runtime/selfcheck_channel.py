@@ -34,6 +34,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = ROOT / "schemas" / "chat-events.schema.json"
 SENTINEL = "sk-test-SENTINEL-DO-NOT-LEAK"
 EVENT_TYPES = {"token", "reasoning", "tool_call", "artifact", "interrupt", "gate", "phase", "error", "done"}
+sys.path.insert(0, str(ROOT / "runtime" / "src"))
+from mms.provider import apply_reasoning, find_provider  # noqa: E402
+
 results: list[dict] = []
 
 
@@ -518,6 +521,80 @@ def tests() -> None:
                     f"第 3 次请求角色 {[m.get('role') for m in replay]}",
                 )
                 check("C11 密钥只出现在 Authorization 头", records[2].get("auth") == f"Bearer {SENTINEL}", "头部存在，正文不含")
+
+            # C14 思考深度与上下文预算真的进入请求体
+            before = len(records)
+            status, started = channel2.start_chat(
+                {
+                    "providerId": "custom",
+                    "model": "test-model",
+                    "apiKey": SENTINEL,
+                    "baseUrl": base,
+                    "thinking": "max",
+                    "contextTokens": 50000,
+                    "messages": [
+                        {"role": "user", "content": "数" * 30000 + "甲"},
+                        {"role": "assistant", "content": "数" * 30000 + "乙"},
+                        {"role": "user", "content": "最新问题"},
+                    ],
+                }
+            )
+            events14, _ = channel2.events(started.get("chatId", ""))
+            first_body = records[before]["body"] if len(records) > before else {}
+            sent = first_body.get("messages") or []
+            check(
+                "C14 思维深度映射为 reasoning_effort",
+                status == 200 and first_body.get("reasoning_effort") == "max",
+                f"HTTP {status} effort={first_body.get('reasoning_effort')!r}",
+            )
+            check(
+                "C14 上下文预算截断最早历史",
+                len(sent) == 2
+                and sent[-1].get("content") == "最新问题"
+                and all("数" * 100 not in str(m.get("content") or "") for m in sent),
+                f"请求消息 {[m.get('role') for m in sent]}",
+            )
+            check(
+                "C14 截断后对话仍能跑完",
+                bool(events14) and events14[-1]["event"] == "done",
+                f"最后事件 {events14[-1] if events14 else None}",
+            )
+
+            before = len(records)
+            status, started = channel2.start_chat(
+                {
+                    "providerId": "custom",
+                    "model": "test-model",
+                    "apiKey": SENTINEL,
+                    "baseUrl": base,
+                    "thinking": "max",
+                    "sendThinking": False,
+                    "messages": [{"role": "user", "content": "不发送深度"}],
+                }
+            )
+            events15, _ = channel2.events(started.get("chatId", ""))
+            off_body = records[before]["body"] if len(records) > before else {}
+            check(
+                "C14 关闭开关时不带 reasoning_effort",
+                status == 200 and "reasoning_effort" not in off_body,
+                f"字段={sorted(off_body.keys())[:8]}",
+            )
+
+            def mapped(provider_id: str, model_name: str, depth: str) -> dict:
+                payload: dict = {}
+                apply_reasoning(payload, find_provider(provider_id) or {}, model_name, depth)
+                return payload
+
+            deep = mapped("deepseek", "deepseek-flash", "medium")
+            kimi = mapped("kimi", "kimi-k2.6", "max")
+            qwen = mapped("qwen", "qwen3.8-max", "medium")
+            check(
+                "C14 预设深度的参数映射",
+                deep.get("reasoning_effort") == "low"
+                and kimi.get("thinking", {}).get("type") == "enabled"
+                and qwen.get("reasoning_effort") == "medium",
+                f"deepseek={deep} kimi-k2.6={kimi} qwen={qwen}",
+            )
             channel2.stop()
             check("C11 密钥不出现在服务器 stderr", SENTINEL not in channel2.stderr, "已扫描 stderr")
         finally:

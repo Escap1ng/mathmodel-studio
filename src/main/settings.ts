@@ -1,6 +1,7 @@
 import { app, safeStorage } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import type { ThinkingDepth } from '../shared/api'
 
 // 磁盘上只有 safeStorage 的密文。safeStorage 不可用时**拒绝保存**，
 // 不退回明文——这条比"让用户先存上"重要。
@@ -8,6 +9,9 @@ interface StoredProvider {
   model?: string
   baseUrl?: string
   key?: string
+  context?: number
+  depth?: ThinkingDepth
+  sendThinking?: boolean
 }
 
 interface SettingsFile {
@@ -61,6 +65,9 @@ export interface PublicProvider {
   configured: boolean
   model?: string
   baseUrl?: string
+  context?: number
+  depth?: ThinkingDepth
+  sendThinking?: boolean
 }
 
 /** 只给渲染层展示用的合并视图，不含密文。 */
@@ -68,7 +75,14 @@ export function publicProviders(): Record<string, PublicProvider> {
   const file = loadSettings()
   const out: Record<string, PublicProvider> = {}
   for (const [id, item] of Object.entries(file.providers)) {
-    out[id] = { configured: Boolean(item.key), model: item.model, baseUrl: item.baseUrl }
+    out[id] = {
+      configured: Boolean(item.key),
+      model: item.model,
+      baseUrl: item.baseUrl,
+      context: item.context,
+      depth: item.depth,
+      sendThinking: item.sendThinking
+    }
   }
   return out
 }
@@ -82,17 +96,32 @@ export interface SaveProviderInput {
   model: string
   apiKey?: string
   baseUrl?: string
+  contextTokens?: number
+  thinkingDepth?: ThinkingDepth
+  sendThinking?: boolean
 }
+
+const CONTEXTS = new Set([200_000, 400_000, 1_000_000])
+const DEPTHS = new Set<ThinkingDepth>(['medium', 'high', 'max'])
 
 export function saveProvider(input: SaveProviderInput): void {
   const id = String(input.id || '').trim()
   const model = String(input.model || '').trim()
   if (!id) throw new Error('缺少服务商标识')
   if (!model) throw new Error('缺少模型名')
+  if (input.contextTokens !== undefined && !CONTEXTS.has(input.contextTokens)) {
+    throw new Error('上下文预算只能是 200k / 400k / 1m')
+  }
+  if (input.thinkingDepth !== undefined && !DEPTHS.has(input.thinkingDepth)) {
+    throw new Error('思维深度只能是中 / 高 / 最大')
+  }
   const file = loadSettings()
   const prev = file.providers[id] ?? {}
   const next: StoredProvider = { ...prev, model }
   if (typeof input.baseUrl === 'string') next.baseUrl = input.baseUrl.trim()
+  if (input.contextTokens !== undefined) next.context = input.contextTokens
+  if (input.thinkingDepth !== undefined) next.depth = input.thinkingDepth
+  if (typeof input.sendThinking === 'boolean') next.sendThinking = input.sendThinking
   const apiKey = String(input.apiKey || '').trim()
   if (apiKey) {
     if (!safeStorage.isEncryptionAvailable()) {

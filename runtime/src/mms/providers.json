@@ -1,44 +1,101 @@
 {
-  "version": 1,
+  "version": 2,
+  "updated": "2026-10-31",
   "providers": [
     {
       "id": "deepseek",
       "display": "DeepSeek",
       "base_url": "https://api.deepseek.com/v1",
       "auth_style": "bearer",
-      "models": ["deepseek-chat", "deepseek-reasoner"],
+      "models": ["deepseek-flash", "deepseek-v4-pro"],
       "tool_calling": true,
       "streaming_tools": true,
       "reasoning_field": "reasoning_content",
-      "context_len": 131072,
-      "max_out": 8192,
-      "note": "deepseek-reasoner 的工具调用支持随上游变化，默认用 deepseek-chat。"
+      "context_len": 1000000,
+      "max_out": 131072,
+      "reasoning": {
+        "param": "reasoning_effort",
+        "map": { "medium": "low", "high": "high", "max": "max" },
+        "note": "官网 2026-10：low / high / max；medium 会被上游归到 high，本应用「中」取 low。"
+      },
+      "note": "官网 2026-10 模型：deepseek-flash、deepseek-v4-pro；1M 上下文，思考默认开启。"
+    },
+    {
+      "id": "qwen",
+      "display": "通义千问",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "auth_style": "bearer",
+      "models": ["qwen3.8-max", "qwen3.7-plus", "qwen3.8-flash"],
+      "tool_calling": true,
+      "streaming_tools": true,
+      "reasoning_field": "reasoning_content",
+      "context_len": 1000000,
+      "max_out": 131072,
+      "reasoning": {
+        "param": "reasoning_effort",
+        "map": { "medium": "medium", "high": "high", "max": "max" },
+        "note": "官网 2026-10：Qwen3.8 支持 reasoning_effort；「中/高/最大」原样传 medium/high/max。"
+      },
+      "note": "官网 2026-10 模型：qwen3.8-max、qwen3.7-plus、qwen3.8-flash；均 1M 上下文。"
     },
     {
       "id": "kimi",
       "display": "Kimi",
       "base_url": "https://api.moonshot.cn/v1",
       "auth_style": "bearer",
-      "models": ["kimi-k2-0905-preview", "moonshot-v1-8k"],
+      "models": ["kimi-k3.1-pro", "kimi-k3", "kimi-k2.7-code", "kimi-k2.6"],
       "tool_calling": true,
       "streaming_tools": true,
       "reasoning_field": "reasoning_content",
-      "context_len": 131072,
-      "max_out": 8192,
-      "note": "Kimi 的模型名会随开放平台更新；不在此列表时可在自定义端点里手填。"
+      "context_len": 1000000,
+      "max_out": 131072,
+      "reasoning": {
+        "param": "reasoning_effort",
+        "models": ["kimi-k3"],
+        "map": { "medium": "low", "high": "high", "max": "max" },
+        "fallback": { "thinking": { "type": "enabled" } },
+        "note": "K3 系列用 reasoning_effort（low/high/max）；K2.x 改用 thinking.type，不发送深度参数。"
+      },
+      "note": "官网 2026-10 模型：kimi-k3.1-pro、kimi-k3、kimi-k2.7-code、kimi-k2.6。"
+    },
+    {
+      "id": "glm",
+      "display": "智谱 GLM",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "auth_style": "bearer",
+      "models": ["glm-5.3", "glm-5.3-flash", "glm-4.7"],
+      "tool_calling": true,
+      "streaming_tools": true,
+      "reasoning_field": "reasoning_content",
+      "context_len": 1000000,
+      "model_context": { "glm-4.7": 200000 },
+      "max_out": 131072,
+      "reasoning": {
+        "param": "reasoning_effort",
+        "models": ["glm-5.3", "glm-5.2"],
+        "map": { "medium": "low", "high": "high", "max": "max" },
+        "fallback": { "thinking": { "type": "enabled" } },
+        "note": "GLM-5.3 只接受 low/high/max；GLM-4.x 改走 thinking.type。"
+      },
+      "note": "官网 2026-10 模型：GLM-5.3、GLM-5.3-Flash、GLM-4.7；5.3 为 1M 上下文。"
     },
     {
       "id": "custom",
-      "display": "自定义 OpenAI 兼容端点",
+      "display": "OpenAI 格式",
       "base_url": "",
       "auth_style": "bearer",
       "models": [],
       "tool_calling": true,
       "streaming_tools": true,
       "reasoning_field": "reasoning_content",
-      "context_len": 131072,
-      "max_out": 8192,
+      "context_len": 1000000,
+      "max_out": 131072,
       "custom": true,
+      "reasoning": {
+        "param": "reasoning_effort",
+        "map": { "medium": "medium", "high": "high", "max": "max" },
+        "note": "只有勾选「发送思考深度」才带 reasoning_effort；端点不支持时请关闭。"
+      },
       "note": "填到 /v1 为止；公网地址必须是 https，http 只接受本机回环地址。"
     }
   ]

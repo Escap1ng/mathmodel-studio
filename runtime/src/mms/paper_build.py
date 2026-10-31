@@ -1,8 +1,8 @@
 """M5 论文排版：xelatex 编译、pandoc 转 Word、去 AI 与章节门禁。
 
-排版工具不在仓库里：xelatex 走系统 PATH（或 MMS_XELATEX），pandoc 走 PATH、
-MMS_PANDOC，最后回落到 %LOCALAPPDATA%/mms-tools/pandoc.exe。缺件时明确报缺，
-不尝试自动安装。
+排版工具不在仓库里：xelatex 走系统 PATH（或 MMS_XELATEX），pandoc 依次看
+MMS_PANDOC、随包的 <MMS_HOME>/pandoc、PATH，最后回落到
+%LOCALAPPDATA%/mms-tools/pandoc.exe。缺件时明确报缺，不尝试自动安装。
 """
 
 from __future__ import annotations
@@ -37,6 +37,11 @@ def _which_pandoc() -> str | None:
     override = os.environ.get("MMS_PANDOC")
     if override:
         return override if Path(override).is_file() else None
+    home = os.environ.get("MMS_HOME")
+    if home:
+        bundled = Path(home) / "pandoc" / ("pandoc.exe" if os.name == "nt" else "pandoc")
+        if bundled.is_file():
+            return str(bundled)
     found = shutil.which("pandoc")
     if found:
         return found
