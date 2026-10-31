@@ -54,13 +54,15 @@ win:
     - target: nsis
       arch:
         - x64
-  # 使用 electron.exe 自带的默认图标（从 electron.exe 提取，非自绘）；安装器与应用保持一致。
-  icon: build/electron-default.ico
+  icon: build/icon.ico
 
 nsis:
-  installerIcon: build/electron-default.ico
-  uninstallerIcon: build/electron-default.ico
-  installerHeaderIcon: build/electron-default.ico
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  # 向导内两张图由 scripts/make-icon.mjs 从 build/icon.svg 生成；assisted 模式下
+  # installerHeaderIcon 不生效（只在 oneClick 分支读取），页头图要靠 installerHeader。
+  installerHeader: installerHeader.bmp
+  installerSidebar: installerSidebar.bmp
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
