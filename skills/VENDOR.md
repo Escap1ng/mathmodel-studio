@@ -1,16 +1,16 @@
 # Vendor 记录
 
-本目录的技能内容来自 [`Escap1ng/mathmodel-kit`](https://github.com/Escap1ng/mathmodel-kit) **v2.0.1**（Apache-2.0），已在 M1 原样引入。
+本目录的技能内容来自 [`Escap1ng/mathmodel-kit`](https://github.com/Escap1ng/mathmodel-kit) **v2.0.1**（Apache-2.0），已在 M1 原样引入；0.6.0 同步了 tag 之后的一个文档提交（`3e23952`，预测题数据角色门禁），无代码改动。
 
 ## 来源
 
 | 项 | 值 |
 |---|---|
-| 上游仓库 | `Escap1ng/mathmodel-kit` |
-| 版本 | `2.0.1` |
-| tag 指向的 commit | `5ec0e464da0ae415d3db87cf53fb66eb6e2dff24` |
-| 取得方式 | `gh api repos/Escap1ng/mathmodel-kit/tarball/v2.0.1` |
-| 核对方式 | 逐文件 sha256 与上游 tarball 一致；目录内无本仓库新增文件 |
+| 上游仓库 | `Escap1ng/mathmodel-kit`（收尾时并入本仓库历史） |
+| 版本 | `2.0.1` + `main@3e23952`（tag 之后的文档增补，未发新 tag） |
+| tag 与 commit | `v2.0.1` 为 annotated tag：tag 对象 `5ec0e464da0ae415d3db87cf53fb66eb6e2dff24`，指向 commit `220175596d0cc9e4a767a610f2384cb60429967c`；该 tag 与旧 Release 已于 2026-10-31 清理 |
+| 取得方式 | v2.0.1 tarball + `git fetch kit main`（`3e23952`） |
+| 核对方式 | v2.0.1 逐文件 sha256 与上游 tarball 一致；7 个变更文件与 `main@3e23952` 逐文件一致（`git diff` 为空）；目录内无本仓库新增文件 |
 
 ## 为什么要 vendor 而不是引用
 
@@ -28,4 +28,5 @@
 
 | 本仓库版本 | 上游版本 | 上游 commit | 差异 |
 |---|---|---|---|
-| 0.1.0（M1） | 2.0.1 | `5ec0e464da0ae415d3db87cf53fb66eb6e2dff24` | 首次 vendor，无改动 |
+| 0.1.0（M1） | 2.0.1 | `220175596d0cc9e4a767a610f2384cb60429967c`（tag 对象 `5ec0e46`） | 首次 vendor，无改动 |
+| 0.6.0 | 2.0.1 + `3e23952` | `3e23952c4af1c354ff7ce4565b3138bf0eb6ae29` | 同步预测题数据角色门禁（7 个 SKILL/文档文件），无代码改动 |

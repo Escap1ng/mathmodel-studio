@@ -48,6 +48,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob
 3. **已知条件**：可用数据、约束条件（资源/时间/物理）
 4. **输出目标**：每个子问题需要什么形式的结果（数值/曲线/方案/排序）
 5. **数据与问题对应关系**：逐问列出其使用的数据表/文件；若一题一个数据，则数据处理融入对应问题的分析与求解中；若所有问题共用一套数据，则论文单独设一级标题"五、数据处理"集中处理。
+6. **数据角色（预测题必查）**：逐个判定所给数据属于**训练集**（含目标值）还是**预测集**（只给自变量、目标列为空，正是要输出结果的部分），另登记结果提交表的索引字段与行数；判定依据写实际读到的行数、目标列非空数与时间范围，靠文件名猜不算完成。角色用反的后果是整问结果塌成 0：空目标列被按 0 参与拟合时系数与截距全为 0、输出恒为 0（不填充的库抛 `Input y contains NaN`），无真值划分上的 R² 恒为 0.0，且全程不报错。细则与断言骨架见 `mathmodel-methods/docs/implementation-guide.md` 第 3.5 节。
 
 ### 阶段二：工作目录创建
 
@@ -97,6 +98,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob
 - 使用 numpy 向量化操作
 - 关键参数通过注释说明
 - 输出清晰的结果摘要
+- 预测类脚本须在读取附件后先做数据角色断言（训练集目标列非空、预测集目标列为空），输出后再做零值守卫（不得全零 / 全 NaN / 常数），命中即报错停住并排查数据用法，禁止把 0 或 NaN 当作结果写入论文；骨架见 `mathmodel-methods/docs/implementation-guide.md` 第 3.5 节
 - 可视化保存至 `figures/final/`，学术风格，≥300 DPI；数据图表优先复用 `mathmodel-figure` 技能模板（统一样式模块 `plot_style.py` 随模板自动复制到工作区），模板不匹配时按该技能的 `docs/guides/nature-standard.md` 现绘，示意图用 `mathmodel-diagram` 技能
 
 ### 阶段五：论文输出
@@ -277,6 +279,7 @@ GB/T 7714 著录格式、引用数量建议与**引用查证流程**见 `mathmod
 
 | 错误类型      | 解决方案                                |
 | --------- | ----------------------------------- |
+| 预测结果为 0 / 全 NaN / 常数 | 先查数据角色：是否在目标列为空的预测集上拟合、join 后为空或时间筛选清空了样本；按 `mathmodel-methods/docs/implementation-guide.md` 第 3.5 节补断言后重跑，再考虑改模型 |
 | 中文乱码      | 使用 xelatex，删除 inputenc              |
 | 图片文字不全    | 设置 SimHei，使用 bbox\_inches='tight'   |
 | 图片中文显示方框  | 缺字体环境用字体检测回退（`mathmodel-figure` 的 `plot_style.pick_cjk_font`），安装 SimHei 或 Noto Sans CJK |
