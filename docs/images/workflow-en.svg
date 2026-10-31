@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-label="Phase rail and decision points">
+  <rect width="1200" height="420" fill="#ffffff"/>
+  <text x="40" y="46" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="600" fill="#1E293B">Phase rail and decision points</text>
+  <text x="40" y="68" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#64748B">Each judgement point pauses the run until the user confirms</text>
+
+  <line x1="90" y1="200" x2="1098" y2="200" stroke="#CBD5E1" stroke-width="2"/>
+
+  <g font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" text-anchor="middle">
+    <text x="90" y="156" font-size="12" fill="#1E293B">Phase 0</text>
+    <text x="90" y="174" font-size="11" fill="#64748B">Environment</text>
+    <text x="258" y="156" font-size="12" fill="#1E293B">Phase 1</text>
+    <text x="258" y="174" font-size="11" fill="#64748B">Problem</text>
+    <text x="426" y="156" font-size="12" fill="#1E293B">Phase 2</text>
+    <text x="426" y="174" font-size="11" fill="#64748B">Workspace</text>
+    <text x="594" y="156" font-size="12" fill="#1E293B">Phase 3</text>
+    <text x="594" y="174" font-size="11" fill="#64748B">Model choice</text>
+    <text x="762" y="156" font-size="12" fill="#1E293B">Phase 4</text>
+    <text x="762" y="174" font-size="11" fill="#64748B">Implementation</text>
+    <text x="930" y="156" font-size="12" fill="#1E293B">Phase 5</text>
+    <text x="930" y="174" font-size="11" fill="#64748B">Paper</text>
+    <text x="1098" y="156" font-size="12" fill="#1E293B">Phase 6</text>
+    <text x="1098" y="174" font-size="11" fill="#64748B">Scoring</text>
+
+    <circle cx="90" cy="200" r="16" fill="#FFFFFF" stroke="#1A6FC4" stroke-width="2"/>
+    <text x="90" y="205" font-size="12" font-weight="600" fill="#1A6FC4">0</text>
+    <circle cx="258" cy="200" r="16" fill="#EAF2FB" stroke="#1A6FC4" stroke-width="2"/>
+    <text x="258" y="205" font-size="12" font-weight="600" fill="#1A6FC4">1</text>
+    <circle cx="426" cy="200" r="16" fill="#EAF2FB" stroke="#1A6FC4" stroke-width="2"/>
+    <text x="426" y="205" font-size="12" font-weight="600" fill="#1A6FC4">2</text>
+    <circle cx="594" cy="200" r="16" fill="#EAF2FB" stroke="#1A6FC4" stroke-width="2"/>
+    <text x="594" y="205" font-size="12" font-weight="600" fill="#1A6FC4">3</text>
+    <circle cx="762" cy="200" r="16" fill="#EAF2FB" stroke="#1A6FC4" stroke-width="2"/>
+    <text x="762" y="205" font-size="12" font-weight="600" fill="#1A6FC4">4</text>
+    <circle cx="930" cy="200" r="16" fill="#EAF2FB" stroke="#1A6FC4" stroke-width="2"/>
+    <text x="930" y="205" font-size="12" font-weight="600" fill="#1A6FC4">5</text>
+    <circle cx="1098" cy="200" r="16" fill="#EAF2FB" stroke="#1A6FC4" stroke-width="2"/>
+    <text x="1098" y="205" font-size="12" font-weight="600" fill="#1A6FC4">6</text>
+
+    <rect x="193" y="248" width="130" height="30" rx="15" fill="#EAF2FB" stroke="#1A6FC4"/>
+    <text x="258" y="268" font-size="12" fill="#1A6FC4">K2 Problem check</text>
+
+    <rect x="534" y="248" width="120" height="30" rx="15" fill="#EAF2FB" stroke="#1A6FC4"/>
+    <text x="594" y="268" font-size="12" fill="#1A6FC4">K3 Model cards</text>
+    <rect x="539" y="288" width="110" height="30" rx="15" fill="#FFFFFF" stroke="#1A6FC4"/>
+    <text x="594" y="308" font-size="12" fill="#1A6FC4">K4 Explain</text>
+
+    <rect x="697" y="248" width="130" height="30" rx="15" fill="#EAF2FB" stroke="#1A6FC4"/>
+    <text x="762" y="268" font-size="12" fill="#1A6FC4">K5 Figure rework</text>
+
+    <rect x="1030" y="248" width="136" height="30" rx="15" fill="#EAF2FB" stroke="#1A6FC4"/>
+    <text x="1098" y="268" font-size="12" fill="#1A6FC4">K6 Scoring rounds</text>
+
+    <line x1="258" y1="216" x2="258" y2="246" stroke="#94A3B8" stroke-dasharray="3 3"/>
+    <line x1="594" y1="216" x2="594" y2="246" stroke="#94A3B8" stroke-dasharray="3 3"/>
+    <line x1="762" y1="216" x2="762" y2="246" stroke="#94A3B8" stroke-dasharray="3 3"/>
+    <line x1="1098" y1="216" x2="1098" y2="246" stroke="#94A3B8" stroke-dasharray="3 3"/>
+  </g>
+
+  <text x="40" y="366" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-size="11" fill="#94A3B8">Pause state, pending cards and message history live in SQLite; closing the window or restarting the process returns to the same point.</text>
+</svg>

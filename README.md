@@ -20,6 +20,10 @@
 
 ---
 
+<p align="center">
+  <img src="docs/images/workbench.png" alt="MathModel Studio 工作台" width="920">
+</p>
+
 > **设计原则**：可自动校验的环节交由门禁，需要判断的环节留给人，并将判断点落实为界面。
 >
 > 本工具将契约化技能集（出版级图表、排版规范、AI 痕迹检查、结构自检与评分）集成于本地桌面程序：模型由使用者提供，数据不出本机，过程可审计。
@@ -32,6 +36,20 @@ MathModel Studio 面向已经完成或正在推进建模工作的参赛者与研
 - **人在环**：阶段推进在关键节点暂停并等待确认，暂停状态可跨进程恢复。
 - **契约驱动**：技能由注册表、JSON Schema 与 CLI 退出码约束，界面从注册表生成，而非硬编码技能清单。
 - **证据可复核**：门禁、评分与 CI 断言均提供读数与反向覆盖。
+
+## 界面
+
+截图为 1440×900 下的实际界面，会话内容来自离线演示，不包含真实赛题或密钥。
+
+| 选模与解释 | 评分与扣分定位 |
+| --- | --- |
+| <img src="docs/images/decision.png" width="100%" alt="K3 选模卡"> | <img src="docs/images/score.png" width="100%" alt="五维评分与扣分定位"> |
+| K3 选模卡：候选路线、字段对齐与「选它 / 解释」 | K6 评分：五维得分、扣分明细与正文定位 |
+
+| 论文排版 | 对话与工具卡 |
+| --- | --- |
+| <img src="docs/images/paper.png" width="100%" alt="论文排版与 PDF 预览"> | <img src="docs/images/conversation.png" width="100%" alt="对话、工具卡与门禁"> |
+| 论文页：xelatex → pandoc → 三道门禁与页级预览 | 对话流、工具卡与四项门禁结果 |
 
 ## 当前状态
 
@@ -90,6 +108,13 @@ npm run gate
 ### 文件与工作区
 
 「文件」页列出工作区内容并支持切换目录；工作区默认位于桌面「赛题」，首次启动时创建。附件可在中栏直接拖入或粘贴，主进程负责抽取正文（PDF 使用 pdfjs，文本与 CSV 直读并报告行列）。
+
+## 架构
+
+<p align="center"><img src="docs/images/architecture.svg" alt="运行时架构" width="920"></p>
+<p align="center"><img src="docs/images/workflow.svg" alt="阶段轨道与决策点" width="920"></p>
+
+桌面端与 Python 运行时通过本地回环通道（HTTP + SSE）通信，模型 Key 仅由主进程加密保存。阶段推进在 K2–K6 决策点暂停，状态、待决卡与消息历史写入 SQLite，可跨进程恢复。
 
 ## 技能矩阵
 

@@ -20,6 +20,10 @@
 
 ---
 
+<p align="center">
+  <img src="docs/images/workbench.png" alt="MathModel Studio workspace" width="920">
+</p>
+
 > **Design principle**: anything a machine can verify goes to a gate; anything that requires judgement stays with the user, with each decision point rendered as UI.
 >
 > This tool integrates a contract-driven skill set (publication-grade figures, typesetting rules, AI-trace checks, structural audit and scoring) into a local desktop program: the model is provided by the user, data stays on the machine, and every step is auditable.
@@ -32,6 +36,20 @@ MathModel Studio targets contestants and researchers who are already working thr
 - **Human in the loop**: phase progression pauses at key decision points and waits for confirmation; pending state survives process restarts.
 - **Contract driven**: skills are constrained by a registry, JSON Schemas and CLI exit codes; the UI is generated from the registry rather than a hard-coded skill list.
 - **Reviewable evidence**: gates, scoring and CI assertions provide readings and negative coverage.
+
+## Interface
+
+Screenshots are captured at 1440×900 from the real UI; conversation content comes from the offline demo and contains no real problem statement or key.
+
+| Model choice and explanation | Scoring and deduction targets |
+| --- | --- |
+| <img src="docs/images/decision.png" width="100%" alt="K3 model-choice cards"> | <img src="docs/images/score.png" width="100%" alt="Five-dimension score and deduction targets"> |
+| K3 model cards: candidate routes, aligned fields and Choose / Explain | K6 scoring: five dimensions, deductions and in-text targets |
+
+| Paper typesetting | Conversation and tool cards |
+| --- | --- |
+| <img src="docs/images/paper.png" width="100%" alt="Paper typesetting and PDF preview"> | <img src="docs/images/conversation.png" width="100%" alt="Conversation, tool cards and gates"> |
+| Paper tab: xelatex → pandoc → three gates and page preview | Conversation flow, tool cards and the four-row gate result |
 
 ## Status
 
@@ -90,6 +108,13 @@ The figure workbench calls the real renderer to produce PNG/PDF/SVG and keeps th
 ### Files and workspace
 
 The files tab lists the workspace and can switch directories; the default workspace is a `赛题` folder on the Desktop, created on first launch. Attachments can be dropped or pasted into the chat column; the main process extracts their text (pdfjs for PDFs, direct reads for text/CSV with row × column counts).
+
+## Architecture
+
+<p align="center"><img src="docs/images/architecture-en.svg" alt="Runtime architecture" width="920"></p>
+<p align="center"><img src="docs/images/workflow-en.svg" alt="Phase rail and decision points" width="920"></p>
+
+The desktop shell and the Python runtime communicate over a loopback channel (HTTP + SSE); model keys are encrypted by the main process only. Phase progression pauses at K2–K6 decision points, and phase, pending cards and message history are persisted in SQLite so they survive process restarts.
 
 ## Skills
 
