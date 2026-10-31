@@ -8,6 +8,9 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/version-0.6.0-2B4C7E?style=flat" alt="version">
+  <img src="https://github.com/Escap1ng/mathmodel-studio/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI">
+  <img src="https://img.shields.io/badge/platform-Windows%20x64-4A5568?style=flat" alt="platform">
   <img src="https://img.shields.io/badge/skills-7-7B5FD6?style=flat" alt="skills">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-1A6FC4?style=flat" alt="license">
   <img src="https://img.shields.io/badge/Python-3.12+-2E9E44?style=flat" alt="Python">
@@ -21,7 +24,7 @@
 ---
 
 <p align="center">
-  <img src="docs/images/workbench.png" alt="MathModel Studio workspace: phase rail on the left, decision cards in the middle, workbench on the right" width="100%">
+  <img src="docs/images/workbench.png" alt="MathModel Studio: conversation and phase rail on the left, K3 model-choice cards in the middle" width="100%">
 </p>
 
 > **Design principle**: anything a machine can verify goes to a gate; anything that requires judgement stays with the user, with each decision point rendered as UI.
@@ -39,17 +42,20 @@ MathModel Studio targets contestants and researchers who are already working thr
 
 ## Interface
 
-Screenshots are captured at 1440×900 from the real UI; conversation content comes from the offline demo and contains no real problem statement or key.
+Screenshots come from the real UI at 1.5× pixel density: the first is a maximized window, the rest are crops from a 1440×900 window. Conversation content comes from the offline demo and contains no real problem statement or key.
 
-| Model choice and explanation | Scoring and deduction targets |
-| --- | --- |
-| <img src="docs/images/decision.png" width="100%" alt="K3 model-choice cards"> | <img src="docs/images/score.png" width="100%" alt="Five-dimension score and deduction targets"> |
-| K3 model cards: candidate routes, aligned fields and Choose / Explain | K6 scoring: five dimensions, deductions and in-text targets |
+<img src="docs/images/decision.png" width="100%" alt="K3 model-choice cards: three candidate routes with aligned fields">
 
-| Paper typesetting | Conversation and tool cards |
+Model choice: three candidate routes aligned on innovation, interpretability, implementation difficulty, estimated time, precision and robustness — choose one directly or read the explanation first.
+
+| Scoring and deduction targets | Paper typesetting and PDF preview |
 | --- | --- |
-| <img src="docs/images/paper.png" width="100%" alt="Paper typesetting and PDF preview"> | <img src="docs/images/conversation.png" width="100%" alt="Conversation, tool cards and gates"> |
-| Paper tab: xelatex → pandoc → three gates and page preview | Conversation flow, tool cards and the four-row gate result |
+| <img src="docs/images/score.png" width="100%" alt="Five-dimension score and deduction details"> | <img src="docs/images/paper.png" width="100%" alt="Paper typesetting and PDF preview"> |
+| Five dimensions, deductions and in-text targets | xelatex → pandoc → three gates and page-level preview |
+
+<img src="docs/images/conversation.png" width="100%" alt="Conversation, tool cards and gates">
+
+Conversation: streamed replies, tool cards and the four-row gate result on one timeline.
 
 ## Status
 

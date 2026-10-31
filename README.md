@@ -1,13 +1,16 @@
 <h1 align="center">MathModel Studio</h1>
 
-<p align="center"><b>面向数学建模竞赛的本地桌面 Agent · 人在环的建模工作台</b></p>
+<p align="center"><b>面向数学建模竞赛的本地桌面 Agent · 关键判断留给你</b></p>
 
 <p align="center">
-  从赛题到论文，关键判断保留给使用者：<br>
-  选模依据、方案解释、门禁结论与评分明细均可见、可追问、可回滚。
+  从赛题到论文，需要判断的地方都会停下来等你确认：<br>
+  选模理由、方案解释、门禁结论和扣分明细都在界面上，可以追问，也可以回滚。
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-0.6.0-2B4C7E?style=flat" alt="版本">
+  <img src="https://github.com/Escap1ng/mathmodel-studio/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI">
+  <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-4A5568?style=flat" alt="平台">
   <img src="https://img.shields.io/badge/%E6%8A%80%E8%83%BD-7-7B5FD6?style=flat" alt="技能">
   <img src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-AGPL--3.0-1A6FC4?style=flat" alt="许可证">
   <img src="https://img.shields.io/badge/Python-3.12+-2E9E44?style=flat" alt="Python">
@@ -21,43 +24,46 @@
 ---
 
 <p align="center">
-  <img src="docs/images/workbench.png" alt="MathModel Studio 工作台：左侧阶段轨道、中间决策卡、右侧工作台" width="100%">
+  <img src="docs/images/workbench.png" alt="MathModel Studio：左侧会话与阶段轨道，中间 K3 选模卡" width="100%">
 </p>
 
-> **设计原则**：可自动校验的环节交由门禁，需要判断的环节留给人，并将判断点落实为界面。
+> **设计原则**：能自动校验的交给门禁，需要判断的留给人，判断点做成界面。
 >
-> 本工具将契约化技能集（出版级图表、排版规范、AI 痕迹检查、结构自检与评分）集成于本地桌面程序：模型由使用者提供，数据不出本机，过程可审计。
+> 桌面程序内置一组技能（出版级图表、排版规范、AI 痕迹检查、结构自检与评分）。模型由使用者接入，数据不出本机。
 
 ## 概览
 
-MathModel Studio 面向已经完成或正在推进建模工作的参赛者与研究者。它不替代建模判断，而是把阶段推进、模型选择、图表返工、论文排版与交付检查组织为一条可审计的工作流。
+MathModel Studio 面向正在推进建模工作、准备交付的参赛者与研究者。它不替使用者做建模判断，但把阶段推进、选模、图表返工、论文排版和交付检查放在同一个工作台里，每一步都有记录。
 
-- **本地优先**：桌面端与 Python 运行时均在本机执行，模型 Key 经系统安全存储加密保存。
-- **人在环**：阶段推进在关键节点暂停并等待确认，暂停状态可跨进程恢复。
-- **契约驱动**：技能由注册表、JSON Schema 与 CLI 退出码约束，界面从注册表生成，而非硬编码技能清单。
-- **证据可复核**：门禁、评分与 CI 断言均提供读数与反向覆盖。
+- **本地优先**：桌面端和 Python 运行时都在本机运行，模型 Key 用系统安全存储加密。
+- **人在环**：关键节点会停下来等确认；重启后仍停在原来的决策点。
+- **契约驱动**：技能由注册表、JSON Schema 和 CLI 退出码约束，界面按注册表生成，不写死技能清单。
+- **证据可复核**：每条门禁都有读数，并配反向用例。
 
 ## 界面
 
-截图为 1440×900 下的实际界面，会话内容来自离线演示，不包含真实赛题或密钥。
+截图来自实际界面（1.5 倍像素密度）：首图是最大化窗口，其余裁自 1440×900 窗口。会话内容来自离线演示，没有真实赛题和密钥。
 
-| 选模与解释 | 评分与扣分定位 |
-| --- | --- |
-| <img src="docs/images/decision.png" width="100%" alt="K3 选模卡"> | <img src="docs/images/score.png" width="100%" alt="五维评分与扣分定位"> |
-| K3 选模卡：候选路线、字段对齐与「选它 / 解释」 | K6 评分：五维得分、扣分明细与正文定位 |
+<img src="docs/images/decision.png" width="100%" alt="K3 选模卡：三条候选路线与字段对照">
 
-| 论文排版 | 对话与工具卡 |
+选模：每条候选路线逐项列出创新度、可解释性、实现难度、预计耗时、精度与鲁棒性，可以直接选，也可以先看解释。
+
+| 评分与扣分定位 | 论文排版与 PDF 预览 |
 | --- | --- |
-| <img src="docs/images/paper.png" width="100%" alt="论文排版与 PDF 预览"> | <img src="docs/images/conversation.png" width="100%" alt="对话、工具卡与门禁"> |
-| 论文页：xelatex → pandoc → 三道门禁与页级预览 | 对话流、工具卡与四项门禁结果 |
+| <img src="docs/images/score.png" width="100%" alt="五维评分与扣分明细"> | <img src="docs/images/paper.png" width="100%" alt="论文排版与 PDF 预览"> |
+| 五维得分、扣分明细和正文定位 | xelatex → pandoc → 三道门禁与页级预览 |
+
+<img src="docs/images/conversation.png" width="100%" alt="对话、工具卡与门禁">
+
+对话：流式回复、工具卡和四项门禁结果在同一条时间线上。
 
 ## 当前状态
 
-**0.6.0（2026-10-31）**。本版本引入多会话管理，DeepSeek、通义千问、Kimi、智谱 GLM 与 OpenAI 格式五类模型入口，200k / 400k / 1m 上下文预算，中 / 高 / 最大思维深度，以及可收起的右侧工作台。
+**0.6.0（2026-10-31）**。这一版加入多会话管理、五类模型入口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenAI 格式端点）、200k / 400k / 1m 上下文预算、中 / 高 / 最大思维深度，以及可收起的右侧工作台。
 
-论文页执行完整排版链路：xelatex 两遍 → pandoc 转 DOCX → Word 版式后处理 → 去 AI 措辞、结构指标与章节结构三道门禁；PDF 使用 pdf.js 做页级预览。当前编译对象为仓库内置演示稿，阶段机不会因构建成功自动将阶段五标记为通过。
+论文页完成整条排版链路：xelatex 两遍 → pandoc 转 DOCX → Word 版式后处理 → 去 AI 措辞、结构指标和章节结构三道门禁；PDF 用 pdf.js 逐页预览。当前编译的是仓库自带的演示稿，构建成功也不会自动把阶段五标记为通过。
 
-M6 打包已接线：electron-builder 配合随包便携 Python 与 pandoc，NSIS x64 安装包已在本机构建；尚未在干净机器上安装验证。
+M6 打包已配置完成：electron-builder 把便携 Python 和 pandoc 一起装进安装包，NSIS x64 安装包已在本机构建，尚未在干净机器上安装验证。
 
 里程碑见 [PLAN.md](PLAN.md) §7；已验证结论与未证事项见 [docs/HANDOFF.md](docs/HANDOFF.md)。
 
@@ -79,46 +85,46 @@ npm run mms -- invoke figure paired-raincloud
 npm run gate
 ```
 
-`npm run gate` 通过表示脚手架自洽，不依赖网络与显示器。论文自检需要本机安装 `xelatex` 与 `pandoc`（见「依赖」）。
+`npm run gate` 全部通过，表示本地门禁没有问题，且不依赖网络和显示器。论文自检需要本机安装 `xelatex` 和 `pandoc`（见「依赖」）。
 
 ## 核心能力
 
 ### 阶段编排与决策点
 
-上游阶段零至阶段六（环境预检、赛题分析、工作目录、算法选择、代码实现、论文输出、评分优化）映射为一条状态轨道，可直接看到当前阻塞位置。关键节点以决策卡暂停：
+阶段零到阶段六（环境预检、赛题分析、工作目录、算法选择、代码实现、论文输出、评分优化）排成一条状态轨道，当前卡在哪一步可以直接看到。关键节点用决策卡暂停：
 
-- **K2 赛题与附件确认**：子问题拆分、附件与数据角色、逐问数据对应关系。
-- **K3 选模卡**：2–3 个候选方案，含核心思路、创新度、可解释性、实现难度、预计耗时与精度预期；支持换一批。
-- **K4 就地解释**：打开解释抽屉而不清除待选状态。
-- **K5 图表返工**：换模板、换主题、重渲与回滚；重渲后仅展示当前版本，旧版本进入历史。
-- **K6 评分与优化轮次**：五维评分、扣分定位、三轮熔断与一票否决。
+- **K2 赛题与附件确认**：拆出子问题，标明附件用途，逐问对应数据。
+- **K3 选模卡**：2–3 条候选路线，列出核心思路、创新度、可解释性、实现难度、预计耗时和精度预期，可换一批。
+- **K4 就地解释**：打开解释抽屉，待选状态不丢。
+- **K5 图表返工**：换模板、换主题、重渲和回滚；重渲后只显示当前图，旧版本进入历史。
+- **K6 评分与优化轮次**：五维评分、扣分定位、三轮熔断和一票否决。
 
 ### 会话与上下文
 
-左栏为会话列表：建模会话从 SQLite 读取，问答会话保存在本地；支持新建、切换、单条删除与清空。切换时恢复消息、附件、阶段与待决卡。中栏顶部显示当前会话与上下文用量，按 200k / 400k / 1m 预算从最新消息回溯装载。
+左栏是会话列表：建模会话存在 SQLite，问答会话存在本地；可以新建、切换、单条删除和清空。切换时恢复消息、附件、阶段和待决卡。中栏顶部显示当前会话和上下文用量，按 200k / 400k / 1m 预算从最新消息往回装载。
 
 ### 模型接入
 
-设置页以服务商列表组织五类入口，模型名可按预设选择或手动填写。Key 仅经主进程 `safeStorage` 加密落盘；未配置 Key 时可运行离线演示。详见 [docs/providers.md](docs/providers.md)。
+设置页按服务商列出五类入口，模型名可选预设或手动填写。Key 只经主进程 `safeStorage` 加密保存；未配置 Key 时可用离线演示。详见 [docs/providers.md](docs/providers.md)。
 
 ### 图表与论文
 
-图表工作台真实调用渲染器输出 PNG/PDF/SVG，并保留可复现命令与运行日志。论文页完成 xelatex、pandoc、Word 版式后处理与三道交付门禁，PDF 以 pdf.js 逐页预览。
+图表工作台调用真实渲染器输出 PNG/PDF/SVG，同时保留可复现的命令和运行日志。论文页完成 xelatex、pandoc、Word 版式后处理和三道交付门禁，PDF 用 pdf.js 逐页预览。
 
 ### 文件与工作区
 
-「文件」页列出工作区内容并支持切换目录；工作区默认位于桌面「赛题」，首次启动时创建。附件可在中栏直接拖入或粘贴，主进程负责抽取正文（PDF 使用 pdfjs，文本与 CSV 直读并报告行列）。
+「文件」页列出工作区内容，可以切换目录；工作区默认在桌面「赛题」，首次启动时创建。附件可以直接拖入中栏或粘贴，主进程负责抽取正文（PDF 用 pdfjs，文本和 CSV 直接读取并报告行列）。
 
 ## 架构
 
 <p align="center"><img src="docs/images/architecture.svg" alt="运行时架构" width="920"></p>
 <p align="center"><img src="docs/images/workflow.svg" alt="阶段轨道与决策点" width="920"></p>
 
-桌面端与 Python 运行时通过本地回环通道（HTTP + SSE）通信，模型 Key 仅由主进程加密保存。阶段推进在 K2–K6 决策点暂停，状态、待决卡与消息历史写入 SQLite，可跨进程恢复。
+桌面端和 Python 运行时通过本地回环通道（HTTP + SSE）通信，模型 Key 只由主进程加密保存。阶段在 K2–K6 决策点暂停，状态、待决卡和消息历史写入 SQLite，重启后可以恢复。
 
 ## 技能矩阵
 
-单一事实源为 [`skills/manifest.json`](skills/manifest.json)；下表行数与徽章计数由 CI 强校验一致。
+技能清单以 [`skills/manifest.json`](skills/manifest.json) 为准；下表行数和徽章计数由 CI 校验，必须一致。
 
 | 技能 | 职责 | 状态 |
 | --- | --- | --- |
@@ -130,11 +136,11 @@ npm run gate
 | [`mathmodel-deai`](skills/mathmodel-deai/) | 降 AI 与交付核查：词表级、结构级、字符级三道门禁 | 内置 |
 | [`mathmodel-score`](skills/mathmodel-score/) | 结构自检与评分：章节门槛与百分制五维评分卡 | 内置 |
 
-七个技能以源码形式随仓库分发（Apache-2.0），版本与引入记录见 [`skills/VENDOR.md`](skills/VENDOR.md)。运行时仅通过 subprocess 调用技能脚本并按退出码判定，因此每个技能仍可被 Claude Code 等宿主单独装载与使用。
+七个技能以源码随仓库分发（Apache-2.0），版本和引入记录见 [`skills/VENDOR.md`](skills/VENDOR.md)。运行时只通过 subprocess 调用技能脚本、按退出码判定，因此每个技能也能被 Claude Code 等宿主单独加载。
 
 ## 质量门禁与证据
 
-每条门禁均配置反向覆盖：仅返回通过结果的检查器不构成证据。
+每条门禁都配了反向用例：只会报通过的检查器不算证据。
 
 | 门禁 | 判据 | 反向覆盖 |
 | --- | --- | --- |
@@ -143,19 +149,19 @@ npm run gate
 | G2 契约校验 | 注册表按 JSON Schema Draft 2020-12 校验；`jsonschema` 缺席时降级并说明 | 两份非法注册表必须被拒 |
 | G2b 版本同源 | `VERSION`、`package.json`、`pyproject.toml`、`mms/__init__.py` 四处一致 | 任一缺项或取值不同即失败 |
 | G3 CLI 契约 | 退出码 0/1/2 均可达；实际调用渲染器并核验 PNG/PDF/SVG 三件产物 | 词表外取值、非法 JSON、空 `MMS_HOME`、未知子命令/模板与渲染器假成功均被拦截（`runtime/selfcheck.py`） |
-| G4 事件流 | 握手、Bearer token、回环 Host/Origin 白名单、九类 SSE 事件、续传与取消；覆盖 K2/K3 暂停恢复与跨进程恢复；0.6.0 增加思维深度、关闭开关与上下文裁剪（52 条） | 10 种坏事件必须被拒；无 token、错误 Host、无待决恢复均被拒（`python runtime/selfcheck_channel.py --selftest`） |
-| G5 provider 离线契约 | 本地假端点覆盖 429 退避、`reasoning_content` 分离、分片 `tool_calls` 拼装、历史剥离与 Key 传递边界 | Key 哨兵不得进入事件流与 stderr；未开启离线模式时假 provider 被拒 |
+| G4 事件流 | 握手、Bearer token、回环 Host/Origin 白名单、九类 SSE 事件、续传与取消；覆盖 K2/K3 暂停恢复与进程重启后恢复；0.6.0 增加思维深度、关闭开关和上下文裁剪（52 条） | 10 种坏事件必须被拒；无 token、错误 Host、无待决恢复均被拒（`python runtime/selfcheck_channel.py --selftest`） |
+| G5 provider 离线契约 | 本地假端点覆盖 429 退避、`reasoning_content` 分离、分片 `tool_calls` 拼装、历史消息剥离和 Key 传递边界 | Key 哨兵不得进入事件流与 stderr；未开启离线模式时假 provider 被拒 |
 | G6 桌面骨架 | 类型检查、构建，并校验产物包含本项目中文文案与设计令牌 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
-| G9 工作台 | 真实渲染两版图、版本历史与回滚，未知模板/主题/版本不落版本；三轮评分、扣分定位、章节样例与一票否决（13 条） | 未知模板/主题/版本均为反向控制（`runtime/selfcheck_workbench.py`） |
-| G10 论文排版 | xelatex 两遍 → pandoc → Word 后处理：PDF/DOCX 文件头与体积、六个步骤、三道门禁、状态落盘（10 条） | 缺件、坏稿、坏 TeX、缺稿件四条反向；`MMS_PAPER_SKIP=1` 才允许跳过并打印未验证 |
-| G7 真启动冒烟 | 以生产入口起窗，验证构建产物、1440×900、非白像素、IPC、中文真字形与 Key 不回显；覆盖 K2→K3→解释→选择、图表重渲与回滚、评分、论文构建与预览、附件、多会话、五家预设、上下文与思维深度、右栏收起（97 条） | 空白截图、自建窗口、豆腐字与删除关键断言均被拦截（`tests/window-smoke.cjs`） |
-| G6b 结果核验 | 读取冒烟 JSON 并复算读数：内容尺寸、非白像素、断言下限、关键断言与自述计数 | `--selftest` 以 12 份合成结果证明假绿被拒（`scripts/check-window-smoke.mjs`） |
+| G9 工作台 | 真实渲染两版图、版本历史与回滚，未知模板、主题或版本不会写入历史；三轮评分、扣分定位、章节样例和一票否决（13 条） | 未知模板/主题/版本均为反向控制（`runtime/selfcheck_workbench.py`） |
+| G10 论文排版 | xelatex 两遍 → pandoc → Word 后处理：PDF/DOCX 文件头与体积、六个步骤、三道门禁、状态写入磁盘（10 条） | 缺件、坏稿、坏 TeX、缺稿件四条反向；`MMS_PAPER_SKIP=1` 才允许跳过并打印未验证 |
+| G7 真启动冒烟 | 以生产入口起窗，验证构建产物、1440×900、非白像素、IPC、中文真字形与 Key 不回显；覆盖 K2→K3→解释→选择、图表重渲与回滚、评分、论文构建与预览、附件、多会话、五家预设、上下文与思维深度、右栏收起（97 条） | 空白截图、自建窗口、缺字（方框字形）和删除关键断言都会被拦截（`tests/window-smoke.cjs`） |
+| G6b 结果核验 | 读取冒烟 JSON 并复算读数：内容尺寸、非白像素、断言下限、关键断言与自述计数 | `--selftest` 用 12 份合成结果证明假通过会被拒（`scripts/check-window-smoke.mjs`） |
 
 ## 验证状态
 
-0.6.0 的本机验证包括类型检查、构建、G4 52/52、G7 97/97 与 G6b 核验。CI run [`41172805948`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41172805948) 三个 job 全部通过：ubuntu 真启动 97/97、内容尺寸 1440×900、非白像素 4.16%，G6b 核验一致；ubuntu 与 windows 门禁 job 均通过，Windows 的 G10 显式跳过并标注未验证。
+0.6.0 在本机验证了类型检查、构建、G4 52/52、G7 97/97 和 G6b 复算。CI run [`41172805948`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41172805948) 的三个任务全部通过：ubuntu 真启动 97/97、内容尺寸 1440×900、非白像素 4.16%，G6b 复算一致；ubuntu 和 windows 门禁都通过，Windows 上的 G10 显式跳过并标注未验证。
 
-M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.0-setup.exe`，约 264 MB，未签名，使用 Electron 默认图标），尚未在干净机器上安装验证。
+M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.0-setup.exe`，约 264 MB，未签名，Electron 默认图标），尚未在干净机器上安装验证。
 
 未覆盖范围：五家服务商的真实联网对话（本仓库不包含 Key）、CI 的 Windows 真起窗、CSP 违规场景的主动探测、安装包在干净机器上的安装与运行。历史 CI run 与读数见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -166,17 +172,17 @@ M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.0-setup.exe`
 | 桌面壳 | Electron、electron-vite、React、TypeScript | 见 `package.json` |
 | 运行时 | Python 3.12+ | 通道服务器、SSE 与 provider 客户端仅用标准库；`jsonschema>=4.20` 可选，缺席时契约校验降级 |
 | 模型接入 | DeepSeek、通义千问、Kimi、智谱 GLM 与任意 OpenAI 格式端点 | 见 [docs/providers.md](docs/providers.md)；Key 经主进程 `safeStorage` 加密 |
-| 排版 | xelatex、pandoc、python-docx | xelatex 需本机安装（TeX Live 或 MiKTeX）；pandoc 可随包提供，亦可置于 PATH、设置 `MMS_PANDOC` 或安装到 `%LOCALAPPDATA%\mms-tools\pandoc.exe` |
+| 排版 | xelatex、pandoc、python-docx | xelatex 需本机安装（TeX Live 或 MiKTeX）；pandoc 可随包提供，也可放进 PATH、设置 `MMS_PANDOC`，或安装到 `%LOCALAPPDATA%\mms-tools\pandoc.exe` |
 | 出图 | matplotlib、numpy、seaborn | 版本下限见 `requirements.txt`，安装使用镜像 |
 | 论文预览 | pdfjs-dist | 随 `npm install` 安装，worker 由 Vite 打包，运行时无需网络 |
 
 ## 打包与分发
 
-打包形态已确定并接线：内置便携 Python 运行时（python-build-standalone，位于 `vendor/python`，不入库），pandoc 以 `vendor/pandoc/pandoc.exe` 随包放入 `resources/pandoc`；xelatex 仍要求本机安装，TeX 未内置。NSIS x64 配置见 `electron-builder.yml`，随包工具链由 `scripts/prepare-vendor.mjs` 准备。当前安装包未签名并使用 Electron 默认图标。
+打包已配置：内置便携 Python 运行时（python-build-standalone，放在 `vendor/python`，不入库），pandoc 以 `vendor/pandoc/pandoc.exe` 随包放进 `resources/pandoc`；xelatex 仍需本机安装，TeX 没有内置。NSIS x64 配置见 `electron-builder.yml`，随包工具链由 `scripts/prepare-vendor.mjs` 准备。当前安装包未签名，使用 Electron 默认图标。
 
 ## 合规声明
 
-本工具辅助已经完成的建模工作：规范排版、出版级图表、交付前自检与方法选型讨论。它不替代建模判断，也不保证获奖。内置评分与结构自检默认采用国赛口径（对齐 2026 格式规范），美赛口径可通过参数切换；AI 痕迹检查仅清理模板腔与不可见字符，不将未完成的工作表述为已完成。伪造结果、编造文献与数据属于硬性红线。请遵守所在赛事对生成式工具的规定。
+本工具用于排版、出图、交付前自检和方法选型讨论，不代替建模判断，也不保证获奖。内置评分与结构自检默认采用国赛口径（对齐 2026 格式规范），美赛口径可通过参数切换；AI 痕迹检查仅清理模板腔与不可见字符，不将未完成的工作表述为已完成。伪造结果、编造文献与数据属于硬性红线。请遵守所在赛事对生成式工具的规定。
 
 ## 许可
 
