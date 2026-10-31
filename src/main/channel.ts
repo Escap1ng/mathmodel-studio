@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { join } from 'node:path'
+import type { ReasoningSpec } from '../shared/api'
 
 // 与 runtime/src/mms/server.py 的握手契约。渲染层永远拿不到 port 与 token。
 export interface ChannelHandshake {
@@ -27,6 +28,9 @@ export interface ProviderRow {
   tool_calling?: boolean
   requires_key?: boolean
   custom?: boolean
+  context_len?: number
+  model_context?: Record<string, number>
+  reasoning?: ReasoningSpec
   note?: string
 }
 
@@ -52,6 +56,7 @@ export class Channel {
 
   constructor(
     private readonly root: string,
+    private readonly python: string,
     private readonly dataDir?: string
   ) {}
 
@@ -85,15 +90,15 @@ export class Channel {
 
   private async launch(): Promise<void> {
     this.setStatus({ state: 'starting' })
-    const python =
-      process.env['MMS_PYTHON'] || (process.platform === 'win32' ? 'python' : 'python3')
-    const child = spawn(python, [join(this.root, 'runtime', 'cli.py'), 'serve', '--port', '0'], {
+    const child = spawn(this.python, [join(this.root, 'runtime', 'cli.py'), 'serve', '--port', '0'], {
       cwd: this.root,
       windowsHide: true,
       env: {
         ...process.env,
         MMS_HOME: this.root,
         ...(this.dataDir ? { MMS_DATA_DIR: this.dataDir } : {}),
+        // 打包后 runtime 在只读的安装目录里；.pyc 统一写到 userData，别污染 resources
+        ...(this.dataDir ? { PYTHONPYCACHEPREFIX: join(this.dataDir, 'pycache') } : {}),
         PYTHONIOENCODING: 'utf-8',
         PYTHONUTF8: '1'
       }
@@ -170,7 +175,7 @@ export class Channel {
       }
       const onError = (err: Error): void => {
         cleanup()
-        reject(new Error(`无法启动 Python（${process.env['MMS_PYTHON'] || 'python'}）：${err.message}`))
+        reject(new Error(`无法启动 Python（${this.python}）：${err.message}`))
       }
       const onExit = (code: number | null): void => {
         cleanup()
@@ -241,6 +246,26 @@ export class Channel {
     const data = await this.request('/sessions/latest')
     const session = data['session']
     return session && typeof session === 'object' ? (session as Record<string, unknown>) : null
+  }
+
+  async getSession(sessionId: string): Promise<Record<string, unknown> | null> {
+    const data = await this.request(`/sessions/${encodeURIComponent(sessionId)}`)
+    const session = data['session']
+    return session && typeof session === 'object' ? (session as Record<string, unknown>) : null
+  }
+
+  async listSessions(): Promise<Record<string, unknown>[]> {
+    const data = await this.request('/sessions')
+    return (data['sessions'] as Record<string, unknown>[]) ?? []
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.request(`/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
+  }
+
+  async clearSessions(): Promise<number> {
+    const data = await this.request('/sessions', { method: 'DELETE' })
+    return Number(data['removed'] ?? 0)
   }
 
   async workbenchState(): Promise<Record<string, unknown>> {

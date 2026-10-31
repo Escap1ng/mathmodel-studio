@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type {
   ChatEvent,
@@ -7,7 +7,8 @@ import type {
   DecisionAction,
   ProviderList,
   RuntimeStatus,
-  SessionSnapshot
+  SessionSnapshot,
+  SessionSummary
 } from '../../shared/api'
 import ChatPane from './components/ChatPane'
 import { candidatesOf, type ModelCandidate } from './components/DecisionCard'
@@ -17,6 +18,17 @@ import SettingsDialog from './components/SettingsDialog'
 import WorkspacePane from './components/WorkspacePane'
 import { splitContextContent, type SendExtras } from './lib/attachments'
 import { applyChatEvent, assistantText, type ChatEntry } from './lib/chat'
+import { contextLabel, conversationTokens, depthLabel, fitHistory } from './lib/context'
+import {
+  clearChatConversations,
+  loadChatConversations,
+  removeChatConversation,
+  saveChatConversation,
+  titleOf,
+  type ChatConversation,
+  type ConversationItem,
+  type ConversationKind
+} from './lib/conversations'
 import { PHASES, type PhaseState } from './lib/phases'
 
 // 类型由 src/preload/index.d.ts 声明的全局 window.studio 反推，
@@ -31,6 +43,7 @@ const PANE_MIN = 380
 const PANE_MAX = 1100
 const CHAT_MIN = 480
 const PANE_STORAGE_KEY = 'mms.paneWidth'
+const WORKSPACE_COLLAPSE_KEY = 'mms.workspaceCollapsed'
 
 function clampPaneWidth(width: number, rail = RAIL_WIDTH): number {
   const max = Math.min(PANE_MAX, Math.max(PANE_MIN, window.innerWidth - rail - CHAT_MIN))
@@ -51,6 +64,21 @@ function positionGrip(element: HTMLElement, clientY: number): void {
   const rect = element.getBoundingClientRect()
   const y = Math.min(Math.max(24, clientY - rect.top), Math.max(24, rect.height - 24))
   element.style.setProperty('--grip-y', `${Math.round(y)}px`)
+}
+
+function readWorkspaceCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(WORKSPACE_COLLAPSE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function titleFromProblem(problem: string): string {
+  const { display } = splitContextContent(problem || '')
+  const text = (display || problem || '').replace(/\s+/g, ' ').trim()
+  if (!text) return '建模会话'
+  return text.length > 30 ? `${text.slice(0, 30)}…` : text
 }
 
 let sequence = 0
@@ -126,6 +154,12 @@ export default function App() {
   const [explain, setExplain] = useState<ModelCandidate | null>(null)
   const [paneWidth, setPaneWidth] = useState<number | null>(readPaneWidth)
   const [resizingPane, setResizingPane] = useState(false)
+  const [workspaceCollapsed, setWorkspaceCollapsed] = useState(readWorkspaceCollapsed)
+  const [localChats, setLocalChats] = useState<ChatConversation[]>(loadChatConversations)
+  const [remoteSessions, setRemoteSessions] = useState<SessionSummary[]>([])
+  const [activeKind, setActiveKind] = useState<ConversationKind | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [trimNote, setTrimNote] = useState<string | null>(null)
   const shellRef = useRef<HTMLDivElement | null>(null)
 
   // 事件可能比 chat.start 的返回值先到，先按 chatId 暂存，拿到 id 后再按序补放。
@@ -147,6 +181,52 @@ export default function App() {
       /* 本地存储不可用时只保留本次会话内的宽度 */
     }
   }, [paneWidth])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(WORKSPACE_COLLAPSE_KEY, workspaceCollapsed ? '1' : '0')
+    } catch {
+      /* 本地存储不可用时只保留本次会话内的状态 */
+    }
+  }, [workspaceCollapsed])
+
+  const refreshSessions = async (): Promise<void> => {
+    if (runtime.state !== 'ready') return
+    try {
+      const list = await window.studio.session.list()
+      setRemoteSessions(list.sessions)
+    } catch {
+      // 列表刷新失败不打断正在进行的对话；下次结束时还会再试。
+    }
+  }
+
+  useEffect(() => {
+    if (runtime.state !== 'ready') return
+    let alive = true
+    window.studio.session
+      .list()
+      .then((list) => {
+        if (alive) setRemoteSessions(list.sessions)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [runtime.state])
+
+  // 问答会话存在渲染层的本地存储里；流结束后才落盘，避免每来一个 token 写一次。
+  useEffect(() => {
+    if (mode !== 'chat' || streaming || activeKind !== 'chat' || !activeId || entries.length === 0) {
+      return
+    }
+    setLocalChats(saveChatConversation({ id: activeId, updatedAt: Date.now(), entries }))
+  }, [entries, streaming, mode, activeKind, activeId])
+
+  useEffect(() => {
+    if (streaming || runtime.state !== 'ready' || mode !== 'workflow') return
+    void refreshSessions()
+    // 每次一轮结束刷新一次标题与待决策标记；refreshSessions 只读 runtime 状态。
+  }, [streaming, runtime.state, mode])
 
   useEffect(() => {
     if (paneWidth == null) return
@@ -221,12 +301,24 @@ export default function App() {
     window.studio.session
       .latest()
       .then(({ session }) => {
-        if (!alive || !session || activeChat.current) return
+        if (!alive || activeChat.current) return
+        if (!session) {
+          const latestChat = localChats[0]
+          if (latestChat && entriesRef.current.length === 0) {
+            setEntries(latestChat.entries)
+            setMode('chat')
+            setActiveKind('chat')
+            setActiveId(latestChat.id)
+          }
+          return
+        }
         const hasPending = Boolean(session.pending)
         if (!hasPending && entriesRef.current.length > 0) return
         sessionId.current = session.id
         setEntries(entriesFromSnapshot(session))
         setPhases(phaseMap(session))
+        setActiveKind('workflow')
+        setActiveId(session.id)
       })
       .catch(() => undefined)
     return () => {
@@ -279,23 +371,148 @@ export default function App() {
     Boolean(provider) &&
     (!provider?.requiresKey || Boolean(provider?.configured))
 
+  const conversations = useMemo<ConversationItem[]>(() => {
+    const rows: ConversationItem[] = [
+      ...remoteSessions.map((session) => ({
+        id: session.id,
+        kind: 'workflow' as const,
+        title: titleFromProblem(session.problem),
+        updatedAt: session.updatedAt * 1000,
+        pending: session.pending
+      })),
+      ...localChats.map((chat) => ({
+        id: chat.id,
+        kind: 'chat' as const,
+        title: chat.title,
+        updatedAt: chat.updatedAt
+      }))
+    ]
+    return rows.sort((a, b) => b.updatedAt - a.updatedAt)
+  }, [remoteSessions, localChats])
+
+  const activeConversation = conversations.find(
+    (item) => item.id === activeId && item.kind === activeKind
+  )
+  const activeTitle = activeConversation?.title ?? (entries.length > 0 ? titleOf(entries) : '新对话')
+  const usedTokens = conversationTokens(entries)
+  const selectedContextLabel = contextLabel(provider?.contextLimit ?? 200_000)
+  const selectedDepthLabel = depthLabel(provider?.thinkingDepth ?? 'high')
+
+  const newConversation = (): void => {
+    if (streaming) {
+      setNotice('正在生成，先停止再新建会话')
+      return
+    }
+    sessionId.current = null
+    activeChat.current = null
+    activeAssistant.current = null
+    setEntries([])
+    setPhases({})
+    setActiveKind(null)
+    setActiveId(null)
+    setTrimNote(null)
+    setNotice(null)
+  }
+
+  const selectConversation = async (item: ConversationItem): Promise<void> => {
+    if (streaming) {
+      setNotice('正在生成，先停止再切换会话')
+      return
+    }
+    setNotice(null)
+    setTrimNote(null)
+    if (item.kind === 'workflow') {
+      try {
+        const { session } = await window.studio.session.get(item.id)
+        if (!session) {
+          setNotice('这个建模会话已经不存在')
+          void refreshSessions()
+          return
+        }
+        sessionId.current = session.id
+        activeChat.current = null
+        activeAssistant.current = null
+        setEntries(entriesFromSnapshot(session))
+        setPhases(phaseMap(session))
+        setMode('workflow')
+        setActiveKind('workflow')
+        setActiveId(session.id)
+      } catch (err) {
+        setNotice(errorText(err))
+      }
+      return
+    }
+    const chat = localChats.find((row) => row.id === item.id)
+    if (!chat) {
+      setNotice('这个问答会话已经不存在')
+      setLocalChats(loadChatConversations())
+      return
+    }
+    sessionId.current = null
+    activeChat.current = null
+    activeAssistant.current = null
+    setEntries(chat.entries)
+    setPhases({})
+    setMode('chat')
+    setActiveKind('chat')
+    setActiveId(chat.id)
+  }
+
+  const deleteConversation = async (item: ConversationItem): Promise<void> => {
+    if (streaming) return
+    try {
+      if (item.kind === 'workflow') {
+        await window.studio.session.remove(item.id)
+        await refreshSessions()
+      } else {
+        setLocalChats(removeChatConversation(item.id))
+      }
+      if (activeKind === item.kind && activeId === item.id) newConversation()
+    } catch (err) {
+      setNotice(errorText(err))
+    }
+  }
+
+  const clearHistory = async (): Promise<void> => {
+    if (streaming) {
+      setNotice('正在生成，先停止再清空历史')
+      return
+    }
+    try {
+      await window.studio.session.clear()
+      clearChatConversations()
+      setLocalChats([])
+      setRemoteSessions([])
+      newConversation()
+    } catch (err) {
+      setNotice(errorText(err))
+    }
+  }
+
   const send = async (text: string, extras?: SendExtras): Promise<void> => {
     if (!provider || !canSend || streaming) return
     const content = extras?.context ?? text
     if (!content.trim()) return
 
     const baseEntries = mode === 'workflow' ? [] : entries
-    const history: ChatMessageInput[] = []
+    const allHistory: ChatMessageInput[] = []
     for (const entry of baseEntries) {
       if (entry.role === 'user') {
         // 附件正文不进界面，但重放历史时要留给模型，所以优先进模型的全文。
         const value = entry.context ?? userText(entry)
-        if (value) history.push({ role: 'user', content: value })
+        if (value) allHistory.push({ role: 'user', content: value })
       } else {
         const value = assistantText(entry)
-        if (value) history.push({ role: 'assistant', content: value })
+        if (value) allHistory.push({ role: 'assistant', content: value })
       }
     }
+    const fitted = fitHistory(allHistory, content, provider.contextLimit)
+    const history = fitted.messages
+    setTrimNote(
+      fitted.dropped > 0
+        ? `已按 ${contextLabel(provider.contextLimit)} 上下文省略最早 ${fitted.dropped} 条消息（本地估算）。`
+        : null
+    )
 
     const assistantId = nextId('a')
     const user: ChatEntry = {
@@ -314,8 +531,11 @@ export default function App() {
       parts: [],
       streaming: true
     }
+    const nextEntries = [...baseEntries, user, assistant]
+    const chatConvId =
+      mode === 'chat' ? (activeKind === 'chat' && activeId ? activeId : nextId('c')) : null
 
-    setEntries([...baseEntries, user, assistant])
+    setEntries(nextEntries)
     setNotice(null)
     setStreaming(true)
     activeChat.current = null
@@ -323,19 +543,36 @@ export default function App() {
     if (mode === 'workflow') {
       setPhases({})
       sessionId.current = null
+      setActiveKind(null)
+      setActiveId(null)
+    } else if (chatConvId) {
+      setActiveKind('chat')
+      setActiveId(chatConvId)
+      // 先把用户问题落盘：流到一半关窗时，至少还能在列表里找回这一问。
+      setLocalChats(
+        saveChatConversation({ id: chatConvId, updatedAt: Date.now(), entries: nextEntries })
+      )
     }
 
     const input: ChatStartInput = {
       providerId: provider.id,
       model: provider.model,
       mode,
-      messages: [...history, { role: 'user', content }]
+      messages: [...history, { role: 'user', content }],
+      thinking: provider.thinkingDepth,
+      contextTokens: provider.contextLimit,
+      sendThinking: provider.sendThinking
     }
 
     try {
       const result = await window.studio.chat.start(input)
       activeChat.current = result.chatId
-      if (mode === 'workflow') sessionId.current = result.chatId
+      if (mode === 'workflow') {
+        sessionId.current = result.chatId
+        setActiveKind('workflow')
+        setActiveId(result.chatId)
+        void refreshSessions()
+      }
       const queued = buffered.current.get(result.chatId) ?? []
       buffered.current.clear()
       for (const event of queued) {
@@ -383,6 +620,9 @@ export default function App() {
     ])
     setStreaming(true)
     setNotice(null)
+    setTrimNote(null)
+    setActiveKind('workflow')
+    setActiveId(sid)
     activeChat.current = sid
     activeAssistant.current = assistantId
     try {
@@ -506,14 +746,27 @@ export default function App() {
   const onGripMove = (event: ReactPointerEvent<HTMLDivElement>): void =>
     positionGrip(event.currentTarget, event.clientY)
 
+  const toggleWorkspace = (): void => setWorkspaceCollapsed((value) => !value)
+
   return (
     <div
       className="shell"
       ref={shellRef}
       data-resizing={resizingPane ? 'col' : undefined}
+      data-pane={workspaceCollapsed ? 'collapsed' : 'expanded'}
       style={paneWidth == null ? undefined : ({ '--pane-w': `${paneWidth}px` } as CSSProperties)}
     >
-      <PhaseRail states={phases} current={currentPhase} />
+      <PhaseRail
+        states={phases}
+        current={currentPhase}
+        conversations={conversations}
+        activeId={activeId}
+        busy={streaming}
+        onNew={newConversation}
+        onSelect={(item) => void selectConversation(item)}
+        onDelete={(item) => void deleteConversation(item)}
+        onClearAll={() => void clearHistory()}
+      />
       <ChatPane
         runtime={runtime}
         provider={provider}
@@ -525,6 +778,11 @@ export default function App() {
         currentPhase={currentPhase}
         mode={mode}
         pending={pending}
+        conversationTitle={activeTitle}
+        contextLabel={selectedContextLabel}
+        depthLabel={selectedDepthLabel}
+        usedTokens={usedTokens}
+        trimNote={trimNote}
         onModeChange={setMode}
         onSend={(text, extras) => void send(text, extras)}
         onStop={stop}
@@ -532,8 +790,13 @@ export default function App() {
         onExplain={setExplain}
         onOpenSettings={() => setSettingsOpen(true)}
         onRestart={() => void restart()}
+        onClearCurrent={newConversation}
       />
-      <WorkspacePane runtimeReady={runtime.state === 'ready'} />
+      <WorkspacePane
+        runtimeReady={runtime.state === 'ready'}
+        collapsed={workspaceCollapsed}
+        onToggle={toggleWorkspace}
+      />
       <div
         className="splitter splitter--col"
         role="separator"

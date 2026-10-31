@@ -8,7 +8,9 @@ import type {
   ResumeInput,
   RuntimeStatus,
   SaveProviderPayload,
+  SessionGet,
   SessionLatest,
+  SessionList,
   StageResult,
   StagedFile,
   StagedBlob,
@@ -52,7 +54,11 @@ const studioApi = {
   },
 
   session: {
-    latest: (): Promise<SessionLatest> => ipcRenderer.invoke('session:latest')
+    latest: (): Promise<SessionLatest> => ipcRenderer.invoke('session:latest'),
+    list: (): Promise<SessionList> => ipcRenderer.invoke('session:list'),
+    get: (id: string): Promise<SessionGet> => ipcRenderer.invoke('session:get', id),
+    remove: (id: string): Promise<{ ok: true }> => ipcRenderer.invoke('session:delete', id),
+    clear: (): Promise<{ ok: true; removed: number }> => ipcRenderer.invoke('session:clear')
   },
 
   files: {

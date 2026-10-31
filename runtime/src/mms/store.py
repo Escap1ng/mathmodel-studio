@@ -129,6 +129,40 @@ class SessionStore:
             row = conn.execute("SELECT * FROM sessions ORDER BY updated DESC LIMIT 1").fetchone()
         return self._row(row)
 
+    def list_summaries(self, limit: int = 100) -> list[dict]:
+        """左栏会话列表只需要标题、时间与待决状态，不把 messages 整包搬出来。"""
+        with self.lock, self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, created, updated, provider, model, problem, phases, pending"
+                " FROM sessions ORDER BY updated DESC LIMIT ?",
+                (max(1, min(500, limit)),),
+            ).fetchall()
+        out: list[dict] = []
+        for row in rows:
+            out.append(
+                {
+                    "id": row["id"],
+                    "created": row["created"],
+                    "updatedAt": row["updated"],
+                    "provider": row["provider"],
+                    "model": row["model"],
+                    "problem": row["problem"],
+                    "phases": json.loads(row["phases"]),
+                    "pending": bool(row["pending"]),
+                }
+            )
+        return out
+
+    def delete(self, session_id: str) -> bool:
+        with self.lock, self._connect() as conn:
+            cur = conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        return cur.rowcount > 0
+
+    def clear(self) -> int:
+        with self.lock, self._connect() as conn:
+            cur = conn.execute("DELETE FROM sessions")
+        return max(0, cur.rowcount)
+
     def put(self, record: dict) -> None:
         record["updated"] = time.time()
         with self.lock, self._connect() as conn:

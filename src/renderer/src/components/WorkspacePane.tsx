@@ -15,18 +15,26 @@ import SelectMenu from './SelectMenu'
 GlobalWorkerOptions.workerSrc = pdfWorker
 
 const TABS = [
-  { id: 'figure', label: '图表' },
-  { id: 'paper', label: '论文' },
-  { id: 'code', label: '代码' },
-  { id: 'score', label: '评分' },
-  { id: 'gate', label: '门禁' },
-  { id: 'log', label: '日志' },
-  { id: 'files', label: '文件' }
+  { id: 'figure', label: '图表', icon: '图' },
+  { id: 'paper', label: '论文', icon: '论' },
+  { id: 'code', label: '代码', icon: '码' },
+  { id: 'score', label: '评分', icon: '评' },
+  { id: 'gate', label: '门禁', icon: '门' },
+  { id: 'log', label: '日志', icon: '志' },
+  { id: 'files', label: '文件', icon: '件' }
 ] as const
 type TabId = (typeof TABS)[number]['id']
 
+const TAB_GROUPS: { label: string; ids: TabId[] }[] = [
+  { label: '产出', ids: ['figure', 'paper', 'code'] },
+  { label: '评审', ids: ['score', 'gate'] },
+  { label: '资料', ids: ['log', 'files'] }
+]
+
 interface Props {
   runtimeReady: boolean
+  collapsed: boolean
+  onToggle: () => void
 }
 
 function errorText(err: unknown): string {
@@ -55,23 +63,22 @@ const DIM_SHORT: Record<string, string> = {
   layout: '排版'
 }
 
-function GateBar({ rows }: { rows: GateRow[] }) {
+function GateSummary({ rows, onOpen }: { rows: GateRow[]; onOpen: () => void }) {
+  const passed = rows.filter((row) => row.ok).length
   return (
-    <div className="gatebar" aria-label="门禁摘要">
-      <span className="gatebar__label">门禁</span>
-      {rows.map((row) => (
-        <span
-          key={row.id}
-          className="gatebar__chip"
-          data-gate={row.id}
-          data-ok={row.ok ? 'true' : 'false'}
-          title={row.detail}
-        >
-          <span className="gatebar__dot" aria-hidden="true" />
-          {row.label}
-        </span>
-      ))}
-    </div>
+    <button
+      type="button"
+      className="gate-summary"
+      onClick={onOpen}
+      title={rows.map((row) => `${row.label}：${row.detail}`).join('\n')}
+    >
+      <span className="gate-summary__dots" aria-hidden="true">
+        {rows.map((row) => (
+          <i key={row.id} className="gate-summary__dot" data-ok={row.ok ? 'true' : 'false'} data-gate={row.id} />
+        ))}
+      </span>
+      <span className="gate-summary__text">门禁 {passed}/{rows.length}</span>
+    </button>
   )
 }
 
@@ -98,15 +105,12 @@ function FigurePanel({
 }) {
   const figure = state.figure
   const active = findVersion(state, figure.active)
-  const previous = findVersion(state, figure.previous)
   return (
     <div className="panel" data-panel="figure">
-      <div className="panel__head">
-        <div>
-          <div className="panel__kicker">工作台 · 图表</div>
-          <h2 className="panel__title">样例图与主题</h2>
-        </div>
-        <span className="panel__meta">{active ? `${active.label} · ${active.theme_title}` : '尚未渲染'}</span>
+      <div className="panel__bar">
+        <span className="panel__meta">
+          {active ? `${active.label} · ${active.theme_title}` : '尚未渲染'}
+        </span>
       </div>
 
       <div className="figure-controls">
@@ -138,37 +142,19 @@ function FigurePanel({
       {error ? <div className="panel__error" role="alert">{error}</div> : null}
 
       {active ? (
-        previous && previous.id !== active.id ? (
-          <div className="figure-diff" data-role="figure-diff">
-            <figure className="figure-shot figure-shot--previous">
-              <img src={figure.previousImage ?? undefined} alt={`上一版 ${previous.label}`} />
-              <figcaption>
-                上一版 {previous.label} · {previous.theme_title}
-                <button type="button" className="linkbtn" data-action="rollback" data-version={previous.id} onClick={() => onRollback(previous.id)}>
-                  回滚
-                </button>
-              </figcaption>
-            </figure>
-            <figure className="figure-shot">
-              <img src={figure.activeImage ?? undefined} alt={`当前 ${active.label}`} data-role="figure-image" />
-              <figcaption>当前 {active.label} · {active.theme_title}</figcaption>
-            </figure>
-          </div>
-        ) : (
-          <figure className="figure-shot figure-shot--single">
-            <img src={figure.activeImage ?? undefined} alt={`当前 ${active.label}`} data-role="figure-image" />
-            <figcaption>
-              {active.template_title} · {active.label} · {active.theme_title}
-            </figcaption>
-          </figure>
-        )
+        <figure className="figure-shot figure-shot--single">
+          <img src={figure.activeImage ?? undefined} alt={`当前 ${active.label}`} data-role="figure-image" />
+          <figcaption>
+            {active.template_title} · {active.label} · {active.theme_title}
+          </figcaption>
+        </figure>
       ) : (
         <div className="panel__empty">
           <p>还没有图表产物。</p>
           <ol className="empty-steps">
             <li>选模板与主题</li>
             <li>渲染出首版 PNG/PDF/SVG</li>
-            <li>换主题重渲，可并排比对或回滚</li>
+            <li>换主题重渲，旧版留在下方历史里</li>
           </ol>
           <button type="button" className="btn btn--primary btn--sm" data-action="render-first" disabled={rendering} onClick={onRender}>
             渲染样例图
@@ -177,8 +163,8 @@ function FigurePanel({
       )}
 
       {figure.versions.length ? (
-        <div className="version-strip" aria-label="版本历史">
-          <span className="version-strip__label">版本</span>
+        <div className="version-strip" aria-label="历史版本">
+          <span className="version-strip__label">历史</span>
           {figure.versions.map((version) => (
             <button
               key={version.id}
@@ -186,6 +172,7 @@ function FigurePanel({
               className="version-chip"
               data-version={version.id}
               data-active={version.id === figure.active ? 'true' : 'false'}
+              title={`${version.template_title} · ${version.theme_title}`}
               disabled={version.id === figure.active || rendering}
               onClick={() => onRollback(version.id)}
             >
@@ -222,38 +209,33 @@ function ScorePanel({
   const changes = round.changes ?? []
   return (
     <div className={`panel score-panel${round.veto ? ' score-panel--veto' : ''}`} data-panel="score" data-round={round.round}>
-      <div className="panel__head">
-        <div>
-          <div className="panel__kicker">决策点 K6 · 评分</div>
-          <h2 className="panel__title">五维评分与扣分定位</h2>
+      <div className="panel__bar">
+        <div className="score-toolbar">
+          {rounds.map((r) => (
+            <button
+              key={r.round}
+              type="button"
+              className="score-round"
+              data-round={r.round}
+              aria-pressed={!vetoMode && r.round === round.round}
+              onClick={() => onRound(r.round)}
+            >
+              第 {r.round} 轮
+            </button>
+          ))}
+          <button
+            type="button"
+            className="score-round score-round--veto"
+            data-action="veto"
+            aria-pressed={vetoMode}
+            onClick={() => onVeto(!vetoMode)}
+          >
+            红线示例
+          </button>
         </div>
         <span className={`score-badge score-badge--${round.veto ? 'veto' : round.pass ? 'pass' : 'fix'}`} data-role="score-verdict">
           {badge}
         </span>
-      </div>
-
-      <div className="score-toolbar">
-        {rounds.map((r) => (
-          <button
-            key={r.round}
-            type="button"
-            className="score-round"
-            data-round={r.round}
-            aria-pressed={!vetoMode && r.round === round.round}
-            onClick={() => onRound(r.round)}
-          >
-            第 {r.round} 轮
-          </button>
-        ))}
-        <button
-          type="button"
-          className="score-round score-round--veto"
-          data-action="veto"
-          aria-pressed={vetoMode}
-          onClick={() => onVeto(!vetoMode)}
-        >
-          红线示例
-        </button>
       </div>
 
       {round.veto ? (
@@ -343,11 +325,7 @@ function GatePanel({ state }: { state: WorkbenchState }) {
   const passed = state.gate.filter((row) => row.ok).length
   return (
     <div className="panel" data-panel="gate">
-      <div className="panel__head">
-        <div>
-          <div className="panel__kicker">工作台 · 门禁</div>
-          <h2 className="panel__title">当前交付检查</h2>
-        </div>
+      <div className="panel__bar">
         <span className="panel__meta" data-role="gate-summary">
           {passed}/{state.gate.length} 通过
         </span>
@@ -372,12 +350,6 @@ function CodePanel({ state, onGoto }: { state: WorkbenchState; onGoto: (tab: Tab
   const active = findVersion(state, state.figure.active)
   return (
     <div className="panel" data-panel="code">
-      <div className="panel__head">
-        <div>
-          <div className="panel__kicker">工作台 · 代码</div>
-          <h2 className="panel__title">可复现的渲染命令</h2>
-        </div>
-      </div>
       {active ? (
         <div className="code-layout">
           <pre className="code-block" data-role="figure-command">{active.command}</pre>
@@ -406,12 +378,6 @@ function LogPanel({ state, onGoto }: { state: WorkbenchState; onGoto: (tab: TabI
   const active = findVersion(state, state.figure.active)
   return (
     <div className="panel" data-panel="log">
-      <div className="panel__head">
-        <div>
-          <div className="panel__kicker">工作台 · 日志</div>
-          <h2 className="panel__title">最近一次渲染</h2>
-        </div>
-      </div>
       {active ? (
         <>
           <pre className="code-block code-block--log">{active.stdout || '（无标准输出）'}</pre>
@@ -544,23 +510,19 @@ function PaperPanel({
     : ''
   return (
     <div className="panel" data-panel="paper">
-      <div className="panel__head">
-        <div>
-          <div className="panel__kicker">工作台 · 论文</div>
-          <h2 className="panel__title">排版与预览</h2>
-        </div>
-        <div className="panel__actions">
-          {summary ? <span className="panel__meta" data-role="paper-summary">{summary}</span> : null}
-          <button
-            type="button"
-            className="btn btn--primary btn--sm"
-            data-action="build-paper"
-            disabled={building || !paper.env.ok}
-            onClick={onBuild}
-          >
-            {building ? '编译中…' : built ? '重新构建' : '构建论文'}
-          </button>
-        </div>
+      <div className="panel__bar">
+        <span className="panel__meta" data-role="paper-summary">
+          {summary || '尚未构建'}
+        </span>
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          data-action="build-paper"
+          disabled={building || !paper.env.ok}
+          onClick={onBuild}
+        >
+          {building ? '编译中…' : built ? '重新构建' : '构建论文'}
+        </button>
       </div>
 
       {paper.env.ok ? (
@@ -655,7 +617,7 @@ function PaperPanel({
   )
 }
 
-export default function WorkspacePane({ runtimeReady }: Props) {
+export default function WorkspacePane({ runtimeReady, collapsed, onToggle }: Props) {
   const [active, setActive] = useState<TabId>('figure')
   const [state, setState] = useState<WorkbenchState | null>(null)
   const [loading, setLoading] = useState(false)
@@ -724,25 +686,101 @@ export default function WorkspacePane({ runtimeReady }: Props) {
   }, [runtimeReady])
 
   return (
-    <aside className="workspace" aria-label="工作台" data-loading={loading ? 'true' : 'false'}>
-      <div className="tabs" role="tablist">
-        {TABS.map((tab) => (
+    <aside
+      className={`workspace${collapsed ? ' workspace--collapsed' : ''}`}
+      aria-label="工作台"
+      data-loading={loading ? 'true' : 'false'}
+    >
+      <div className="workspace__head">
+        {collapsed ? (
           <button
-            key={tab.id}
-            role="tab"
-            className="tab"
-            data-tab={tab.id}
-            aria-selected={tab.id === active}
-            onClick={() => setActive(tab.id)}
+            type="button"
+            className="workspace__toggle"
+            aria-label="展开工作台"
+            title="展开工作台"
+            onClick={onToggle}
           >
-            {tab.label}
+            ‹
           </button>
-        ))}
+        ) : (
+          <>
+            <span className="workspace__name">工作台</span>
+            {state ? (
+              <GateSummary rows={state.gate} onOpen={() => setActive('gate')} />
+            ) : (
+              <span className="workspace__hint">载入中…</span>
+            )}
+            <button
+              type="button"
+              className="workspace__toggle"
+              aria-label="收起工作台"
+              title="收起工作台，专注对话"
+              onClick={onToggle}
+            >
+              ›
+            </button>
+          </>
+        )}
       </div>
 
-      {state ? <GateBar rows={state.gate} /> : null}
+      {collapsed ? (
+        <div className="workspace__icons">
+          {state ? (
+            <div
+              className="workspace__gate-dots"
+              title={state.gate.map((row) => `${row.label}：${row.detail}`).join('\n')}
+            >
+              {state.gate.map((row) => (
+                <i key={row.id} data-ok={row.ok ? 'true' : 'false'} />
+              ))}
+            </div>
+          ) : null}
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className="workspace-icon"
+              data-tab={tab.id}
+              title={tab.label}
+              aria-label={tab.label}
+              onClick={() => {
+                setActive(tab.id)
+                onToggle()
+              }}
+            >
+              {tab.icon}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="tabs" role="tablist">
+            {TAB_GROUPS.map((group) => (
+              <div className="tabs__group" key={group.label}>
+                <span className="tabs__label">{group.label}</span>
+                <div className="tabs__set">
+                  {group.ids.map((id) => {
+                    const tab = TABS.find((item) => item.id === id)
+                    if (!tab) return null
+                    return (
+                      <button
+                        key={tab.id}
+                        role="tab"
+                        className="tab"
+                        data-tab={tab.id}
+                        aria-selected={tab.id === active}
+                        onClick={() => setActive(tab.id)}
+                      >
+                        {tab.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
 
-      <div className="workspace__body" role="tabpanel">
+          <div className="workspace__body" role="tabpanel">
         {!state && !error && active !== 'files' ? (
           <div className="card">运行时准备好后载入工作台…</div>
         ) : null}
@@ -803,7 +841,9 @@ export default function WorkspacePane({ runtimeReady }: Props) {
         {state && active === 'paper' ? (
           <PaperPanel state={state} building={building} error={error} onBuild={() => void buildPaper()} />
         ) : null}
-      </div>
+          </div>
+        </>
+      )}
     </aside>
   )
 }

@@ -92,11 +92,7 @@ export default function FilesPanel() {
 
   return (
     <div className="panel" data-panel="files">
-      <div className="panel__head">
-        <div>
-          <div className="panel__kicker">工作台 · 文件</div>
-          <h2 className="panel__title">工作区</h2>
-        </div>
+      <div className="panel__bar">
         <span className="panel__meta">
           {listing ? `${files} 个文件${dirs > 0 ? ` · ${dirs} 个文件夹` : ''} · ${formatSize(listing.totalSize)}` : ''}
         </span>

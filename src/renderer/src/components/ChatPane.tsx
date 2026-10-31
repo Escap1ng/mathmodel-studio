@@ -9,6 +9,7 @@ import type {
 import type { DecisionAction, ProviderView, RuntimeStatus, StagedFile } from '../../../shared/api'
 import { buildContextText, type SendExtras } from '../lib/attachments'
 import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
+import { formatTokens } from '../lib/context'
 import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
 import DecisionCard, { type ModelCandidate } from './DecisionCard'
 import DropZone from './DropZone'
@@ -54,6 +55,11 @@ interface Props {
   currentPhase?: number
   mode: 'workflow' | 'chat'
   pending: boolean
+  conversationTitle: string
+  contextLabel: string
+  depthLabel: string
+  usedTokens: number
+  trimNote: string | null
   onModeChange: (mode: 'workflow' | 'chat') => void
   onSend: (text: string, extras?: SendExtras) => void
   onStop: () => void
@@ -61,6 +67,7 @@ interface Props {
   onExplain: (candidate: ModelCandidate) => void
   onOpenSettings: () => void
   onRestart: () => void
+  onClearCurrent: () => void
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -204,13 +211,19 @@ export default function ChatPane({
   currentPhase,
   mode,
   pending,
+  conversationTitle,
+  contextLabel,
+  depthLabel,
+  usedTokens,
+  trimNote,
   onModeChange,
   onSend,
   onStop,
   onDecision,
   onExplain,
   onOpenSettings,
-  onRestart
+  onRestart,
+  onClearCurrent
 }: Props) {
   const [draft, setDraft] = useState('')
   const streamRef = useRef<HTMLDivElement>(null)
@@ -525,6 +538,28 @@ export default function ChatPane({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
+      <header className="chat__head">
+        <div className="chat__head-main">
+          <span className="chat__head-kind">{mode === 'workflow' ? '建模会话' : '自由问答'}</span>
+          <h1 className="chat__head-title" title={conversationTitle}>
+            {conversationTitle}
+          </h1>
+        </div>
+        <div className="chat__head-side">
+          <span
+            className="chat__head-meter"
+            title="按估算 token 显示；历史回放按这个预算截断，不是模型硬上限"
+          >
+            上下文约 {formatTokens(usedTokens)} / {contextLabel}
+          </span>
+          {entries.length > 0 ? (
+            <button type="button" className="linkbtn" data-action="clear-current" onClick={onClearCurrent}>
+              新对话
+            </button>
+          ) : null}
+        </div>
+      </header>
+
       <div className="chat__stream" ref={streamRef}>
         <div className="chat__column">
           {entries.length === 0 ? (
@@ -575,6 +610,11 @@ export default function ChatPane({
       {entries.length > 0 && attachNotice ? (
         <div className="chat__banner" role="alert">
           <span>{attachNotice}</span>
+        </div>
+      ) : null}
+      {trimNote ? (
+        <div className="chat__banner chat__banner--soft" data-role="trim-note">
+          <span>{trimNote}</span>
         </div>
       ) : null}
 
@@ -657,6 +697,15 @@ export default function ChatPane({
             {provider
               ? `${provider.display} · ${provider.model}`
               : '未选择模型'}
+          </button>
+          <button
+            type="button"
+            className="pill pill--button pill--params"
+            onClick={onOpenSettings}
+            disabled={!provider}
+            title={`上下文预算 ${contextLabel}，已用约 ${formatTokens(usedTokens)}；思维深度 ${depthLabel}。点击修改。`}
+          >
+            {contextLabel} · {depthLabel}
           </button>
           <span className="pill" data-role="phase-pill">
             {phaseText}

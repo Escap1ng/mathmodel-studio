@@ -19,6 +19,13 @@ __pycache__/
 # 打包产物与缓存
 .cache/
 tmp/
+# M6 随包工具链：本机准备，不入库（体积与许可证都归上游）
+vendor/python/
+vendor/pandoc/
+vendor/*.zip
+vendor/.downloads/
+# 图标栅格化产物；源是 build/icon-candidates/*.svg 与最终的 build/icon.*
+build/icon-candidates/*.png
 # 冒烟产物由 CI 上传为 artifact；只挡这几个具体文件，
 # 免得将来要提交的界面截图（screenshots/*.png）被整目录规则一起吞掉
 screenshots/window-smoke.png

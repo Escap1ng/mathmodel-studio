@@ -1,0 +1,60 @@
+# electron-builder 配置（M6）
+#
+# 资源布局：runtime/skills/schemas/VERSION/python/pandoc 都放在 resources/ 下，
+# 与 src/main/runtime-env.ts 的 APP_ROOT 对齐；app.asar 里只放 JS 产物。
+# vendor/python 与 vendor/pandoc 由 scripts/prepare-vendor.mjs 准备，不入库。
+appId: cn.escap1ng.mathmodel-studio
+productName: MathModel Studio
+copyright: Copyright © 2026 Escap1ng
+
+directories:
+  output: release
+  buildResources: build
+
+# 只留中英文 Chromium 语言包，其余 locale 不进包（约省 45MB）
+electronLanguages:
+  - zh-CN
+  - en-US
+
+files:
+  - out/**/*
+  - package.json
+  - node_modules/pdfjs-dist/**/*
+
+extraResources:
+  - from: runtime
+    to: runtime
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+  - from: skills
+    to: skills
+  - from: schemas
+    to: schemas
+  - from: VERSION
+    to: VERSION
+  - from: vendor/python
+    to: python
+  - from: vendor/pandoc/pandoc.exe
+    to: pandoc/pandoc.exe
+
+# 主进程用 createRequire 加载 pdfjs 的 legacy 构建，从 asar 里读 worker/字体不稳。
+asarUnpack:
+  - node_modules/pdfjs-dist/**
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # 图标先挂起：build/ 下不放 icon.ico/png，electron-builder 会回落到 Electron 默认图标。
+  # 定稿后在这里加回 icon: build/icon.ico（由 scripts/make-icon.mjs 从 build/icon.svg 生成）。
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: MathModel Studio
+  artifactName: ${name}-${version}-setup.${ext}
