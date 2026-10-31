@@ -190,7 +190,7 @@ LaTeX 路线已在 2026-10-30 定为 **xelatex 优先**（接 kit 现状），Wo
 
 ```
 Escap1ng/<仓库名>/
-├── README.md / README_EN.md / CHANGELOG.md / VERSION / LICENSE(Apache-2.0)
+├── README.md / README_EN.md / CHANGELOG.md / VERSION / LICENSE(AGPL-3.0-only)
 ├── docs/            架构、交互规格、provider 指南、环境手册、upgrade-plan(+_EN)
 ├── skills/          vendor 自 kit v2.0.1，含 VENDOR.md 记录来源 commit 与差异
 ├── runtime/         providers/ orchestrator/ tools/ artifacts/ server/ events/

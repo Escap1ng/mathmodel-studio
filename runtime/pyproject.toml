@@ -3,7 +3,7 @@ name = "mms-runtime"
 version = "0.6.0"
 description = "mathmodel-studio 的 Agent 运行时：技能注册表读取、阶段编排、provider 适配与产物登记"
 requires-python = ">=3.12"
-license = { text = "Apache-2.0" }
+license = { text = "AGPL-3.0-only" }
 authors = [{ name = "Escap1ng" }]
 # runtime 本身只依赖标准库：注册表读取与校验在 jsonschema 缺席时降级为内置最小校验。
 # 技能脚本的依赖（matplotlib 等）不装进 runtime 包，统一写在仓库根 requirements.txt。

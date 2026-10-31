@@ -9,7 +9,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/skills-7-7B5FD6?style=flat" alt="skills">
-  <img src="https://img.shields.io/badge/license-Apache--2.0-1A6FC4?style=flat" alt="license">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-1A6FC4?style=flat" alt="license">
   <img src="https://img.shields.io/badge/Python-3.12+-2E9E44?style=flat" alt="Python">
   <img src="https://img.shields.io/badge/desktop-Electron-2B4C7E?style=flat" alt="desktop">
 </p>
@@ -155,4 +155,4 @@ This tool assists modeling work that has already been done: typesetting, publica
 
 ## License
 
-[Apache-2.0](LICENSE). Copyright and license of the skill content are retained with this repository; versions and provenance are recorded in [`skills/VENDOR.md`](skills/VENDOR.md).
+[AGPL-3.0-only](LICENSE). This repository is released as a whole under AGPL-3.0-only; distributing the software or a modified version requires providing the corresponding source under that license. Files under [`skills/`](skills/) that are Apache-2.0 retain their original license and notices; versions and provenance are recorded in [`skills/VENDOR.md`](skills/VENDOR.md).
