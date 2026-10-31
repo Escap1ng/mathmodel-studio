@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-label="MathModel Studio architecture">
   <rect width="1200" height="640" fill="#ffffff"/>
+  <rect x="1" y="1" width="1198" height="638" fill="none" stroke="#D0D7DE" stroke-width="2"/>
   <text x="40" y="42" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="600" fill="#1E293B">Runtime architecture</text>
   <text x="40" y="64" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#64748B">Desktop, process boundaries and data flow</text>
 

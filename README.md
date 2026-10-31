@@ -27,6 +27,8 @@
   <img src="docs/images/workbench.png" alt="MathModel Studio：左侧会话与阶段轨道，中间 K3 选模卡" width="100%">
 </p>
 
+<p align="center"><sub>工作台：左侧会话与阶段轨道，中间三条候选的 K3 选模卡</sub></p>
+
 > **设计原则**：能自动校验的交给门禁，需要判断的留给人，判断点做成界面。
 >
 > 桌面程序内置一组技能（出版级图表、排版规范、AI 痕迹检查、结构自检与评分）。模型由使用者接入，数据不出本机。
@@ -44,18 +46,18 @@ MathModel Studio 面向正在推进建模工作、准备交付的参赛者与研
 
 截图来自实际界面（1.5 倍像素密度）：首图是最大化窗口，其余裁自 1440×900 窗口。会话内容来自离线演示，没有真实赛题和密钥。
 
-<img src="docs/images/decision.png" width="100%" alt="K3 选模卡：三条候选路线与字段对照">
+<p align="center"><img src="docs/images/decision.png" width="100%" alt="K3 选模卡：三条候选路线与字段对照"></p>
 
-选模：每条候选路线逐项列出创新度、可解释性、实现难度、预计耗时、精度与鲁棒性，可以直接选，也可以先看解释。
+<p align="center"><sub>K3 选模：三条候选路线逐项对比，可直接选，也可先看解释</sub></p>
 
 | 评分与扣分定位 | 论文排版与 PDF 预览 |
 | --- | --- |
 | <img src="docs/images/score.png" width="100%" alt="五维评分与扣分明细"> | <img src="docs/images/paper.png" width="100%" alt="论文排版与 PDF 预览"> |
-| 五维得分、扣分明细和正文定位 | xelatex → pandoc → 三道门禁与页级预览 |
+| <sub>五维得分、扣分明细和正文定位</sub> | <sub>xelatex → pandoc → 三道门禁与页级预览</sub> |
 
-<img src="docs/images/conversation.png" width="100%" alt="对话、工具卡与门禁">
+<p align="center"><img src="docs/images/conversation.png" width="100%" alt="对话、工具卡与门禁"></p>
 
-对话：流式回复、工具卡和四项门禁结果在同一条时间线上。
+<p align="center"><sub>对话：流式回复、工具卡和四项门禁结果在同一条时间线上</sub></p>
 
 ## 当前状态
 
