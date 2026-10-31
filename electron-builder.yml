@@ -34,6 +34,12 @@ extraResources:
     to: schemas
   - from: VERSION
     to: VERSION
+  - from: LICENSE
+    to: LICENSE.txt
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+  - from: licenses
+    to: licenses
   - from: vendor/python
     to: python
   - from: vendor/pandoc/pandoc.exe

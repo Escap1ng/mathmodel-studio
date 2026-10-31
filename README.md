@@ -9,7 +9,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/%E6%8A%80%E8%83%BD-7-7B5FD6?style=flat" alt="技能">
-  <img src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-Apache--2.0-1A6FC4?style=flat" alt="许可证">
+  <img src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-AGPL--3.0-1A6FC4?style=flat" alt="许可证">
   <img src="https://img.shields.io/badge/Python-3.12+-2E9E44?style=flat" alt="Python">
   <img src="https://img.shields.io/badge/%E6%A1%8C%E9%9D%A2%E7%AB%AF-Electron-2B4C7E?style=flat" alt="桌面端">
 </p>
@@ -155,4 +155,4 @@ M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.0-setup.exe`
 
 ## 许可
 
-[Apache-2.0](LICENSE)。技能内容的版权与许可随本仓库一并保留，版本与出处记录见 [`skills/VENDOR.md`](skills/VENDOR.md)。
+[AGPL-3.0-only](LICENSE)。本仓库整体以 AGPL-3.0-only 发布；分发本软件或其修改版时，需按该许可提供对应源码。[`skills/`](skills/) 中的 Apache-2.0 文件保留原许可与版权声明，版本与出处记录见 [`skills/VENDOR.md`](skills/VENDOR.md)。

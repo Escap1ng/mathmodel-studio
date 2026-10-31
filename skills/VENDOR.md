@@ -1,6 +1,6 @@
 # Vendor 记录
 
-本目录的技能内容来自 [`Escap1ng/mathmodel-kit`](https://github.com/Escap1ng/mathmodel-kit) **v2.0.1**（Apache-2.0），已在 M1 原样引入；0.6.0 同步了 tag 之后的一个文档提交（`3e23952`，预测题数据角色门禁），无代码改动。
+本目录的技能内容来自 [`Escap1ng/mathmodel-kit`](https://github.com/Escap1ng/mathmodel-kit) **v2.0.1**（Apache-2.0），已在 M1 原样引入；0.6.0 同步了 tag 之后的一个文档提交（`3e23952`，预测题数据角色门禁），无代码改动。这些文件按 Apache-2.0 保留原许可与署名；本仓库整体以 AGPL-3.0-only 分发，不改变本目录文件原有的许可。
 
 ## 来源
 
