@@ -3,7 +3,7 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
 
-## 未发布 - 2026-10-31
+## 0.6.0 - 2026-10-31
 
 多对话、五家模型预设与可收起的右栏。
 
@@ -26,10 +26,16 @@
 - G4 新增 4 条（C14）：思维深度写入 `reasoning_effort`、关闭开关时不带字段、上下文预算截断最早历史、截断后仍能跑完；总数 47 → 52。
 - G7 的截图统一走重试封装，避免 Windows 遮挡时 `capturePage()` 的 `UnknownVizError` 把整轮判成脚本异常。
 
-### 验证（本机 Windows，2026-10-31）
+### 打包与仓库
+
+- **NSIS 安装包**：electron-builder 配置与随包工具链（便携 Python、pandoc）接线完成；本机构建 `mathmodel-studio-0.6.0-setup.exe`（约 264 MB，未签名、Electron 默认图标），尚未在干净机器上安装验证。
+- **仓库收尾**：studio 历史并入原技能库并改名为 `Escap1ng/mathmodel-studio`，原私有仓改名为 `mathmodel-studio-archive`；旧 Release 与 tag 已清理，`skills/VENDOR.md` 记录同步。
+
+### 验证（本机 Windows 与 CI，2026-10-31）
 
 - `npm run typecheck`、`npm run build` 通过；`python runtime/selfcheck_channel.py` 52/52；G7 真启动 97/97，G6b 独立核验一致（内容尺寸 1440x900，非白像素 4.09%）。
-- **这一批尚未跑 CI**，也未用真实 DeepSeek / Qwen / Kimi / GLM Key 联网；模型名来自官网 2026-10，参数效果不在证据里。
+- CI run `41172805948` 三 job 全绿：ubuntu 真启动 97/97、内容尺寸 1440x900、非白像素 4.16%，G6b 核验一致；ubuntu 与 windows 门禁 job 均通过，Windows 的 G10 显式跳过并标注未验证。
+- 未用真实 DeepSeek / 通义千问 / Kimi / 智谱 GLM Key 联网；模型名来自官网 2026-10，参数效果不在证据里。
 
 ## 0.5.3 - 2026-10-30
 
