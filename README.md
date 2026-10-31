@@ -25,9 +25,9 @@
 > **能交给机器校验的，交给门禁；该由人判断的，留给人，并且把判断点做成界面。**
 > 本项目把 [mathmodel-kit](https://github.com/Escap1ng/mathmodel-kit) 的契约化技能集（出版级图表、排版规范、降 AI 检查、结构自检与评分）落到一个本地桌面程序里：模型自带、数据不外传、过程可审计。
 
-**当前状态：M5 排版全链路**。M3 的编排闭环仍在：发赛题停在 **K2**，确认后给 3 张 **K3 选模卡**，可换一批、可打开 **K4 解释抽屉**；待决卡跨重启保留。M4 的工作台保留：图表真渲、换主题重渲、并排 diff、回滚；五维评分与扣分定位。M5 把右栏「论文」页接成真流水线：**xelatex 两遍 → pandoc 转 Word → Word 版式微调 → 去 AI 措辞 / 结构指标 / 章节结构三道门禁**，PDF 用 pdf.js 做页级预览；顶部门禁条变成图表 / 评分 / 章节 / 论文排版四项。右栏宽度默认按窗口取 38%（460–1100px），工作台栏边界与输入框上沿都可拖拽，双击复位；左栏固定 240px。栏边界的高亮是一道以指针为中心、向两端渐隐的光带，输入框上沿常显一条空心描边长条。中栏空态是一个拖放框：整列可拖入赛题或数据文件；发送时主进程抽出正文（PDF 用 pdfjs、文本与 CSV 直读并报行列）随消息交给模型，界面只显示附件胶囊。右栏「文件」页可查看工作区并切换目录，工作区默认在桌面「赛题」，首启创建。
+**当前状态：0.6.0 多对话、五家模型预设与可收起右栏**。M3 的编排闭环仍在：发赛题停在 **K2**，确认后给 3 张 **K3 选模卡**，可换一批、可打开 **K4 解释抽屉**；待决卡跨重启保留。M4 的工作台保留：图表真渲、换主题重渲（只显示当前一张，旧版收进历史）、回滚；五维评分与扣分定位。M5 把右栏「论文」页接成真流水线：**xelatex 两遍 → pandoc 转 Word → Word 版式微调 → 去 AI 措辞 / 结构指标 / 章节结构三道门禁**，PDF 用 pdf.js 做页级预览；顶部门禁条变成图表 / 评分 / 章节 / 论文排版四项。右栏宽度默认按窗口取 38%（460–1100px），工作台栏边界与输入框上沿都可拖拽，双击复位；左栏固定 240px。栏边界的高亮是一道以指针为中心、向两端渐隐的光带，输入框上沿常显一条空心描边长条。中栏空态是一个拖放框：整列可拖入赛题或数据文件；发送时主进程抽出正文（PDF 用 pdfjs、文本与 CSV 直读并报行列）随消息交给模型，界面只显示附件胶囊。右栏「文件」页可查看工作区并切换目录，工作区默认在桌面「赛题」，首启创建。
 论文页的「构建」是工作台动作，**阶段机不会因构建成功自动把阶段五标成已过**，也不会替你写正文；现在编译的是仓库里的演示稿 `runtime/src/mms/paper_sample/paper.tex`（约 7 页），不是对真实赛题的自动解答。模型接入、流式对话、工具卡与 Key 的 `safeStorage` 边界沿用 M2；没有 Key 也能开 `MMS_FAKE_PROVIDER=1` 的离线演示，见 [docs/providers.md](docs/providers.md)。
-里程碑见 [PLAN.md](PLAN.md) §7；打包、便携 Python 与 Release 在 M6。
+里程碑见 [PLAN.md](PLAN.md) §7；M6 的打包已接线：electron-builder + 随包便携 Python/pandoc，本机已打出 0.6.0 安装包，首个 Release 尚未发布。
 要接手或复核，先读 [docs/HANDOFF.md](docs/HANDOFF.md)：哪些结论已被证明、哪些还没有、以及这一轮踩过的坑。
 
 ## 快速开始
@@ -49,7 +49,7 @@ npm run gate
 ```
 
 `npm run gate` 全绿即说明脚手架自洽；它不依赖网络，也不依赖显示器。论文自检需要本机有 `xelatex` 与 `pandoc`（见「依赖」）。
-界面分「建模」与「问答」两种输入：建模会把赛题送进状态机并停在决策卡，问答保持 M2 的自由流式对话与工具卡。左栏现在同时是会话列表：建模与问答会话都能新建、切换、单条删除或一键清空，问答会话存在本地、建模会话从 SQLite 读；中栏顶部显示当前会话与上下文用量。右栏工作台可先渲染一张样例图，再换主题重渲；评分页能点开扣分项看到正文位置；论文页点「构建论文」真编演示稿、跑三道门禁并预览 PDF；文件页列出工作区里的文件并可直接切换工作区。右栏可收成 56px 图标条，展开时标签按「产出 / 评审 / 资料」分组，门禁摘要并入栏头。模型设置提供 DeepSeek、通义千问、Kimi、智谱 GLM 与 OpenAI 格式五类入口，可选 200k / 400k / 1m 上下文预算与中 / 高 / 最大思维深度。截图见 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`、`screenshots/paper.png`、`screenshots/dropzone.png`、`screenshots/files.png`（本地生成，不入库）。
+界面分「建模」与「问答」两种输入：建模会把赛题送进状态机并停在决策卡，问答保持 M2 的自由流式对话与工具卡。左栏现在同时是会话列表：建模与问答会话都能新建、切换、单条删除或一键清空，问答会话存在本地、建模会话从 SQLite 读；中栏顶部显示当前会话与上下文用量。右栏工作台可先渲染一张样例图，再换主题重渲，旧版留在历史条里可回滚；评分页能点开扣分项看到正文位置；论文页点「构建论文」真编演示稿、跑三道门禁并预览 PDF；文件页列出工作区里的文件并可直接切换工作区。右栏可收成 56px 图标条，展开时标签按「产出 / 评审 / 资料」分组，门禁摘要并入栏头。模型设置提供 DeepSeek、通义千问、Kimi、智谱 GLM 与 OpenAI 格式五类入口，可选 200k / 400k / 1m 上下文预算与中 / 高 / 最大思维深度。截图见 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`、`screenshots/paper.png`、`screenshots/dropzone.png`、`screenshots/files.png`（本地生成，不入库）。
 
 ## 这是什么
 
@@ -85,7 +85,7 @@ npm run gate
 | [`mathmodel-deai`](skills/mathmodel-deai/) | 降 AI 与交付核查：词表级、结构级、字符级三道门禁 | vendored |
 | [`mathmodel-score`](skills/mathmodel-score/) | 结构自检与评分：章节门槛 + 百分制五维评分卡 | vendored |
 
-技能内容来自 [mathmodel-kit](https://github.com/Escap1ng/mathmodel-kit) v2.0.1（Apache-2.0），引入规则与 re-sync 记录见 [`skills/VENDOR.md`](skills/VENDOR.md)。运行时**只用 subprocess 调用技能脚本并按退出码判定**，所以每个技能仍能被 Claude Code 等宿主单独装载、单独使用。
+技能内容来自 [mathmodel-kit](https://github.com/Escap1ng/mathmodel-kit) v2.0.1 与 tag 后的文档提交 `3e23952`（Apache-2.0），引入规则与 re-sync 记录见 [`skills/VENDOR.md`](skills/VENDOR.md)。运行时**只用 subprocess 调用技能脚本并按退出码判定**，所以每个技能仍能被 Claude Code 等宿主单独装载、单独使用。
 
 ## 已实现的质量门禁
 
@@ -100,19 +100,19 @@ npm run gate
 | G3 CLI 契约 | 退出码 `0 成功 / 1 校验失败 / 2 用法或环境错误` 三码各自可达；M1 起真调上游渲染器出一张图，并独立核验 PNG/PDF/SVG 三件产物非空 | 词表外取值→1、非法 JSON→1、空 `MMS_HOME`→2、未知子命令/未知模板→2、渲染器假成功（退出 0 但没写产物）→1（`runtime/selfcheck.py`） |
 | G4 事件流 | 握手一行 JSON；Bearer token 与 Host/Origin 回环白名单；SSE 九类事件按契约校验；`Last-Event-ID` 续传；取消后必须收到 `done.reason=cancelled`。M3 追加：新赛题停在 K2、确认进 K3、换一批、选择后进阶段四，以及**换一个服务器进程仍读得到待决卡**；0.6.0 追加思考深度进入请求体、关闭开关时不带字段、上下文预算截断最早历史（52 条） | 10 种坏事件逐个必须被拒；无 token / 错 Host / 无待决时恢复被拒（`python runtime/selfcheck_channel.py --selftest`） |
 | G5 provider 离线契约 | 本地假 OpenAI 端点跑 429 退避、`reasoning_content` 与正文分离、分片 `tool_calls` 拼装、历史剥离 reasoning、Key 只出现在 Authorization | Key 哨兵不得出现在事件流与 stderr；未开 `MMS_FAKE_PROVIDER` 时必须拒绝假 provider（同上） |
-| G9 工作台 | 真渲两版图（nature → studio-ink）、并排版本与回滚、未知模板/主题/版本被拒且不落版本；三轮评分、扣分正文定位、章节样例与一票否决示例（13 条） | 未知模板/主题/版本均为反向；需要 matplotlib（gates job 已装） |
+| G9 工作台 | 真渲两版图（nature → studio-ink）、版本历史与回滚、未知模板/主题/版本被拒且不落版本；三轮评分、扣分正文定位、章节样例与一票否决示例（13 条） | 未知模板/主题/版本均为反向；需要 matplotlib（gates job 已装） |
 | G10 论文排版 | 真跑 xelatex 两遍 → pandoc → Word 后处理：PDF/DOCX 文件头与体积、六个步骤、三道门禁、状态落盘；缺 pandoc 明确拒绝；坏稿仍出 PDF 但门禁判红；坏 TeX 退出 1；稿件不存在退出 2（10 条） | 缺件、坏稿、坏 TeX、缺稿件四条反向；`MMS_PAPER_SKIP=1` 才允许跳过，且会打印未验证（`runtime/selfcheck_paper.py`） |
 | G6 桌面骨架 | 类型检查 + 构建 + 产物里确实含有本项目的中文文案与设计令牌名 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
-| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗，再断言：加载构建产物、内容尺寸 1440×900、非白像素 ≥1%、IPC 端到端、阶段轨道与输入区、中文真字形、设置页不回显 Key 且落盘只有密文/明确拒绝；M3 追加 K2→K3→解释抽屉→换一批→选择→阶段四与跨重启恢复；M4 追加首版渲染、换主题重渲 diff、回滚、评分五维/86、扣分定位、第三轮熔断、一票否决与门禁条；M5 追加论文页构建、PDF/DOCX、三道门禁与 pdf.js 预览；M5.1 追加宽屏右栏比例、宽屏论文页/评分页两栏、中/右分隔条、左栏固定、输入框上沿拖拽与空心长条、光带跟随指针；M5.2 追加附件拖放（框与加号、拖拽高亮、CDP 真拖放落盘与移除、坏文件原因）、文件页列表与默认工作区（74 条）；M5.3 追加附件正文抽取（PDF/CSV、行列数）、附件随消息送入与重开还原、K2 附件登记（78 条）；0.5.3 把操作行移出输入卡片、按钮行位置不随拉伸改变、去掉常驻附件按钮并支持粘贴截图（82 条）；0.6.0 增加多对话历史与清空、五家预设与上下文/深度选择器、右栏收起与分组（97 条）；M2 自由问答与工具卡保留为回归 | 空白截图过不了像素阈值；自建窗口的假版本、豆腐块截图、删掉关键断言再补满条数，三类都暴露过（`tests/window-smoke.cjs`） |
+| G7 真启动冒烟 | `require` 生产入口 `out/main/index.js` 起窗，再断言：加载构建产物、内容尺寸 1440×900、非白像素 ≥1%、IPC 端到端、阶段轨道与输入区、中文真字形、设置页不回显 Key 且落盘只有密文/明确拒绝；M3 追加 K2→K3→解释抽屉→换一批→选择→阶段四与跨重启恢复；M4 追加首版渲染、换主题重渲（只显示当前一张）、回滚、评分五维/86、扣分定位、第三轮熔断、一票否决与门禁条；M5 追加论文页构建、PDF/DOCX、三道门禁与 pdf.js 预览；M5.1 追加宽屏右栏比例、宽屏论文页/评分页两栏、中/右分隔条、左栏固定、输入框上沿拖拽与空心长条、光带跟随指针；M5.2 追加附件拖放（框与加号、拖拽高亮、CDP 真拖放落盘与移除、坏文件原因）、文件页列表与默认工作区（74 条）；M5.3 追加附件正文抽取（PDF/CSV、行列数）、附件随消息送入与重开还原、K2 附件登记（78 条）；0.5.3 把操作行移出输入卡片、按钮行位置不随拉伸改变、去掉常驻附件按钮并支持粘贴截图（82 条）；0.6.0 增加多对话历史与清空、五家预设与上下文/深度选择器、右栏收起与分组（97 条）；M2 自由问答与工具卡保留为回归 | 空白截图过不了像素阈值；自建窗口的假版本、豆腐块截图、删掉关键断言再补满条数，三类都暴露过（`tests/window-smoke.cjs`） |
 | G6b 结果核验 | 读 `screenshots/window-smoke.json` 并**复算读数**：内容尺寸、非白像素比、断言条数下限、关键断言是否还在、自述计数与明细一致 | 带 `--selftest`，12 份合成结果证明「ok=true 但读数不对」「删掉 M2/M3/M4/M5 的关键断言再补满条数」照样被拒（`scripts/check-window-smoke.mjs`） |
 
 G7 在 CI 里先把 Electron 的 SUID 沙箱助手修好（root:4755）再启动，所以 preload 与 IPC 是在生产那套 `sandbox: true` 下验的，不是靠 `--no-sandbox` 绕过。
 为什么要有 G6b 这道独立核验：CI 里曾经出现过冒烟打印「10/12 项通过」但 job 是绿的——`app.exit(1)` 被生产入口的 `window-all-closed → app.quit()` 抢先顶掉了。通过与否从此不吊在 Electron 的退出码管道上。
-**仍未覆盖**：真实 DeepSeek/Kimi 的联网对话（本仓库没有 Key，也不该有）、CI 的 Windows 真起窗、CSP 违规场景的主动探测。
+**仍未覆盖**：五家服务商的真实联网对话（本仓库没有 Key，也不该有）、CI 的 Windows 真起窗、CSP 违规场景的主动探测、安装包在干净机器上的安装与运行。
 
 退出码约定、注册表字段与产物路径属于 **Stable**；`--json` 字段顺序与错误措辞属于 **Experimental**；脚本内几何常量属于 **Internal**。
 
-**执行状态要说清**：M5 的本机 `npm run gate` 全绿——G1（含 9 条反向覆盖）、G8（含 6 条反向覆盖）、G2（完整与降级两种模式）、G3（13 条断言）、G4（52 条通道断言，含跨进程恢复、思考深度与上下文截断）、事件判据自测（10/10）、G9（13 条工作台断言）、G10（10 条论文断言）、G6b 自测（12/12）、类型检查、构建与 G6 产物冒烟。G7 在本机 Windows 上 97 条全过，独立核验通过；选模卡、图表工作台、评分卡、论文页、拖放区、文件页与附件气泡截图在 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`、`screenshots/paper.png`、`screenshots/dropzone.png`、`screenshots/files.png`、`screenshots/attachments.png`。0.6.0 这批界面改动**尚未跑 CI**，本机 G7 的 97 条与 G6b 核验是当前证据。
+**执行状态要说清**：整套本机 `npm run gate` 在 M5 时全绿，逐项清单见 `CHANGELOG.md` 的 0.5.x。0.6.0 这一批重跑的是 typecheck、构建、G4（52 条，含思考深度与上下文截断）、G7（97 条）与 G6b 核验；G1/G8/G2/G3/G9/G10 未因这批改动重跑。G7 在本机 Windows 上 97 条全过，独立核验通过；选模卡、图表工作台、评分卡、论文页、拖放区、文件页与附件气泡截图在 `screenshots/decision.png`、`screenshots/figure.png`、`screenshots/score.png`、`screenshots/paper.png`、`screenshots/dropzone.png`、`screenshots/files.png`、`screenshots/attachments.png`。0.6.0 这批界面改动**尚未跑 CI**，本机 G7 的 97 条与 G6b 核验是当前证据；安装包 `release/mathmodel-studio-0.6.0-setup.exe`（264 MB，未签名、Electron 默认图标）已在本机打出，尚未在干净机器上安装验证。
 M5 的 CI（run `41017241564`）三 job 全绿：ubuntu 真启动 57/57、内容尺寸 1440x900、非白像素 2.96%，G6b 独立核验一致，G10 10/10、G9 13/13、G6 14/14；Windows 的 G10 显式跳过并标注未验证。0.5.2 的 CI（run `41065088121`）同样三 job 全绿：ubuntu 真启动 78/78、非白像素 3.81%，G6b 一致，双平台 G4 47/47、G9 13/13、G3 13/13，ubuntu 的 G10 10/10；Windows 的 G10 仍显式跳过并标注未验证。0.4.0 的 run `41008695577` 三 job 全绿：ubuntu 真启动 53/53、非白像素 3.98%。0.3.0/0.3.1 的 run `40982728779`、`41000678500` 同样三 job 全绿。M1/M2 的历史 run 与坑记录保留在 `CHANGELOG.md`，没有删。
 
 ## 依赖
@@ -126,7 +126,7 @@ M5 的 CI（run `41017241564`）三 job 全绿：ubuntu 真启动 57/57、内容
 | 出图（M1） | matplotlib、numpy、seaborn | 已随技能 vendor；版本下限写在 `requirements.txt`，安装走镜像 |
 | 论文预览（M5） | pdfjs-dist | 随 `npm install` 安装，worker 由 Vite 打进 `out/renderer/assets`，运行时不需要网络 |
 
-打包形态已定：**内置便携 Python 运行时**（bundled `uv` + python-build-standalone），用户不需要装 Python。TeX 与 pandoc 的打包方案（要求本机安装 / 内置 Tectonic / 两者都支持）还没定，M5 只做了本机检测与明确拒绝，留到 M6 处理。
+打包形态已定并接线：**内置便携 Python 运行时**（python-build-standalone，装在 `vendor/python`，不入库），用户不需要装 Python；pandoc 以 `vendor/pandoc/pandoc.exe` 随包放到 `resources/pandoc`。xelatex 仍要求本机安装（TeX Live 或 MiKTeX），TeX 未内置。NSIS x64 配置在 `electron-builder.yml`，随包工具链由 `scripts/prepare-vendor.mjs` 准备；当前安装包未签名，使用 Electron 默认图标。
 
 ## 定位与合规声明
 
