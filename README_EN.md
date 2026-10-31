@@ -27,6 +27,8 @@
   <img src="docs/images/workbench.png" alt="MathModel Studio: conversation and phase rail on the left, K3 model-choice cards in the middle" width="100%">
 </p>
 
+<p align="center"><sub>Workspace: conversation and phase rail on the left, three K3 candidate cards in the middle</sub></p>
+
 > **Design principle**: anything a machine can verify goes to a gate; anything that requires judgement stays with the user, with each decision point rendered as UI.
 >
 > This tool integrates a contract-driven skill set (publication-grade figures, typesetting rules, AI-trace checks, structural audit and scoring) into a local desktop program: the model is provided by the user, data stays on the machine, and every step is auditable.
@@ -44,18 +46,18 @@ MathModel Studio targets contestants and researchers who are already working thr
 
 Screenshots come from the real UI at 1.5× pixel density: the first is a maximized window, the rest are crops from a 1440×900 window. Conversation content comes from the offline demo and contains no real problem statement or key.
 
-<img src="docs/images/decision.png" width="100%" alt="K3 model-choice cards: three candidate routes with aligned fields">
+<p align="center"><img src="docs/images/decision.png" width="100%" alt="K3 model-choice cards: three candidate routes with aligned fields"></p>
 
-Model choice: three candidate routes aligned on innovation, interpretability, implementation difficulty, estimated time, precision and robustness — choose one directly or read the explanation first.
+<p align="center"><sub>K3 model choice: three candidate routes side by side — choose one directly or read the explanation first</sub></p>
 
 | Scoring and deduction targets | Paper typesetting and PDF preview |
 | --- | --- |
 | <img src="docs/images/score.png" width="100%" alt="Five-dimension score and deduction details"> | <img src="docs/images/paper.png" width="100%" alt="Paper typesetting and PDF preview"> |
-| Five dimensions, deductions and in-text targets | xelatex → pandoc → three gates and page-level preview |
+| <sub>Five dimensions, deductions and in-text targets</sub> | <sub>xelatex → pandoc → three gates and page-level preview</sub> |
 
-<img src="docs/images/conversation.png" width="100%" alt="Conversation, tool cards and gates">
+<p align="center"><img src="docs/images/conversation.png" width="100%" alt="Conversation, tool cards and gates"></p>
 
-Conversation: streamed replies, tool cards and the four-row gate result on one timeline.
+<p align="center"><sub>Conversation: streamed replies, tool cards and the four-row gate result on one timeline</sub></p>
 
 ## Status
 
