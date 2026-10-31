@@ -52,6 +52,7 @@ open-dev.lnk
 .secrets/
 *.pem
 *.p12
+*.pfx
 .env
 .env.*
 !.env.example
