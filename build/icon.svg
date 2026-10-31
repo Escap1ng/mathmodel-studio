@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- 外圈渐变由分段实色弧模拟（MuPDF 不解析 SVG 渐变，会渲染成纯黑）；相邻段重叠 0.5 度遮缝 -->
+  <rect width="1024" height="1024" rx="224" fill="#FFFFFF"/>
+  <g fill="none" stroke-linecap="butt">
+    <path d="M555.0 889.6 A380 380 0 0 1 520.2 891.9" stroke="#8A9DAD" stroke-width="44"/>
+    <path d="M526.9 891.7 A380 380 0 0 1 492.0 891.5" stroke="#879AAA" stroke-width="44"/>
+    <path d="M498.6 891.8 A380 380 0 0 1 463.9 888.9" stroke="#8497A7" stroke-width="44"/>
+    <path d="M470.5 889.7 A380 380 0 0 1 436.0 884.3" stroke="#8194A5" stroke-width="44"/>
+    <path d="M442.5 885.6 A380 380 0 0 1 408.6 877.7" stroke="#7E91A2" stroke-width="44"/>
+    <path d="M415.0 879.4 A380 380 0 0 1 381.7 869.0" stroke="#7B8E9F" stroke-width="44"/>
+    <path d="M388.0 871.2 A380 380 0 0 1 355.6 858.3" stroke="#788B9C" stroke-width="44"/>
+    <path d="M361.6 861.0 A380 380 0 0 1 330.3 845.7" stroke="#758899" stroke-width="44"/>
+    <path d="M336.1 848.9 A380 380 0 0 1 306.0 831.3" stroke="#728596" stroke-width="44"/>
+    <path d="M311.6 834.9 A380 380 0 0 1 282.9 815.1" stroke="#6F8294" stroke-width="44"/>
+    <path d="M288.2 819.1 A380 380 0 0 1 261.0 797.3" stroke="#6C7F91" stroke-width="44"/>
+    <path d="M266.0 801.6 A380 380 0 0 1 240.5 777.9" stroke="#697C8E" stroke-width="44"/>
+    <path d="M245.2 782.6 A380 380 0 0 1 221.5 757.0" stroke="#677A8B" stroke-width="44"/>
+    <path d="M225.8 762.0 A380 380 0 0 1 204.1 734.7" stroke="#647788" stroke-width="44"/>
+    <path d="M208.1 740.1 A380 380 0 0 1 188.4 711.3" stroke="#617485" stroke-width="44"/>
+    <path d="M192.0 716.9 A380 380 0 0 1 174.5 686.7" stroke="#5E7183" stroke-width="44"/>
+    <path d="M177.6 692.5 A380 380 0 0 1 162.5 661.1" stroke="#5B6E80" stroke-width="44"/>
+    <path d="M165.1 667.2 A380 380 0 0 1 152.4 634.8" stroke="#586B7D" stroke-width="44"/>
+    <path d="M154.6 641.0 A380 380 0 0 1 144.3 607.7" stroke="#55687A" stroke-width="44"/>
+    <path d="M146.0 614.1 A380 380 0 0 1 138.2 580.2" stroke="#526577" stroke-width="44"/>
+    <path d="M139.4 586.7 A380 380 0 0 1 134.1 552.2" stroke="#4F6274" stroke-width="44"/>
+    <path d="M134.9 558.8 A380 380 0 0 1 132.2 524.0" stroke="#4C5F72" stroke-width="44"/>
+    <path d="M132.5 530.7 A380 380 0 0 1 132.3 495.8" stroke="#495C6F" stroke-width="44"/>
+    <path d="M132.1 502.4 A380 380 0 0 1 134.6 467.7" stroke="#46596C" stroke-width="44"/>
+    <path d="M133.9 474.3 A380 380 0 0 1 161.0 366.5" stroke="#46596C" stroke-width="44"/>
+    <path d="M158.5 372.6 A380 380 0 0 1 213.9 276.3" stroke="#46596C" stroke-width="44"/>
+    <path d="M209.9 281.5 A380 380 0 0 1 289.4 204.0" stroke="#46596C" stroke-width="44"/>
+    <path d="M284.1 207.9 A380 380 0 0 1 381.8 155.0" stroke="#46596C" stroke-width="44"/>
+    <path d="M375.6 157.3 A380 380 0 0 1 484.1 133.0" stroke="#46596C" stroke-width="44"/>
+    <path d="M477.4 133.6 A380 380 0 0 1 588.4 139.8" stroke="#46596C" stroke-width="44"/>
+    <path d="M581.9 138.5 A380 380 0 0 1 687.0 174.7" stroke="#46596C" stroke-width="44"/>
+    <path d="M681.1 171.7 A380 380 0 0 1 772.3 235.1" stroke="#46596C" stroke-width="44"/>
+    <path d="M767.4 230.6 A380 380 0 0 1 837.9 316.6" stroke="#46596C" stroke-width="44"/>
+    <path d="M834.4 310.9 A380 380 0 0 1 878.8 412.8" stroke="#46596C" stroke-width="44"/>
+    <path d="M877.0 406.4 A380 380 0 0 1 892.0 516.5" stroke="#46596C" stroke-width="44"/>
+    <path d="M892.0 509.9 A380 380 0 0 1 876.4 619.9" stroke="#46596C" stroke-width="44"/>
+    <circle cx="551.7" cy="889.9" r="22.0" fill="#8A9DAD"/>
+    <circle cx="877.3" cy="616.7" r="22.0" fill="#46596C"/>
+    <path d="M465.1 246.1 A270 270 0 1 1 246.1 465.1" stroke="#46596C" stroke-width="44" stroke-linecap="round"/>
+  </g>
+  <path d="M691.6 524.6 A180 180 0 0 1 411.3 661.2" stroke="#EF8531" stroke-width="52" stroke-linecap="round" fill="none"/>
+</svg>
