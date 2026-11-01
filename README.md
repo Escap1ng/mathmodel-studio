@@ -164,7 +164,7 @@ npm run gate
 
 ## 验证状态
 
-0.6.1 在本机验证了类型检查、构建、完整 `npm run gate`（G4 52/52、G11 13/13、G12 14/14、G13 10/10、G9 13/13、G10 10/10）与 G7 100/100，G6b 独立复算一致（内容尺寸 1440×900、非白像素 3.83%）。0.6.1 尚未跑 CI；最近一次 CI 证据是 0.6.0 的 run [`41172805948`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41172805948)，三个任务全部通过。
+0.6.1 在本机验证了类型检查、构建、完整 `npm run gate`（G4 52/52、G11 13/13、G12 14/14、G13 10/10、G9 13/13、G10 10/10）与 G7 100/100，G6b 独立复算一致（内容尺寸 1440×900、非白像素 3.83%）。CI run [`41289813731`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41289813731) 的三个任务全部通过：ubuntu 真启动 100/100、内容尺寸 1440×900、非白像素 4.43%，G6b 复算一致；ubuntu 与 windows 门禁均通过，Windows 上的 G10 显式跳过并标注未验证。
 
 M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.1-setup.exe`，约 265 MB，自签名证书，未受信任的根，SmartScreen 会提示未知发布者），尚未在干净机器上安装验证。
 

@@ -32,7 +32,8 @@
 
 - `npm run typecheck`、`npm run build`、`npm run gate` 全部通过：注册表 8/8 与 9/9 破坏被拒、技能 6/6 与 7/7、构建产物 14/14、契约 9/9、G3 13/13、G4 52/52 与 10/10 坏事件被拒、G11 13/13 与 2/2 反向、G12 14/14 与 2/2 反向、G13 10/10、G9 13/13、G10 10/10。
 - G7 真启动 100/100，内容尺寸 1440×900，非白像素 3.83%；G6b 独立核验一致。
-- 未用真实 DeepSeek / 通义千问 / Kimi / 智谱 GLM Key 联网；0.6.1 未跑 CI，Windows CI 与干净机安装仍是未证项。
+- CI run [`41289813731`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41289813731) 三个任务全绿：ubuntu 真启动 100/100、内容尺寸 1440×900、非白像素 4.43%，G6b 复算一致；ubuntu 与 windows 门禁均通过，Windows 的 G10 显式跳过并标注未验证。
+- 未用真实 DeepSeek / 通义千问 / Kimi / 智谱 GLM Key 联网；Windows CI 真起窗与干净机安装仍是未证项。
 
 ## 0.6.0 - 2026-10-31
 
