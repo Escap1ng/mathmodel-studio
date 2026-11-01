@@ -115,7 +115,7 @@ The figure workbench calls the real renderer to produce PNG/PDF/SVG and keeps th
 
 ### Files and workspace
 
-The files tab lists the workspace and can switch directories; the default workspace is a `赛题` folder on the Desktop, created on first launch. Attachments can be dropped or pasted into the chat column; the main process extracts their text (pdfjs for PDFs, direct reads for text/CSV with row × column counts).
+The files tab lists the workspace and can switch directories; the default workspace is a `赛题` folder on the Desktop, created on first launch. Attachments can be dropped or pasted into the chat column; the main process extracts their text (pdfjs for PDFs, direct reads for text/CSV with row × column counts, and xlsx read sheet by sheet with date detection; legacy .xls still needs conversion).
 
 ## Architecture
 
@@ -156,6 +156,7 @@ Every gate ships with negative coverage: a checker that only ever returns zero i
 | G6 desktop scaffold | typecheck and build, plus verification that the bundle contains this project's Chinese copy and design tokens | any failed assertion exits 1 (`scripts/smoke-dist.mjs`) |
 | G9 workbench | two real renders, version history and rollback, unknown template/theme/version rejected without adding a version; three scoring rounds, deduction targets, chapter sample and veto example (13 assertions) | unknown template/theme/version are negative controls (`runtime/selfcheck_workbench.py`) |
 | G10 paper typesetting | xelatex twice → pandoc → Word restyle: PDF/DOCX magic and size, six steps, three gates and persisted state (10 assertions) | four negative controls (missing tools, bad paper, broken TeX, missing source); skipping requires `MMS_PAPER_SKIP=1` and prints that G10 was not verified |
+| G13 attachment xlsx | unzips the workbook and reads every sheet: shared strings and rich text, sparse columns, booleans/errors, cached formula values, date and time formats (including the 1904 date system); at most 300 rows × 60 columns per sheet (10 assertions) | a non-ZIP file and a ZIP without a workbook must be rejected; a 301-row sheet must be cut to 300 rows (`npm run check:xlsx`) |
 | G7 real launch | launches the production entry and asserts built artifact, 1440×900, non-white pixels, IPC, real CJK glyphs and that keys are never echoed; covers K2→K3→explain→choose, figure re-render and rollback, scoring, paper build and preview, attachments, multi-conversation, five provider presets, context and thinking depth, and the collapsed workspace (97 assertions) | blank screenshots, self-built windows, tofu glyphs and deleted key assertions have all been caught (`tests/window-smoke.cjs`) |
 | G6b result audit | reads the smoke JSON and recomputes the readings: content size, non-white ratio, assertion floor, key assertions and self-reported counts | `--selftest` with 12 synthetic results proves that fake greens are rejected (`scripts/check-window-smoke.mjs`) |
 

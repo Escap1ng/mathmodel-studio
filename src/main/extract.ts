@@ -3,6 +3,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { AttachmentBlock, AttachmentContext, StagedFile } from '../shared/api'
 import { attachmentsRoot } from './workspace'
+import { extractXlsx } from './xlsx'
 
 // 附件正文抽取：发送前把用户拖进来的文件读成文本，连同消息交给模型。
 // 只读暂存区里的副本；读不了的文件不报错，而是带一条说明，让模型知道有这个文件、为什么没正文。
@@ -18,8 +19,7 @@ const TEXT_EXT = new Set([
 const UNSUPPORTED: Record<string, string> = {
   doc: 'Word 文档暂不解析，可另存为 PDF 或直接粘贴正文',
   docx: 'Word 文档暂不解析，可另存为 PDF 或直接粘贴正文',
-  xls: 'Excel 暂不解析，可另存为 CSV',
-  xlsx: 'Excel 暂不解析，可另存为 CSV',
+  xls: '旧版 .xls 暂不解析，可另存为 .xlsx 或 CSV',
   pages: 'Pages 文档暂不解析，可另存为 PDF',
   zip: '压缩包不解析，请解压后拖入具体文件'
 }
@@ -129,6 +129,22 @@ async function extractOne(path: string): Promise<AttachmentBlock> {
         kind,
         text: '',
         note: `PDF 解析失败：${err instanceof Error ? err.message : String(err)}`
+      }
+    }
+  }
+
+  if (ext === 'xlsx') {
+    try {
+      const bytes = await readFile(path)
+      const { text, note } = extractXlsx(bytes)
+      const clipped = clip(text, MAX_FILE_CHARS)
+      return { name, kind, text: clipped.text, note: clipped.clipped ? `${note}，正文已截断` : note }
+    } catch (err) {
+      return {
+        name,
+        kind,
+        text: '',
+        note: `Excel 解析失败：${err instanceof Error ? err.message : String(err)}`
       }
     }
   }
