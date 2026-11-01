@@ -164,7 +164,7 @@ Every gate ships with negative coverage: a checker that only ever returns zero i
 
 ## Verification status
 
-Local verification for 0.6.1 covers typecheck, build, the full `npm run gate` (G4 52/52, G11 13/13, G12 14/14, G13 10/10, G9 13/13, G10 10/10) and G7 100/100, with an agreeing independent G6b audit (1440×900, 3.83% non-white pixels). 0.6.1 has not run in CI yet; the most recent CI evidence is the 0.6.0 run [`41172805948`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41172805948), green in all three jobs.
+Local verification for 0.6.1 covers typecheck, build, the full `npm run gate` (G4 52/52, G11 13/13, G12 14/14, G13 10/10, G9 13/13, G10 10/10) and G7 100/100, with an agreeing independent G6b audit (1440×900, 3.83% non-white pixels). CI run [`41289813731`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41289813731) is green in all three jobs: ubuntu real launch 100/100 at 1440×900 with 4.43% non-white pixels and an agreeing G6b audit; both the ubuntu and windows gate jobs pass, with the Windows G10 explicitly skipped and marked unverified.
 
 The M6 NSIS x64 installer has been built locally (`mathmodel-studio-0.6.1-setup.exe`, about 265 MB, self-signed with an untrusted root, so SmartScreen still warns about an unknown publisher) but not yet installed on a clean machine.
 
