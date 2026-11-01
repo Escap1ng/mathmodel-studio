@@ -685,6 +685,18 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle }: Pro
     // eslint 未启用，避免把 renderFigure 写进依赖导致反复载入。
   }, [runtimeReady])
 
+  // 阶段四把图登记成新版本后，主进程之外的改动不会走 renderFigure，靠事件回拉一次状态。
+  useEffect(() => {
+    const reload = (): void => {
+      window.studio.workbench
+        .state()
+        .then((next) => setState(next))
+        .catch(() => undefined)
+    }
+    window.addEventListener('mms:workbench-changed', reload)
+    return () => window.removeEventListener('mms:workbench-changed', reload)
+  }, [])
+
   return (
     <aside
       className={`workspace${collapsed ? ' workspace--collapsed' : ''}`}

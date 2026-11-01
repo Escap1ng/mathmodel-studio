@@ -405,6 +405,94 @@ async function main() {
   record('G7-4 真拖放走完暂存与移除', dragUi.ok, dragUi.detail)
   record('G7-4 文件页列出工作区文件', filesUi.ok, filesUi.detail)
 
+  // —— G7-4c 直接放进工作区的文件：不经拖放也能发给模型，条目可拖、可右键 ——
+  // 放到「文件页」断言之后再加，避免把上面 1 个文件的计数改掉。
+  const directPath = join(userDataDir, 'workspace', 'direct-note.txt')
+  writeFileSync(directPath, 'DIRECT-WORKSPACE-MARKER\n', 'utf8')
+  // 走产品自己的刷新事件，不用按钮：按钮在读取期间是禁用的，点空会静默失效。
+  await win.webContents.executeJavaScript(`window.dispatchEvent(new Event('mms:workspace-changed'))`)
+  const directListed = await waitFor(
+    win,
+    `[...document.querySelectorAll('.file-row__name')].some((n) => n.textContent === 'direct-note.txt')`,
+    10000
+  )
+  const directDrag = await win.webContents.executeJavaScript(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+    const row = [...document.querySelectorAll('.file-row')].find((r) => r.querySelector('.file-row__name')?.textContent === 'direct-note.txt')
+    if (!row) return { found: false }
+    const dt = new DataTransfer()
+    row.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    const types = Array.from(dt.types)
+    const chat = document.querySelector('.chat')
+    chat.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    chat.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    await wait(60)
+    const hot = chat.dataset.drag === 'true'
+    chat.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    for (let i = 0; i < 40; i++) {
+      await wait(100)
+      if ([...document.querySelectorAll('.composer__attach .file-chip__name')].some((n) => n.textContent === 'direct-note.txt')) break
+    }
+    const chips = [...document.querySelectorAll('.composer__attach .file-chip__name')].map((n) => n.textContent)
+    const disk = (await window.studio.workspace.get()).entries.map((entry) => entry.rel)
+    return { found: true, types, hot, chips, disk }
+  })()`)
+  const directContext = await win.webContents.executeJavaScript(
+    `window.studio.files.context([${JSON.stringify(directPath)}])`
+  )
+  record(
+    'G7-4 工作区文件可拖进对话',
+    Boolean(directListed) &&
+      directDrag.found === true &&
+      directDrag.types.includes('application/x-mms-workspace-files') &&
+      directDrag.hot === true &&
+      directDrag.chips.includes('direct-note.txt') &&
+      String(directContext?.blocks?.[0]?.text ?? '').includes('DIRECT-WORKSPACE-MARKER'),
+    JSON.stringify({ directListed, ...directDrag, block: directContext?.blocks?.[0] })
+  )
+
+  const menuProbe = await win.webContents.executeJavaScript(`(async () => {
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    const row = [...document.querySelectorAll('.file-row')].find((r) => r.querySelector('.file-row__name')?.textContent === 'direct-note.txt')
+    if (!row) return { found: false }
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 780, clientY: 420 }))
+    await frame()
+    const items = [...document.querySelectorAll('.context-menu__item')].map((b) => b.textContent.trim())
+    document.querySelector('.context-menu__item[data-danger="true"]')?.click()
+    await frame()
+    const armed = [...document.querySelectorAll('.context-menu__item')].map((b) => b.textContent.trim())
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await frame()
+    return { found: true, items, armed, closed: !document.querySelector('.context-menu') }
+  })()`)
+  record(
+    'G7-4 文件条目右键菜单可控制',
+    menuProbe.found === true &&
+      ['添加到对话', '打开', '在文件夹中显示', '复制路径', '移到回收站'].every((label) =>
+        menuProbe.items.includes(label)
+      ) &&
+      menuProbe.armed.includes('确认移到回收站') &&
+      menuProbe.closed === true,
+    JSON.stringify(menuProbe)
+  )
+
+  // 工作区原文件只是图钉，不该被「移除」删掉；删文件只能走右键并二次确认。
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.composer__attach .file-chip__remove')?.click()`
+  )
+  await sleep(400)
+  const directGone = await win.webContents.executeJavaScript(
+    `document.querySelectorAll('.composer__attach .file-chip').length`
+  )
+  record(
+    'G7-4 工作区原件移除后不删',
+    directGone === 0 && existsSync(directPath),
+    `剩余胶囊=${directGone}，原文件还在=${existsSync(directPath)}`
+  )
+  // 这条是探针自己的文件，断言完就收走，别影响后面用工作区的用例。
+  rmSync(directPath, { force: true })
+
+
   // 默认工作区是桌面的「赛题」；冒烟用 MMS_WORKSPACE 指走，所以这里只核对默认路径的形状。
   const wsInfo = await win.webContents.executeJavaScript(`window.studio.workspace.get()`)
   record(
@@ -534,7 +622,7 @@ async function main() {
       return String(err && err.message ? err.message : err)
     }
   })()`)
-  record('G7-4 只读取工作区附件', String(guard).includes('工作区'), String(guard))
+  record('G7-4 只读取工作区里的文件', String(guard).includes('工作区'), String(guard))
 
   // 中文字体可用性。不能再用 document.fonts.check(具名族)：
   // Chromium 在有回退字体时对任何族名都返回 true，包括根本没装的族。

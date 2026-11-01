@@ -7,7 +7,7 @@ import type {
   PointerEvent as ReactPointerEvent
 } from 'react'
 import type { DecisionAction, ProviderView, RuntimeStatus, StagedFile } from '../../../shared/api'
-import { buildContextText, type SendExtras } from '../lib/attachments'
+import { buildContextText, WORKSPACE_DRAG, type SendExtras } from '../lib/attachments'
 import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
 import { formatTokens } from '../lib/context'
 import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
@@ -44,6 +44,14 @@ function hasFiles(event: DragEvent<HTMLElement>): boolean {
   return Array.from(event.dataTransfer.types).includes('Files')
 }
 
+function hasWorkspaceDrag(event: DragEvent<HTMLElement>): boolean {
+  return Array.from(event.dataTransfer.types).includes(WORKSPACE_DRAG)
+}
+
+function acceptsDrop(event: DragEvent<HTMLElement>): boolean {
+  return hasFiles(event) || hasWorkspaceDrag(event)
+}
+
 interface Props {
   runtime: RuntimeStatus
   provider?: ProviderView
@@ -62,6 +70,7 @@ interface Props {
   trimNote: string | null
   onModeChange: (mode: 'workflow' | 'chat') => void
   onSend: (text: string, extras?: SendExtras) => void
+  onRetry: () => void
   onStop: () => void
   onDecision: (action: DecisionAction, choice?: string) => void
   onExplain: (candidate: ModelCandidate) => void
@@ -132,11 +141,13 @@ function ToolCardView({ tool }: { tool: ToolCard }) {
 function EntryView({
   entry,
   onDecision,
-  onExplain
+  onExplain,
+  onRetry
 }: {
   entry: ChatEntry
   onDecision: (action: DecisionAction, choice?: string) => void
   onExplain: (candidate: ModelCandidate) => void
+  onRetry?: () => void
 }) {
   if (entry.role === 'user') {
     const text = entry.parts.map((p) => (p.kind === 'text' ? p.text : '')).join('')
@@ -188,7 +199,16 @@ function EntryView({
           onExplain={onExplain}
         />
       ) : null}
-      {entry.error ? <div className="msg__error">{entry.error}</div> : null}
+      {entry.error ? (
+        <div className="msg__error">
+          <span>{entry.error}</span>
+          {onRetry ? (
+            <button type="button" className="linkbtn msg__retry" onClick={onRetry}>
+              重试
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {entry.doneReason === 'cancelled' ? <div className="msg__note">已停止</div> : null}
       {entry.doneReason === 'waiting' && !entry.interrupt?.resolved ? (
         <div className="msg__note">已暂停，等你做出选择。</div>
@@ -218,6 +238,7 @@ export default function ChatPane({
   trimNote,
   onModeChange,
   onSend,
+  onRetry,
   onStop,
   onDecision,
   onExplain,
@@ -340,6 +361,34 @@ export default function ChatPane({
     }
   }
 
+  // 文件页拖过来或右键「添加到对话」：工作区里的原文件直接当附件，不复制副本。
+  const attachRels = async (rels: string[]): Promise<void> => {
+    if (rels.length === 0 || stageLock.current) return
+    stageLock.current = true
+    setStaging(true)
+    try {
+      merge(await window.studio.files.attach(rels))
+    } catch (err) {
+      setAttachError(errorText(err))
+    } finally {
+      stageLock.current = false
+      setStaging(false)
+    }
+  }
+
+  useEffect(() => {
+    const onAttach = (event: Event): void => {
+      const detail = (event as CustomEvent<{ rels?: unknown }>).detail
+      const rels = detail?.rels
+      if (Array.isArray(rels)) {
+        void attachRels(rels.filter((rel): rel is string => typeof rel === 'string'))
+      }
+    }
+    window.addEventListener('mms:attach-workspace', onAttach)
+    return () => window.removeEventListener('mms:attach-workspace', onAttach)
+    // attachRels 只用到 setState 与稳定的 ref，不需要随渲染重订阅
+  }, [])
+
   const stampName = (base: string, ext: string): string => {
     const now = new Date()
     const pad = (n: number): string => String(n).padStart(2, '0')
@@ -426,6 +475,7 @@ export default function ChatPane({
 
   const remove = (file: StagedFile): void => {
     setFiles((prev) => prev.filter((item) => item.id !== file.id))
+    if (file.origin === 'workspace') return
     void window.studio.files.discard(file.path).then(
       () => window.dispatchEvent(new Event('mms:workspace-changed')),
       () => undefined
@@ -437,29 +487,40 @@ export default function ChatPane({
   }
 
   const onDragEnter = (event: DragEvent<HTMLElement>): void => {
-    if (!hasFiles(event)) return
+    if (!acceptsDrop(event)) return
     event.preventDefault()
     setDragging(true)
   }
 
   const onDragOver = (event: DragEvent<HTMLElement>): void => {
-    if (!hasFiles(event)) return
+    if (!acceptsDrop(event)) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
     setDragging(true)
   }
 
   const onDragLeave = (event: DragEvent<HTMLElement>): void => {
-    if (!hasFiles(event)) return
+    if (!acceptsDrop(event)) return
     const next = event.relatedTarget as Node | null
     if (next && event.currentTarget.contains(next)) return
     setDragging(false)
   }
 
   const onDrop = (event: DragEvent<HTMLElement>): void => {
-    if (!hasFiles(event)) return
+    if (!acceptsDrop(event)) return
     event.preventDefault()
     setDragging(false)
+    if (hasWorkspaceDrag(event)) {
+      try {
+        const raw: unknown = JSON.parse(event.dataTransfer.getData(WORKSPACE_DRAG))
+        if (Array.isArray(raw)) {
+          void attachRels(raw.filter((rel): rel is string => typeof rel === 'string'))
+        }
+      } catch {
+        setAttachError('拖进来的内容读不出来')
+      }
+      return
+    }
     const dropped = Array.from(event.dataTransfer.files)
     const paths: string[] = []
     const names: string[] = []
@@ -551,6 +612,9 @@ export default function ChatPane({
             title="按估算 token 显示；历史回放按这个预算截断，不是模型硬上限"
           >
             上下文约 {formatTokens(usedTokens)} / {contextLabel}
+            {entries.some((entry) => entry.role === 'user')
+              ? ` · ${entries.filter((entry) => entry.role === 'user').length} 轮`
+              : ''}
           </span>
           {entries.length > 0 ? (
             <button type="button" className="linkbtn" data-action="clear-current" onClick={onClearCurrent}>
@@ -575,14 +639,21 @@ export default function ChatPane({
             />
           ) : (
             <div className="messages" aria-live="polite">
-              {entries.map((entry) => (
-                <EntryView
-                  key={entry.id}
-                  entry={entry}
-                  onDecision={onDecision}
-                  onExplain={onExplain}
-                />
-              ))}
+              {entries.map((entry) =>
+                entry.notice ? (
+                  <div className="msg-divider" key={entry.id} role="note">
+                    <span>{entry.notice}</span>
+                  </div>
+                ) : (
+                  <EntryView
+                    key={entry.id}
+                    entry={entry}
+                    onDecision={onDecision}
+                    onExplain={onExplain}
+                    onRetry={entry.error && mode === 'chat' ? onRetry : undefined}
+                  />
+                )
+              )}
             </div>
           )}
         </div>

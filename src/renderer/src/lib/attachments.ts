@@ -18,6 +18,9 @@ export interface SendExtras {
 export const ATTACH_START = '--- 附件（本机文件）---'
 export const ATTACH_END = '--- 附件结束 ---'
 
+/** 文件页把工作区条目拖到中栏时用的私有类型，避免和系统文件拖拽混在一起。 */
+export const WORKSPACE_DRAG = 'application/x-mms-workspace-files'
+
 const KIND_BY_EXT: Record<string, StagedFile['kind']> = {
   pdf: 'pdf',
   doc: 'doc',

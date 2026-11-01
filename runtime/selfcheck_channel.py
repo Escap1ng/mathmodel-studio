@@ -548,11 +548,13 @@ def tests() -> None:
                 f"HTTP {status} effort={first_body.get('reasoning_effort')!r}",
             )
             check(
-                "C14 上下文预算截断最早历史",
-                len(sent) == 2
+                "C14 上下文预算裁剪最早历史，保留锚点与最新一问",
+                len(sent) == 3
+                and sent[0].get("role") == "system"
+                and str(sent[1].get("content") or "").startswith("【会话状态】")
                 and sent[-1].get("content") == "最新问题"
                 and all("数" * 100 not in str(m.get("content") or "") for m in sent),
-                f"请求消息 {[m.get('role') for m in sent]}",
+                f"请求消息 {[(m.get('role'), str(m.get('content'))[:12]) for m in sent]}",
             )
             check(
                 "C14 截断后对话仍能跑完",
@@ -701,13 +703,13 @@ def tests() -> None:
             session = latest.get("session") or {}
             last_text = session.get("messages", [{}])[-1].get("content", "") if session.get("messages") else ""
             check(
-                "C12 选择后阶段 3 过、阶段 4 进入，待决清空",
+                "C12 选择后阶段 3 过、阶段 4 真跑完，待决清空",
                 status == 200
                 and chosen_statuses.get(3) == "passed"
-                and chosen_statuses.get(4) == "running"
+                and chosen_statuses.get(4) == "passed"
                 and session.get("pending") is None
                 and chosen[-1]["data"].get("reason") == "stop"
-                and "已选择" in last_text,
+                and "阶段四完成" in last_text,
                 f"状态 {chosen_statuses} pending={session.get('pending')} 文本={last_text[:60]}",
             )
             check(

@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import __version__, orchestrator
+from . import __version__, harness, orchestrator
 from .invoke import list_templates
 from .store import SessionStore, data_dir, snapshot
 from . import paper_build, workbench_figure, workbench_score
@@ -42,7 +42,8 @@ from .registry import EnvError
 MAX_BODY = 16 << 20
 MAX_MESSAGES = 200
 MAX_TOTAL_CHARS = 1_600_000
-TOOL_ROUNDS = 4
+MAX_TOOL_RESULT_CHARS = 8_000
+TOOL_ROUNDS = 8
 PING_SECONDS = 15
 DEPTHS = ("medium", "high", "max")
 
@@ -139,44 +140,8 @@ def normalize_messages(raw) -> list[dict]:
 
 
 def estimate_tokens(text: str) -> int:
-    """粗估 token：CJK 按 1 字 1 token，其余按 3.5 字符 1 token。
-
-    只用于上下文预算与「已用」显示，不追求与任何分词器逐 token 对齐；
-    宁可高估，避免把超出窗口的历史送出去。
-    """
-    cjk = 0
-    for ch in text:
-        code = ord(ch)
-        if 0x2E80 <= code <= 0x9FFF or 0x3000 <= code <= 0x303F or 0xFF00 <= code <= 0xFFEF:
-            cjk += 1
-    other = max(0, len(text) - cjk)
-    return int(cjk + other / 3.5 + 0.999)
-
-
-def trim_history(messages: list[dict], budget: int | None) -> list[dict]:
-    """按界面选定的上下文预算丢掉最早的历史，保留系统提示与最新一问。"""
-    if not budget or budget <= 0 or len(messages) <= 2:
-        return messages
-    limit = int(budget * 0.9)
-    total = sum(estimate_tokens(str(m.get("content") or "")) for m in messages)
-    if total <= limit:
-        return messages
-    kept: list[dict] = []
-    used = 0
-    for message in reversed(messages):
-        if message.get("role") == "system":
-            continue
-        cost = estimate_tokens(str(message.get("content") or ""))
-        if kept and used + cost > limit:
-            break
-        kept.append(message)
-        used += cost
-    kept.reverse()
-    # 截断后不要以 assistant 开头；保留系统提示，再拼最新的一段。
-    while kept and kept[0].get("role") != "user":
-        kept.pop(0)
-    head = [m for m in messages if m.get("role") == "system"]
-    return head + kept if kept else messages
+    """兼容旧调用点；真正的实现在 harness 里。"""
+    return harness.estimate_tokens(text)
 
 
 class ChatSession:
@@ -192,6 +157,8 @@ class ChatSession:
         depth: str = "",
         context_tokens: int | None = None,
         send_thinking: bool = True,
+        goal: str = "",
+        workspace: str = "",
     ):
         self.id = chat_id
         self.provider = provider
@@ -200,6 +167,8 @@ class ChatSession:
         self.messages = messages
         self.depth = depth if send_thinking else ""
         self.context_tokens = context_tokens
+        self.goal = goal
+        self.workspace = workspace
         self.events: list[dict] = []
         self.cond = threading.Condition()
         self.done = False
@@ -245,31 +214,69 @@ class ChatSession:
         # 不在这里 finish：worker 可能在一次工具调用中间，由它收尾，
         # 这样 done 一定排在最后一个真实事件之后。
 
-    def _run(self) -> None:
-        tools = TOOLS if self.provider.get("tool_calling") else None
-        self.messages = trim_history(self.messages, self.context_tokens)
-        try:
-            for _round in range(TOOL_ROUNDS):
-                if self.cancelled:
-                    raise CancelledError()
-                deltas = lambda kind, text: self.append(kind, {"text": text})
+    def _pause(self, seconds: float) -> None:
+        end = time.monotonic() + max(0.0, seconds)
+        while time.monotonic() < end:
+            if self.cancelled:
+                raise CancelledError()
+            time.sleep(min(0.02, max(0.0, end - time.monotonic())))
+
+    def _context_plan(
+        self, ratio: float = harness.COMPACT_RATIO, reason: str = "auto"
+    ) -> harness.Plan:
+        turn = sum(1 for message in self.messages if message.get("role") == "user")
+        extra = [f"工作区：{self.workspace}"] if self.workspace else []
+        anchor = harness.anchor_text(self.goal, turn, extra)
+        return harness.prepare(
+            self.messages, self.context_tokens, anchor=anchor, ratio=ratio, reason=reason
+        )
+
+    def _apply_plan(self, plan: harness.Plan) -> None:
+        self.messages = plan.messages
+        if plan.reason:
+            self.append("compaction", plan.event())
+
+    def _complete(self, tools, deltas):
+        recovered = False
+        while True:
+            if self.cancelled:
+                raise CancelledError()
+            try:
                 if self.provider.get("id") == "fake":
                     try:
                         delay = max(0.0, float(os.environ.get("MMS_FAKE_DELAY_MS") or "20") / 1000)
                     except ValueError:
                         delay = 0.02
-                    completion = fake_completion(self.messages, deltas, self.should_stop, delay)
-                else:
-                    completion = stream_completion(
-                        self.provider,
-                        self.api_key,
-                        self.model,
-                        self.messages,
-                        tools,
-                        deltas,
-                        self.should_stop,
-                        depth=self.depth,
-                    )
+                    return fake_completion(self.messages, deltas, self.should_stop, delay)
+                return stream_completion(
+                    self.provider,
+                    self.api_key,
+                    self.model,
+                    self.messages,
+                    tools,
+                    deltas,
+                    self.should_stop,
+                    depth=self.depth,
+                )
+            except ProviderError as exc:
+                if recovered or not harness.looks_like_overflow(str(exc)):
+                    raise
+                # provider 报上下文溢出：压得更狠再试一次，别把错误直接甩给用户。
+                recovered = True
+                self._apply_plan(
+                    self._context_plan(ratio=harness.OVERFLOW_RATIO, reason="overflow")
+                )
+
+    def _run(self) -> None:
+        tools = TOOLS if self.provider.get("tool_calling") else None
+        self._apply_plan(self._context_plan())
+        seen: dict[str, dict] = {}
+        try:
+            for _round in range(TOOL_ROUNDS):
+                if self.cancelled:
+                    raise CancelledError()
+                deltas = lambda kind, text: self.append(kind, {"text": text})
+                completion = self._complete(tools, deltas)
                 if not completion.tool_calls:
                     self.finish("stop", completion.usage)
                     return
@@ -297,7 +304,13 @@ class ChatSession:
                     if args is None:
                         result, ok = {"ok": False, "error": "工具参数不是合法 JSON"}, False
                     else:
-                        result, ok = run_tool(name, args)
+                        key = f"{name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
+                        if key in seen:
+                            result = {**seen[key], "note": "重复调用，返回上次结果"}
+                            ok = bool(seen[key].get("ok"))
+                        else:
+                            result, ok = run_tool(name, args)
+                            seen[key] = result
                     duration = int((time.monotonic() - started) * 1000)
                     self.append(
                         "tool_call",
@@ -310,14 +323,20 @@ class ChatSession:
                             "duration_ms": duration,
                         },
                     )
+                    content = json.dumps(result, ensure_ascii=False)
+                    if len(content) > MAX_TOOL_RESULT_CHARS:
+                        content = content[:MAX_TOOL_RESULT_CHARS] + "…[工具结果已截断]"
                     self.messages.append(
                         {
                             "role": "tool",
                             "tool_call_id": call_id,
                             "name": name,
-                            "content": json.dumps(result, ensure_ascii=False),
+                            "content": content,
                         }
                     )
+                # 工具结果可能把上下文推过阈值：下一轮之前再压一次。
+                if self.context_tokens:
+                    self._apply_plan(self._context_plan())
             self.finish("max_tool_rounds")
         except CancelledError:
             self.finish("cancelled")
@@ -334,8 +353,16 @@ class ChatSession:
 class WorkflowSession(ChatSession):
     """M3 编排会话：复用事件缓冲与 SSE 语义，内容由状态机产生。"""
 
-    def __init__(self, chat_id: str, store: SessionStore, record: dict, action: str, choice: str):
-        super().__init__(chat_id, {}, "", "", [])
+    def __init__(
+        self,
+        chat_id: str,
+        store: SessionStore,
+        record: dict,
+        action: str,
+        choice: str,
+        workspace: str = "",
+    ):
+        super().__init__(chat_id, {}, "", "", [], workspace=workspace)
         self.store = store
         self.record = record
         self.action = action
@@ -346,10 +373,15 @@ class WorkflowSession(ChatSession):
             if self.action == "start":
                 events = orchestrator.start(self.store, self.record)
             else:
-                events = orchestrator.resume(self.store, self.record, self.action, self.choice)
+                events = orchestrator.resume_iter(
+                    self.store, self.record, self.action, self.choice, self.workspace
+                )
             for ev in events:
                 if self.cancelled:
                     raise CancelledError()
+                delay = ev.get("delay")
+                if delay:
+                    self._pause(float(delay))
                 self.append(ev["event"], ev["data"])
             self.finish("stop" if self.action == "choose" else "waiting")
         except CancelledError:
@@ -699,10 +731,15 @@ class Handler(BaseHTTPRequestHandler):
         if mode not in ("chat", "workflow"):
             self._error(400, "mode", f"未知对话模式: {mode}")
             return
+        workspace = str(body.get("workspace") or "")
+        raw_goal = next((m["content"] for m in messages if m["role"] == "user"), "")
+        goal = " ".join(str(raw_goal).split())[:80]
         if mode == "workflow":
             problem = next(m["content"] for m in reversed(messages) if m["role"] == "user")
             record = self.server.store.create(chat_id, provider_id, model, problem)
-            session: ChatSession = WorkflowSession(chat_id, self.server.store, record, "start", "")
+            session: ChatSession = WorkflowSession(
+                chat_id, self.server.store, record, "start", "", workspace=workspace
+            )
         else:
             session = ChatSession(
                 chat_id,
@@ -713,6 +750,8 @@ class Handler(BaseHTTPRequestHandler):
                 depth=depth,
                 context_tokens=context_tokens,
                 send_thinking=send_thinking,
+                goal=goal,
+                workspace=workspace,
             )
         with self.server.sessions_lock:
             self.server.sessions[chat_id] = session
@@ -738,7 +777,14 @@ class Handler(BaseHTTPRequestHandler):
         if not record.get("pending"):
             self._error(409, "pending", "这个会话没有等待中的决策")
             return
-        session = WorkflowSession(session_id, self.server.store, record, action, choice)
+        session = WorkflowSession(
+            session_id,
+            self.server.store,
+            record,
+            action,
+            choice,
+            workspace=str(body.get("workspace") or ""),
+        )
         with self.server.sessions_lock:
             self.server.sessions[session_id] = session
         session.start()

@@ -2226,3 +2226,26 @@ button:disabled {
     width: auto;
   }
 }
+
+.msg-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 2px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+
+.msg-divider::before,
+.msg-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line, rgba(0, 0, 0, 0.08));
+}
+
+.msg__error .msg__retry {
+  margin-left: 10px;
+  color: var(--accent, #2b4c7e);
+}

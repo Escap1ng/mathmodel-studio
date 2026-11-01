@@ -3,10 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { StagedFile, StageRejection, StageResult } from '../shared/api'
-import { attachmentsRoot } from './workspace'
+import { attachmentsRoot, workspacePath } from './workspace'
 
-// 拖进来的文件只做暂存：复制到 <工作区>/附件/日期/ 下，解析与发送留给下一步。
-// 不直接引用原路径——原文件可能被移动或删除，工作区里要留一份自己的副本。
+// 从工作区外拖进来的文件复制到 <工作区>/附件/日期/ 下：原文件可能被移动或删除，要留一份自己的副本。
+// 已经在工作区里的文件直接引用原路径，不复制——它们本来就是工作区的一部分。
 const MAX_FILE_BYTES = 100 * 1024 * 1024
 const MAX_BATCH = 20
 
@@ -60,6 +60,25 @@ async function uniqueTarget(dir: string, name: string): Promise<string> {
   throw new Error('同名文件太多')
 }
 
+function insideOf(root: string, target: string): boolean {
+  const rel = relative(resolve(root), resolve(target))
+  return Boolean(rel) && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+function fileEntry(path: string, info: { size: number }): StagedFile {
+  const name = basename(path)
+  const ext = extname(name).slice(1).toLowerCase()
+  return {
+    id: randomUUID(),
+    name,
+    size: info.size,
+    ext,
+    kind: KIND_BY_EXT[ext] ?? 'other',
+    path,
+    origin: insideOf(rootDir(), path) ? 'staged' : 'workspace'
+  }
+}
+
 async function stageOne(source: string, dir: string): Promise<StagedFile> {
   if (!isAbsolute(source)) throw new Error('不是绝对路径')
   const info = await stat(source).catch(() => null)
@@ -68,17 +87,11 @@ async function stageOne(source: string, dir: string): Promise<StagedFile> {
   if (info.size > MAX_FILE_BYTES) throw new Error('超过 100 MB')
   const name = basename(source)
   if (!name) throw new Error('文件名不可用')
+  // 已经在工作区里的文件不再复制一份：原文件就是附件，移除时也不删它。
+  if (insideOf(workspacePath(), source)) return fileEntry(resolve(source), info)
   const target = await uniqueTarget(dir, name)
   await copyFile(source, target)
-  const ext = extname(name).slice(1).toLowerCase()
-  return {
-    id: randomUUID(),
-    name,
-    size: info.size,
-    ext,
-    kind: KIND_BY_EXT[ext] ?? 'other',
-    path: target
-  }
+  return fileEntry(target, info)
 }
 
 export async function stageFiles(paths: unknown): Promise<StageResult> {
@@ -101,6 +114,35 @@ export async function stageFiles(paths: unknown): Promise<StageResult> {
     }
   }
   return { ok: true, files, rejected, folder }
+}
+
+// 文件页把工作区里已有的文件交给对话时走这里：只认工作区内的相对路径，不复制、不改动原文件。
+export async function attachWorkspace(rels: unknown): Promise<StageResult> {
+  if (!Array.isArray(rels) || rels.length === 0) throw new Error('没有收到文件')
+  if (rels.length > MAX_BATCH) throw new Error(`一次最多 ${MAX_BATCH} 个文件`)
+  const root = resolve(workspacePath())
+  const files: StagedFile[] = []
+  const rejected: StageRejection[] = []
+  for (const raw of rels) {
+    if (typeof raw !== 'string' || !raw) continue
+    const target = resolve(root, raw)
+    if (!insideOf(root, target)) {
+      rejected.push({ name: basename(raw), reason: '不在工作区里' })
+      continue
+    }
+    try {
+      const info = await stat(target)
+      if (!info.isFile()) throw new Error('这是文件夹')
+      if (info.size > MAX_FILE_BYTES) throw new Error('超过 100 MB')
+      files.push(fileEntry(target, info))
+    } catch (err) {
+      rejected.push({
+        name: basename(raw),
+        reason: err instanceof Error ? err.message : String(err)
+      })
+    }
+  }
+  return { ok: true, files, rejected, folder: root }
 }
 
 function cleanName(raw: string): string {
@@ -135,7 +177,8 @@ export async function stageBlob(payload: unknown): Promise<StagedFile> {
     size: bytes.byteLength,
     ext,
     kind: KIND_BY_EXT[ext] ?? 'other',
-    path: target
+    path: target,
+    origin: 'staged'
   }
 }
 

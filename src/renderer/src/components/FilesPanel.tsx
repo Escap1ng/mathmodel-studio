@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { DragEvent as ReactDragEvent } from 'react'
 import type { FileKind, WorkspaceEntry, WorkspaceListing } from '../../../shared/api'
+import { WORKSPACE_DRAG } from '../lib/attachments'
+import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 
 const KIND_LABEL: Record<FileKind, string> = {
   dir: 'DIR',
@@ -31,6 +34,11 @@ export default function FilesPanel() {
   const [listing, setListing] = useState<WorkspaceListing | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; entry: WorkspaceEntry } | null>(null)
+  // 删除先点一次变「确认」，再点才真的移到回收站，避免右键一路点到底误删。
+  const [armed, setArmed] = useState(false)
+  const [flash, setFlash] = useState<string | null>(null)
+  const flashTimer = useRef<number | null>(null)
 
   const load = async (): Promise<void> => {
     setBusy(true)
@@ -51,8 +59,17 @@ export default function FilesPanel() {
       void load()
     }
     window.addEventListener('mms:workspace-changed', onChanged)
-    return () => window.removeEventListener('mms:workspace-changed', onChanged)
+    return () => {
+      window.removeEventListener('mms:workspace-changed', onChanged)
+      if (flashTimer.current != null) window.clearTimeout(flashTimer.current)
+    }
   }, [])
+
+  const notify = (text: string): void => {
+    setFlash(text)
+    if (flashTimer.current != null) window.clearTimeout(flashTimer.current)
+    flashTimer.current = window.setTimeout(() => setFlash(null), 2200)
+  }
 
   const choose = async (): Promise<void> => {
     setBusy(true)
@@ -87,6 +104,65 @@ export default function FilesPanel() {
     void window.studio.workspace.open(entry.rel).catch((err: unknown) => setError(errorText(err)))
   }
 
+  const attach = (entry: WorkspaceEntry): void => {
+    window.dispatchEvent(new CustomEvent('mms:attach-workspace', { detail: { rels: [entry.rel] } }))
+    notify(`已加入对话：${entry.name}`)
+  }
+
+  const startDrag = (event: ReactDragEvent<HTMLButtonElement>, entry: WorkspaceEntry): void => {
+    if (entry.kind === 'dir') {
+      event.preventDefault()
+      return
+    }
+    event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify([entry.rel]))
+    event.dataTransfer.effectAllowed = 'copy'
+  }
+
+  const menuItems = useMemo<ContextMenuItem[]>(() => {
+    if (!menu) return []
+    const items: ContextMenuItem[] = []
+    if (menu.entry.kind !== 'dir') items.push({ id: 'attach', label: '添加到对话' })
+    items.push(
+      { id: 'open', label: '打开' },
+      { id: 'reveal', label: '在文件夹中显示' },
+      { id: 'copy', label: '复制路径' },
+      { id: 'trash', label: armed ? '确认移到回收站' : '移到回收站', danger: true }
+    )
+    return items
+  }, [menu, armed])
+
+  const runMenu = (id: string): void => {
+    const entry = menu?.entry
+    if (!entry) return
+    if (id === 'trash' && !armed) {
+      setArmed(true)
+      return
+    }
+    setMenu(null)
+    if (id === 'attach') {
+      attach(entry)
+    } else if (id === 'open') {
+      open(entry)
+    } else if (id === 'reveal') {
+      void window.studio.workspace
+        .revealEntry(entry.rel)
+        .catch((err: unknown) => setError(errorText(err)))
+    } else if (id === 'copy') {
+      void window.studio.workspace.copyPath(entry.rel).then(
+        () => notify('路径已复制'),
+        (err: unknown) => setError(errorText(err))
+      )
+    } else if (id === 'trash') {
+      void window.studio.workspace.trash(entry.rel).then(
+        () => {
+          notify(`已移到回收站：${entry.name}`)
+          void load()
+        },
+        (err: unknown) => setError(errorText(err))
+      )
+    }
+  }
+
   const files = listing ? listing.entries.filter((entry) => entry.kind !== 'dir').length : 0
   const dirs = listing ? listing.entries.length - files : 0
 
@@ -110,7 +186,7 @@ export default function FilesPanel() {
       </div>
 
       <p className="files__hint">
-        拖进中栏的文件会复制到 <code>附件/日期/</code> 下；这里也会列出你直接放进工作区的文件。
+        拖进中栏的文件会复制到 <code>附件/日期/</code> 下；这里也会列出你直接放进工作区的文件。拖动条目到中栏可直接发给模型，右键还有更多操作。
       </p>
 
       <div className="files__actions">
@@ -129,6 +205,12 @@ export default function FilesPanel() {
         <div className="panel__error" role="alert">
           {error}
         </div>
+      ) : null}
+
+      {flash ? (
+        <p className="files__note" role="status">
+          {flash}
+        </p>
       ) : null}
 
       {!listing && !error ? <div className="card">正在读取工作区…</div> : null}
@@ -153,7 +235,21 @@ export default function FilesPanel() {
         <ul className="files__list">
           {listing.entries.map((entry) => (
             <li key={entry.rel}>
-              <button type="button" className="file-row" title={entry.rel} onClick={() => open(entry)}>
+              <button
+                type="button"
+                className="file-row"
+                title={`${entry.rel}${entry.kind === 'dir' ? '' : ' · 拖到中栏可发送'}`}
+                draggable={entry.kind !== 'dir'}
+                data-kind-row={entry.kind}
+                data-menu={menu?.entry.rel === entry.rel ? 'true' : undefined}
+                onDragStart={(event) => startDrag(event, entry)}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  setArmed(false)
+                  setMenu({ x: event.clientX, y: event.clientY, entry })
+                }}
+                onClick={() => open(entry)}
+              >
                 <span className="file-row__kind" data-kind={entry.kind}>
                   {KIND_LABEL[entry.kind]}
                 </span>
@@ -174,6 +270,16 @@ export default function FilesPanel() {
       ) : null}
 
       {listing?.truncated ? <p className="files__note">只列出前 400 项，其余请在文件夹里查看。</p> : null}
+
+      {menu ? (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={menuItems}
+          onSelect={runMenu}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
     </div>
   )
 }

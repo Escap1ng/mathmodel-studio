@@ -26,6 +26,8 @@ export interface ChatEntry {
   error?: string
   doneReason?: string
   interrupt?: InterruptCard
+  /** 上下文压缩分隔线：只用于显示，不参与模型输入。 */
+  notice?: string
   /** 随这条消息发送的附件；只用于显示与恢复，不参与渲染正文。 */
   attachments?: AttachmentRef[]
   /** 送给模型的全文（含附件正文）；历史重放用它，不用界面上显示的那段。 */

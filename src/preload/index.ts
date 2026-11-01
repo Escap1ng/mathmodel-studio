@@ -64,6 +64,7 @@ const studioApi = {
   files: {
     pick: (): Promise<StageResult | null> => ipcRenderer.invoke('files:pick'),
     stage: (paths: string[]): Promise<StageResult> => ipcRenderer.invoke('files:stage', paths),
+    attach: (rels: string[]): Promise<StageResult> => ipcRenderer.invoke('files:attach', rels),
     stageBlob: (payload: StagedBlob): Promise<StagedFile> => ipcRenderer.invoke('files:stage-blob', payload),
     discard: (path: string): Promise<void> => ipcRenderer.invoke('files:discard', path),
     context: (paths: string[]): Promise<AttachmentContext> => ipcRenderer.invoke('files:context', paths),
@@ -77,7 +78,10 @@ const studioApi = {
     choose: (): Promise<WorkspaceListing | null> => ipcRenderer.invoke('workspace:choose'),
     reset: (): Promise<WorkspaceListing> => ipcRenderer.invoke('workspace:reset'),
     reveal: (): Promise<void> => ipcRenderer.invoke('workspace:reveal'),
-    open: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:open', rel)
+    open: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:open', rel),
+    revealEntry: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:reveal-entry', rel),
+    copyPath: (rel: string): Promise<string> => ipcRenderer.invoke('workspace:copy-path', rel),
+    trash: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:trash', rel)
   },
 
   workbench: {
