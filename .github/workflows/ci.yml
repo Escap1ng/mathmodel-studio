@@ -80,6 +80,9 @@ jobs:
       - name: G3 CLI 退出码契约
         run: python runtime/selfcheck.py
 
+      - name: G13 附件 xlsx 读取（工作表、日期、上限与坏文件）
+        run: npm run check:xlsx
+
       - name: G9 工作台（真渲两版、回滚、评分）
         run: python runtime/selfcheck_workbench.py
 
