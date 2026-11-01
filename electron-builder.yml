@@ -57,6 +57,7 @@ win:
   icon: build/icon.ico
 
 nsis:
+  # build/installer.nsh 自动被 include，负责把默认安装目录改成桌面的 MathModel Studio。
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   # 向导内两张图由 scripts/make-icon.mjs 从 build/icon.svg 生成；assisted 模式下
