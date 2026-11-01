@@ -163,7 +163,7 @@ npm run gate
 
 0.6.0 在本机验证了类型检查、构建、G4 52/52、G7 97/97 和 G6b 复算。CI run [`41172805948`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41172805948) 的三个任务全部通过：ubuntu 真启动 97/97、内容尺寸 1440×900、非白像素 4.16%，G6b 复算一致；ubuntu 和 windows 门禁都通过，Windows 上的 G10 显式跳过并标注未验证。
 
-M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.0-setup.exe`，约 264 MB，未签名，Electron 默认图标），尚未在干净机器上安装验证。
+M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.0-setup.exe`，约 264 MB，自签名证书，未受信任的根，SmartScreen 会提示未知发布者），尚未在干净机器上安装验证。
 
 未覆盖范围：五家服务商的真实联网对话（本仓库不包含 Key）、CI 的 Windows 真起窗、CSP 违规场景的主动探测、安装包在干净机器上的安装与运行。历史 CI run 与读数见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -180,7 +180,7 @@ M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.0-setup.exe`
 
 ## 打包与分发
 
-打包已配置：内置便携 Python 运行时（python-build-standalone，放在 `vendor/python`，不入库），pandoc 以 `vendor/pandoc/pandoc.exe` 随包放进 `resources/pandoc`；xelatex 仍需本机安装，TeX 没有内置。NSIS x64 配置见 `electron-builder.yml`，随包工具链由 `scripts/prepare-vendor.mjs` 准备。当前安装包未签名，使用 Electron 默认图标。
+打包已配置：内置便携 Python 运行时（python-build-standalone，放在 `vendor/python`，不入库），pandoc 以 `vendor/pandoc/pandoc.exe` 随包放进 `resources/pandoc`；xelatex 仍需本机安装，TeX 没有内置。NSIS x64 配置见 `electron-builder.yml`，随包工具链由 `scripts/prepare-vendor.mjs` 准备。应用、安装器与向导页头/侧栏图共用 `build/icon.svg` 生成的图标；安装包用自签名证书，证书根不受信任，SmartScreen 会提示未知发布者。
 
 ## 合规声明
 

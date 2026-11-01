@@ -5,7 +5,7 @@
 
 ## 0 一句话现状
 
-0.6.0 是多对话与多模型版本：左栏会话列表、五家模型预设、上下文预算与思维深度、可收起右栏；论文页继续执行 xelatex → pandoc → 三道交付门禁。CI run `41172805948` 三 job 全绿（ubuntu 真启动 97/97、1440x900、非白 4.16%，G6b 一致；Windows G10 显式跳过）；NSIS 0.6.0 安装包已在本机构建，未在干净机验证。仓库已完成收尾：studio 历史并入原技能库并改名为 `Escap1ng/mathmodel-studio`，私有原仓改名 `mathmodel-studio-archive`，旧 Release 与 tag 已清理。
+0.6.0 是多对话与多模型版本：左栏会话列表、五家模型预设、上下文预算与思维深度、可收起右栏；论文页继续执行 xelatex → pandoc → 三道交付门禁。CI run `41172805948` 三 job 全绿（ubuntu 真启动 97/97、1440x900、非白 4.16%，G6b 一致；Windows G10 显式跳过）；NSIS 0.6.0 安装包已在本机构建（自签名证书、新星环图标，含向导页头与侧栏图），未在干净机验证。仓库已完成收尾：studio 历史并入原技能库并改名为 `Escap1ng/mathmodel-studio`，私有原仓改名 `mathmodel-studio-archive`，旧 Release 与 tag 已清理。
 
 M5 论文页：右栏「论文」能真跑 **xelatex 两遍 → pandoc 转 DOCX → Word 版式微调 → 去 AI 措辞 / 结构指标 / 章节结构三道门禁**，并用 pdf.js 做页级预览。本机演示稿真编 7 页（PDF 284 KB、DOCX 151 KB），三道门禁全绿；门禁条变成图表 / 评分 / 章节 / 论文排版四项。
 **论文构建是工作台动作，不是阶段机的第五阶段**：阶段五不会因构建成功自动标为已过，K1 环境预检卡也没接；编译的是仓库里的演示稿，不会替你写正文。里程碑见 [../PLAN.md](../PLAN.md) §7。
@@ -90,7 +90,7 @@ gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
 | 真实 DeepSeek / 通义千问 / Kimi / GLM 联网对话 | 无 Key，未跑 | **未证** |
 | Linux 桌面 `safeStorage` 可用分支 | 只证了「不可用就拒绝保存」 | **未证** |
 | Windows CI 真起窗 | 无 | **未证**；Windows 证据来自本机 |
-| 安装包在干净机安装运行 | 0.6.0 NSIS 已在本机构建（便携 Python 与 pandoc 随包，TeX 未内置）；未在干净机验证 | **未证** |
+| 安装包在干净机安装运行 | 0.6.0 NSIS 已在本机构建（便携 Python 与 pandoc 随包，TeX 未内置，自签名证书，证书根不受信任）；未在干净机验证 | **未证** |
 
 ## 3 待维护者定的项
 
