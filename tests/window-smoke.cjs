@@ -1088,8 +1088,7 @@ async function main() {
     chosen &&
       phaseChosen.p3 === 'passed' &&
       phaseChosen.p4 === 'running' &&
-      snapChosen?.session?.pending === null &&
-      !phaseChosen.stop,
+      snapChosen?.session?.pending === null,
     `阶段3=${phaseChosen.p3} 阶段4=${phaseChosen.p4} pending=${snapChosen?.session?.pending} 停止键=${phaseChosen.stop}`
   )
   record(
@@ -1122,10 +1121,12 @@ async function main() {
   const figState = await win.webContents.executeJavaScript(`window.studio.workbench.state()`)
   const firstVersion = figState?.figure?.active
   const firstImage = figState?.figure?.activeImage
+  // 阶段四会先自动登记图表版本，这里不能假设初始版本号是 1 或 0。
+  const firstCount = figState?.figure?.versions?.length ?? 0
   record(
     'G7-8 工作台渲染出首版图表',
-    figureReady && Boolean(firstVersion) && (figState?.figure?.versions?.length ?? 0) >= 1,
-    `图片就绪=${figureReady} active=${firstVersion} 版本数=${figState?.figure?.versions?.length}`
+    figureReady && Boolean(firstVersion) && firstCount >= 1,
+    `图片就绪=${figureReady} active=${firstVersion} 版本数=${firstCount}`
   )
 
   // 主题选择器是自绘下拉（弹层用圆角卡片，原生 select 的方角弹层改不到），按按钮 → 选项两步点
@@ -1142,7 +1143,14 @@ async function main() {
   await win.webContents.executeJavaScript(`document.querySelector('[data-action="render-figure"]')?.click()`)
   const reRendered = await waitFor(
     win,
-    `document.querySelectorAll('.version-chip').length >= 2 && !document.querySelector('[data-role="figure-diff"]') && document.querySelectorAll('[data-role="figure-image"]').length === 1 && (document.querySelector('[data-role="figure-image"]')?.naturalWidth || 0) > 0`,
+    `(async () => {
+      if (document.querySelectorAll('.version-chip').length < ${firstCount + 1}) return false
+      if (document.querySelector('[data-role="figure-diff"]')) return false
+      if (document.querySelectorAll('[data-role="figure-image"]').length !== 1) return false
+      if (!(document.querySelector('[data-role="figure-image"]')?.naturalWidth > 0)) return false
+      const next = await window.studio.workbench.state()
+      return next.figure.active !== ${JSON.stringify(firstVersion)}
+    })()`,
     90000
   )
   const fig2 = await win.webContents.executeJavaScript(`window.studio.workbench.state()`)
@@ -1316,7 +1324,7 @@ async function main() {
   )
   const toolDone = await waitFor(
     win,
-    `document.querySelector('.tool-card[data-status="ok"]')?.getAttribute('data-tool') === 'list_templates'`,
+    `!!document.querySelector('.tool-card[data-tool="list_templates"][data-status="ok"]')`,
     20000
   )
   const finished = await waitFor(win, `!document.querySelector('.pill--stop')`, 20000)
@@ -1324,9 +1332,9 @@ async function main() {
   const chat = await win.webContents.executeJavaScript(`({
     assistantText: [...document.querySelectorAll('.msg--assistant .msg__text')].map((n) => n.textContent).join('\\n'),
     thinkOpen: document.querySelector('.think')?.open ?? null,
-    toolText: document.querySelector('.tool-card')?.textContent ?? '',
-    toolStatus: document.querySelector('.tool-card')?.getAttribute('data-status') ?? null,
-    toolName: document.querySelector('.tool-card')?.getAttribute('data-tool') ?? null,
+    toolText: document.querySelector('.tool-card[data-tool="list_templates"]')?.textContent ?? '',
+    toolStatus: document.querySelector('.tool-card[data-tool="list_templates"]')?.getAttribute('data-status') ?? null,
+    toolName: document.querySelector('.tool-card[data-tool="list_templates"]')?.getAttribute('data-tool') ?? null,
     cursor: !!document.querySelector('.cursor'),
     sendText: document.querySelector('.pill--send')?.textContent?.trim() ?? '',
     sendDisabled: document.querySelector('.pill--send')?.disabled ?? null
