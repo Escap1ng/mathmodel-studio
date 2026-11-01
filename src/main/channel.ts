@@ -235,10 +235,15 @@ export class Channel {
     await this.request(`/chats/${encodeURIComponent(chatId)}/cancel`, { method: 'POST', body: {} })
   }
 
-  async resumeSession(sessionId: string, action: string, choice: string): Promise<void> {
+  async resumeSession(
+    sessionId: string,
+    action: string,
+    choice: string,
+    workspace?: string
+  ): Promise<void> {
     await this.request(`/sessions/${encodeURIComponent(sessionId)}/resume`, {
       method: 'POST',
-      body: { action, choice }
+      body: { action, choice, workspace }
     })
   }
 

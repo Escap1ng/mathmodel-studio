@@ -1,4 +1,4 @@
-import { app, dialog, shell, type BrowserWindow, type OpenDialogOptions } from 'electron'
+import { app, clipboard, dialog, shell, type BrowserWindow, type OpenDialogOptions } from 'electron'
 import { mkdir, readdir, stat } from 'node:fs/promises'
 import { extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { WorkspaceEntry, WorkspaceInfo, WorkspaceListing } from '../shared/api'
@@ -146,12 +146,33 @@ export async function revealWorkspace(): Promise<void> {
   if (error) throw new Error(error)
 }
 
-export async function openWorkspaceEntry(rel: unknown): Promise<void> {
+async function entryPath(rel: unknown): Promise<string> {
   if (typeof rel !== 'string' || !rel) throw new Error('缺少文件路径')
   const root = await ensureWorkspace()
   const target = resolve(root, rel)
   const inside = relative(root, target)
   if (!inside || inside.startsWith('..') || isAbsolute(inside)) throw new Error('路径不在工作区内')
-  const error = await shell.openPath(target)
+  return target
+}
+
+export async function openWorkspaceEntry(rel: unknown): Promise<void> {
+  const error = await shell.openPath(await entryPath(rel))
   if (error) throw new Error(error)
+}
+
+export function revealWorkspaceEntry(rel: unknown): Promise<void> {
+  return entryPath(rel).then((target) => {
+    shell.showItemInFolder(target)
+  })
+}
+
+export async function copyWorkspacePath(rel: unknown): Promise<string> {
+  const target = await entryPath(rel)
+  clipboard.writeText(target)
+  return target
+}
+
+// 用户主动删除时走系统回收站，不做不可恢复的 unlink。
+export async function trashWorkspaceEntry(rel: unknown): Promise<void> {
+  await shell.trashItem(await entryPath(rel))
 }

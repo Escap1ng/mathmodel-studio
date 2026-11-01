@@ -325,6 +325,8 @@ export interface StagedFile {
   ext: string
   kind: 'pdf' | 'doc' | 'sheet' | 'image' | 'text' | 'other'
   path: string
+  /** workspace = 工作区里原有的文件，移除时只从列表拿掉，不删原文件。 */
+  origin?: 'staged' | 'workspace'
 }
 
 export interface StageRejection {

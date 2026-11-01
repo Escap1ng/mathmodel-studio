@@ -336,6 +336,43 @@ export default function App() {
       }
       return true
     }
+    if (event.event === 'compaction') {
+      const data = event.data
+      const before = typeof data.before === 'number' ? data.before : 0
+      const after = typeof data.after === 'number' ? data.after : 0
+      const summarized = typeof data.summarized === 'number' ? data.summarized : 0
+      const pruned = typeof data.pruned === 'number' ? data.pruned : 0
+      const dropped = typeof data.dropped === 'number' ? data.dropped : 0
+      const reason = typeof data.reason === 'string' ? data.reason : ''
+      const head =
+        reason === 'overflow' ? '上下文超出模型窗口，已压缩后重试' : '上下文接近预算，已压缩较早对话'
+      const parts = [
+        summarized > 0 ? `合并 ${summarized} 条消息` : '',
+        pruned > 0 ? `裁剪 ${pruned} 处工具结果` : '',
+        dropped > 0 ? `丢弃 ${dropped} 条最早消息` : ''
+      ].filter(Boolean)
+      const detail = parts.length > 0 ? `：${parts.join('、')}` : ''
+      const divider: ChatEntry = {
+        id: nextId('n'),
+        role: 'assistant',
+        reasoning: '',
+        parts: [],
+        streaming: false,
+        notice: `${head}${detail}（约 ${before} → ${after} tokens）`
+      }
+      setEntries((prev) => {
+        const next = prev.slice()
+        const index = next.findIndex((entry) => entry.id === activeAssistant.current)
+        next.splice(index < 0 ? next.length : index, 0, divider)
+        return next
+      })
+      return true
+    }
+    if (event.event === 'artifact') {
+      // 阶段四把图登记进图表版本后，右侧工作台要重新拉一次状态。
+      window.dispatchEvent(new Event('mms:workbench-changed'))
+      return true
+    }
     const assistantId = activeAssistant.current
     if (!assistantId) return false
     setEntries((prev) =>
@@ -489,12 +526,12 @@ export default function App() {
     }
   }
 
-  const send = async (text: string, extras?: SendExtras): Promise<void> => {
+  const send = async (text: string, extras?: SendExtras, replaceFrom?: number): Promise<void> => {
     if (!provider || !canSend || streaming) return
     const content = extras?.context ?? text
     if (!content.trim()) return
 
-    const baseEntries = mode === 'workflow' ? [] : entries
+    const baseEntries = mode === 'workflow' ? [] : entries.slice(0, replaceFrom ?? entries.length)
     const allHistory: ChatMessageInput[] = []
     for (const entry of baseEntries) {
       if (entry.role === 'user') {
@@ -654,6 +691,18 @@ export default function App() {
     }
   }
 
+  const retry = (): void => {
+    if (streaming) return
+    const lastUser = [...entries].reverse().find((entry) => entry.role === 'user')
+    if (!lastUser) return
+    const index = entries.findIndex((entry) => entry.id === lastUser.id)
+    void send(
+      userText(lastUser),
+      { attachments: lastUser.attachments, context: lastUser.context },
+      index
+    )
+  }
+
   const stop = (): void => {
     const chatId = activeChat.current
     if (!chatId) return
@@ -785,6 +834,7 @@ export default function App() {
         trimNote={trimNote}
         onModeChange={setMode}
         onSend={(text, extras) => void send(text, extras)}
+        onRetry={retry}
         onStop={stop}
         onDecision={(action, choice) => void resume(action, choice)}
         onExplain={setExplain}

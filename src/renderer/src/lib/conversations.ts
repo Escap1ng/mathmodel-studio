@@ -1,9 +1,11 @@
 import type { ChatEntry } from './chat'
 
 const KEY = 'mms.chatConversations.v1'
-const MAX_CONVERSATIONS = 30
-const MAX_ENTRIES = 80
+const MAX_CONVERSATIONS = 60
+const MAX_ENTRIES = 300
 const MAX_TITLE = 30
+// 只有最近几条保留附件全文与思维过程；更早的只留界面文本，避免 localStorage 撑爆。
+const FULL_CONTEXT_ENTRIES = 8
 
 export interface ChatConversation {
   id: string
@@ -36,7 +38,14 @@ function cleanEntry(entry: ChatEntry): ChatEntry {
 }
 
 function cleanEntries(entries: ChatEntry[]): ChatEntry[] {
-  return entries.slice(-MAX_ENTRIES).map(cleanEntry)
+  const kept = entries.slice(-MAX_ENTRIES)
+  return kept.map((entry, index) => {
+    const cleaned = cleanEntry(entry)
+    if (kept.length - index > FULL_CONTEXT_ENTRIES) {
+      return { ...cleaned, reasoning: '', context: undefined }
+    }
+    return cleaned
+  })
 }
 
 export function titleOf(entries: ChatEntry[]): string {

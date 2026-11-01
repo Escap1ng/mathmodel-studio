@@ -1,14 +1,19 @@
-"""M3 编排状态机：起题 → K2 确认 → K3 选模 → 选择后进入阶段四。
+"""M3 编排状态机：起题 → K2 确认 → K3 选模 → 阶段四真跑一次基线。
 
-M3 的内容生成是确定性的：题面按小节切分，候选来自内置方法族模板，
-不冒充模型判断。真实模型参与选模放在 M4；这里先把「暂停/恢复/换一批/
-解释不清待选」的语义与落盘做对。
+M3 的选模内容仍是确定性的：题面按小节切分，候选来自内置方法族模板，
+不冒充模型判断。阶段四不再是一句“接下来进入代码实现”：它定位工作区数据、
+生成脚本、真跑一遍并把图登记成图表版本，进度用工具卡逐条报到界面上。
 """
 
 from __future__ import annotations
 
+import os
 import re
+import time
+from collections.abc import Iterator
+from pathlib import Path
 
+from . import baseline, workbench_figure
 from .store import SessionStore
 
 PHASE_INTRO = "已收到题目。先按小节把题面拆开；确认题面后再进入算法选择。"
@@ -236,49 +241,47 @@ FAMILIES = [
     ),
 ]
 
-DEFAULT_FAMILY = (
-    [
-        {
-            "name": "梯度提升树",
-            "idea": "先用结构化特征建立非线性基线，量化可提升空间。",
-            "innovation": "低",
-            "interpretability": "中",
-            "difficulty": "低",
-            "eta": "1–2 小时",
-            "accuracy": "中高",
-            "math": "ŷ = Σ f_k(x)，逐轮拟合残差。",
-            "fit": "题面尚未暴露明确机制时，先拿到可复现的基线。",
-            "diff": "比机制模型省时，但外推与解释较弱。",
-            "verify": "交叉验证并报告特征重要度。",
-        },
-        {
-            "name": "多元回归 + 正则化",
-            "idea": "用显式变量与约束项给出可解释的基线。",
-            "innovation": "低",
-            "interpretability": "高",
-            "difficulty": "低",
-            "eta": "1–2 小时",
-            "accuracy": "中",
-            "math": "min ‖y−Xβ‖² + λ‖β‖。",
-            "fit": "变量关系近似线性、需要逐项解释时优先。",
-            "diff": "比树模型透明，交互项需要手工构造。",
-            "verify": "残差诊断与系数稳定性检查。",
-        },
-        {
-            "name": "机制模型 + 数据校准",
-            "idea": "先写守恒或平衡关系，再用数据校准少量参数。",
-            "innovation": "高",
-            "interpretability": "高",
-            "difficulty": "高",
-            "eta": "3–6 小时",
-            "accuracy": "中高",
-            "math": "由守恒关系给出 f(x,θ)=0，再最小化观测残差。",
-            "fit": "题面给了明确机制或约束时，比纯拟合更可信。",
-            "diff": "可外推、可解释，但建模与校准都更费时间。",
-            "verify": "参数敏感性分析与留出年份回测。",
-        },
-    ],
-)
+DEFAULT_FAMILY = [
+    {
+        "name": "梯度提升树",
+        "idea": "先用结构化特征建立非线性基线，量化可提升空间。",
+        "innovation": "低",
+        "interpretability": "中",
+        "difficulty": "低",
+        "eta": "1–2 小时",
+        "accuracy": "中高",
+        "math": "ŷ = Σ f_k(x)，逐轮拟合残差。",
+        "fit": "题面尚未暴露明确机制时，先拿到可复现的基线。",
+        "diff": "比机制模型省时，但外推与解释较弱。",
+        "verify": "交叉验证并报告特征重要度。",
+    },
+    {
+        "name": "多元回归 + 正则化",
+        "idea": "用显式变量与约束项给出可解释的基线。",
+        "innovation": "低",
+        "interpretability": "高",
+        "difficulty": "低",
+        "eta": "1–2 小时",
+        "accuracy": "中",
+        "math": "min ‖y−Xβ‖² + λ‖β‖。",
+        "fit": "变量关系近似线性、需要逐项解释时优先。",
+        "diff": "比树模型透明，交互项需要手工构造。",
+        "verify": "残差诊断与系数稳定性检查。",
+    },
+    {
+        "name": "机制模型 + 数据校准",
+        "idea": "先写守恒或平衡关系，再用数据校准少量参数。",
+        "innovation": "高",
+        "interpretability": "高",
+        "difficulty": "高",
+        "eta": "3–6 小时",
+        "accuracy": "中高",
+        "math": "由守恒关系给出 f(x,θ)=0，再最小化观测残差。",
+        "fit": "题面给了明确机制或约束时，比纯拟合更可信。",
+        "diff": "可外推、可解释，但建模与校准都更费时间。",
+        "verify": "参数敏感性分析与留出年份回测。",
+    },
+]
 
 
 def _family_for(problem: str):
@@ -453,7 +456,15 @@ def start(store: SessionStore, record: dict) -> list[dict]:
     ]
 
 
-def resume(store: SessionStore, record: dict, action: str, choice: str) -> list[dict]:
+def resume(
+    store: SessionStore, record: dict, action: str, choice: str, workspace: str = ""
+) -> list[dict]:
+    return list(resume_iter(store, record, action, choice, workspace))
+
+
+def resume_iter(
+    store: SessionStore, record: dict, action: str, choice: str, workspace: str = ""
+) -> Iterator[dict]:
     pending = record["pending"]
     if not pending:
         raise ValueError("这个会话没有等待中的决策")
@@ -477,14 +488,13 @@ def resume(store: SessionStore, record: dict, action: str, choice: str) -> list[
         )
         record["pending"] = {"card": "model-choice", "payload": payload}
         store.put(record)
-        return [
-            phase_event(1, "passed"),
-            phase_event(2, "passed", "会话数据目录已创建"),
-            phase_event(3, "running"),
-            {"event": "token", "data": {"text": text}},
-            phase_event(3, "waiting"),
-            {"event": "interrupt", "data": record["pending"]},
-        ]
+        yield phase_event(1, "passed")
+        yield phase_event(2, "passed", "会话数据目录已创建")
+        yield phase_event(3, "running")
+        yield {"event": "token", "data": {"text": text}}
+        yield phase_event(3, "waiting")
+        yield {"event": "interrupt", "data": record["pending"]}
+        return
 
     if action == "reroll":
         if card != "model-choice":
@@ -503,10 +513,9 @@ def resume(store: SessionStore, record: dict, action: str, choice: str) -> list[
         record["pending"] = {"card": "model-choice", "payload": payload}
         set_phase(record, 3, "waiting")
         store.put(record)
-        return [
-            {"event": "token", "data": {"text": text}},
-            {"event": "interrupt", "data": record["pending"]},
-        ]
+        yield {"event": "token", "data": {"text": text}}
+        yield {"event": "interrupt", "data": record["pending"]}
+        return
 
     if action == "choose":
         if card != "model-choice":
@@ -518,14 +527,228 @@ def resume(store: SessionStore, record: dict, action: str, choice: str) -> list[
         _resolve_interrupt(record, f"已选：{picked['name']}")
         set_phase(record, 3, "passed")
         set_phase(record, 4, "running")
-        text = f"已选择「{picked['name']}」。阶段三已过，接下来进入代码实现。"
+        text = f"已选择「{picked['name']}」。阶段三已过，开始阶段四：真跑一次基线。"
         record["messages"].append({"role": "assistant", "content": text})
         record["pending"] = None
         store.put(record)
-        return [
-            phase_event(3, "passed"),
-            phase_event(4, "running"),
-            {"event": "token", "data": {"text": text}},
-        ]
+        yield phase_event(3, "passed")
+        yield phase_event(4, "running")
+        yield {"event": "token", "data": {"text": text}}
+        yield from _phase4(store, record, picked, workspace)
+        return
 
     raise ValueError(f"未知动作: {action}")
+
+
+def _workflow_delay() -> float:
+    try:
+        return max(0.0, float(os.environ.get("MMS_WORKFLOW_DELAY_MS") or "180") / 1000)
+    except ValueError:
+        return 0.18
+
+
+def _tool(
+    call_id: str,
+    name: str,
+    status: str,
+    *,
+    args=None,
+    result=None,
+    duration_ms: int | None = None,
+    delay: float = 0.0,
+) -> dict:
+    data: dict = {"id": call_id, "name": name, "status": status}
+    if args is not None:
+        data["args"] = args
+    if result is not None:
+        data["result"] = result
+    if duration_ms is not None:
+        data["duration_ms"] = duration_ms
+    row: dict = {"event": "tool_call", "data": data}
+    if delay:
+        row["delay"] = delay
+    return row
+
+
+def _text_event(text: str, delay: float = 0.0) -> dict:
+    row: dict = {"event": "token", "data": {"text": text}}
+    if delay:
+        row["delay"] = delay
+    return row
+
+
+def _close_phase4(store: SessionStore, record: dict, text: str) -> None:
+    record["messages"].append({"role": "assistant", "content": text})
+    record["pending"] = None
+    store.put(record)
+
+
+def _phase4(store: SessionStore, record: dict, picked: dict, workspace: str) -> Iterator[dict]:
+    """阶段四：目录 → 数据 → 脚本 → 真跑 → 登记。每一步一张工具卡。"""
+    delay = _workflow_delay()
+    name = str(picked.get("name") or "方案")
+    data_root = store.path.parent
+    code_dir = data_root / "workbench" / "code"
+    out_dir = code_dir / "outputs"
+
+    yield _text_event(
+        f"按「{name}」进入阶段四：准备目录 → 定位数据 → 生成脚本 → 跑基线并登记产物。\n\n",
+        delay,
+    )
+
+    yield _tool("p4-prepare", "准备目录", "running", args={"dir": str(code_dir)})
+    started = time.monotonic()
+    try:
+        code_dir.mkdir(parents=True, exist_ok=True)
+        prep_error = ""
+    except OSError as exc:
+        prep_error = str(exc)
+    yield _tool(
+        "p4-prepare",
+        "准备目录",
+        "ok" if not prep_error else "error",
+        args={"dir": str(code_dir)},
+        result={"ok": not prep_error, "dir": str(code_dir), "error": prep_error},
+        duration_ms=int((time.monotonic() - started) * 1000),
+        delay=delay,
+    )
+    if prep_error:
+        text = f"阶段四没开始：工作目录创建失败（{prep_error}）。"
+        set_phase(record, 4, "failed")
+        _close_phase4(store, record, text)
+        yield phase_event(4, "failed", prep_error)
+        yield _text_event(text, delay)
+        return
+
+    yield _tool("p4-data", "定位数据", "running", args={"workspace": workspace or "（未设置）"})
+    started = time.monotonic()
+    data_path = baseline.find_data(Path(workspace)) if workspace else None
+    sample = data_path is None
+    if sample:
+        data_path = baseline.ensure_sample(code_dir)
+    try:
+        size_kb = round(data_path.stat().st_size / 1024, 1)
+    except OSError:
+        size_kb = 0.0
+    yield _tool(
+        "p4-data",
+        "定位数据",
+        "ok",
+        args={"workspace": workspace or "（未设置）"},
+        result={
+            "file": data_path.name,
+            "path": str(data_path),
+            "size_kb": size_kb,
+            "sample": sample,
+        },
+        duration_ms=int((time.monotonic() - started) * 1000),
+        delay=delay,
+    )
+    if sample:
+        yield _text_event("工作区里没有 CSV/TSV，先用内置示例数据 sample.csv 把链路跑通。\n", delay)
+
+    yield _tool("p4-code", "生成脚本", "running", args={"file": baseline.SCRIPT_NAME})
+    started = time.monotonic()
+    try:
+        script, lines = baseline.write_script(code_dir)
+        write_error = ""
+    except OSError as exc:
+        script, lines, write_error = code_dir / baseline.SCRIPT_NAME, 0, str(exc)
+    yield _tool(
+        "p4-code",
+        "生成脚本",
+        "ok" if not write_error else "error",
+        args={"file": baseline.SCRIPT_NAME},
+        result={"ok": not write_error, "file": str(script), "lines": lines, "error": write_error},
+        duration_ms=int((time.monotonic() - started) * 1000),
+        delay=delay,
+    )
+    if write_error:
+        text = f"阶段四失败：脚本写入失败（{write_error}）。"
+        set_phase(record, 4, "failed")
+        _close_phase4(store, record, text)
+        yield phase_event(4, "failed", write_error)
+        yield _text_event(text, delay)
+        return
+
+    yield _tool("p4-run", "运行基线", "running", args={"data": str(data_path), "out": str(out_dir)})
+    started = time.monotonic()
+    run = baseline.run_baseline(code_dir, data_path, out_dir)
+    stats = run.get("result") or {}
+    seconds = round(time.monotonic() - started, 1)
+    yield _tool(
+        "p4-run",
+        "运行基线",
+        "ok" if run.get("ok") else "error",
+        args={"data": str(data_path), "out": str(out_dir)},
+        result={
+            "ok": run.get("ok"),
+            "exit": run.get("exit"),
+            "seconds": seconds,
+            "rows": stats.get("rows"),
+            "cols": stats.get("cols"),
+            "target": stats.get("target"),
+            "r2": stats.get("r2"),
+            "rmse": stats.get("rmse"),
+            "stderr": (run.get("stderr") or "")[-400:],
+        },
+        duration_ms=int(seconds * 1000),
+        delay=delay,
+    )
+    if not run.get("ok"):
+        tail = " ".join((run.get("stderr") or run.get("stdout") or "").split())[-200:]
+        text = f"阶段四失败：基线脚本退出 {run.get('exit')}。{('输出：' + tail) if tail else ''}"
+        set_phase(record, 4, "failed")
+        _close_phase4(store, record, text)
+        yield phase_event(4, "failed", "基线脚本失败")
+        yield _text_event(text, delay)
+        return
+
+    yield _tool("p4-collect", "登记产物", "running", args={"outputs": sorted(run["outputs"])})
+    started = time.monotonic()
+    version = workbench_figure.register(
+        data_dir=data_root,
+        sources=run["outputs"],
+        template="baseline",
+        template_title=f"阶段四 · 基线（{name}）",
+        theme="studio-ink",
+        theme_title="Studio Ink",
+        command=run.get("command") or "",
+        stdout=run.get("stdout") or "",
+        stderr=run.get("stderr") or "",
+        label="基线",
+    )
+    yield _tool(
+        "p4-collect",
+        "登记产物",
+        "ok",
+        args={"outputs": sorted(run["outputs"])},
+        result={"version": version["id"], "outputs": version["outputs"]},
+        duration_ms=int((time.monotonic() - started) * 1000),
+        delay=delay,
+    )
+    yield {
+        "event": "artifact",
+        "data": {"kind": "figure", "version": version["id"], "outputs": version["outputs"]},
+    }
+
+    r2 = stats.get("r2")
+    rmse = stats.get("rmse")
+    if isinstance(r2, (int, float)) and isinstance(rmse, (int, float)):
+        fit = f"R²={r2:.3f}，RMSE={rmse:.3f}"
+    else:
+        fit = "数值列不足，未做拟合"
+    source = "内置示例数据" if sample else "工作区数据"
+    text = (
+        f"阶段四完成（{name}）。\n"
+        f"- 数据：{data_path.name}（{source}，{stats.get('rows')} 行 × {stats.get('cols')} 列，"
+        f"目标列 {stats.get('target')}）\n"
+        f"- 拟合：{fit}\n"
+        f"- 产物：PNG/PDF/SVG 三件，已登记为图表版本 {version['id']}\n"
+        "论文输出尚未接入：流程停在阶段五。"
+    )
+    set_phase(record, 4, "passed")
+    set_phase(record, 5, "idle")
+    _close_phase4(store, record, text)
+    yield phase_event(4, "passed", "基线已跑通，图表版本已登记")
+    yield _text_event(text, delay)

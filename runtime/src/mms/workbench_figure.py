@@ -176,3 +176,55 @@ def rollback(version_id: str, root: Path | None = None, data_dir: Path | None = 
         state["active"] = version_id
         _save_state(data_dir, state)
         return 0, {"ok": True, "version": version}
+
+
+def register(
+    *,
+    data_dir: Path,
+    sources: dict[str, str],
+    template: str,
+    template_title: str,
+    theme: str,
+    theme_title: str,
+    command: str,
+    stdout: str = "",
+    stderr: str = "",
+    label: str | None = None,
+) -> dict:
+    """把外部渲染的产物登记成一个版本（阶段四的基线图走这条路）。
+
+    和 render() 共用同一份版本状态：登记后图表页、代码页与日志页都只看这一处，
+    回滚、上限裁剪也沿用原有规则。
+    """
+    with LOCK:
+        state = _load_state(data_dir)
+        state["counter"] += 1
+        version_id = f"v{state['counter']}"
+        out_dir = data_dir / "workbench" / "figure" / "versions" / version_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        outputs: dict[str, str] = {}
+        for kind, source in sources.items():
+            src = Path(source)
+            if not src.is_file():
+                continue
+            dest = out_dir / f"figure.{kind}"
+            shutil.copyfile(src, dest)
+            outputs[kind] = str(dest)
+        version = {
+            "id": version_id,
+            "label": label or version_id,
+            "template": template,
+            "template_title": template_title,
+            "theme": theme,
+            "theme_title": theme_title,
+            "created": time.time(),
+            "outputs": outputs,
+            "command": command,
+            "stdout": (stdout or "")[-4000:],
+            "stderr": (stderr or "")[-4000:],
+        }
+        state["versions"].append(version)
+        state["active"] = version_id
+        _prune(data_dir, state)
+        _save_state(data_dir, state)
+        return version

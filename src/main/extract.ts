@@ -2,11 +2,11 @@ import { createRequire } from 'node:module'
 import { readFile, stat } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { AttachmentBlock, AttachmentContext, StagedFile } from '../shared/api'
-import { attachmentsRoot } from './workspace'
+import { workspacePath } from './workspace'
 import { extractXlsx } from './xlsx'
 
-// 附件正文抽取：发送前把用户拖进来的文件读成文本，连同消息交给模型。
-// 只读暂存区里的副本；读不了的文件不报错，而是带一条说明，让模型知道有这个文件、为什么没正文。
+// 附件正文抽取：发送前把用户选中的文件读成文本，连同消息交给模型。
+// 只读工作区里的文件（含 附件/ 下的暂存副本）；读不了的文件不报错，而是带一条说明，让模型知道有这个文件、为什么没正文。
 const MAX_FILE_BYTES = 40 * 1024 * 1024
 const MAX_FILE_CHARS = 20_000
 const MAX_TOTAL_CHARS = 60_000
@@ -170,7 +170,7 @@ async function extractOne(path: string): Promise<AttachmentBlock> {
 export async function attachmentContext(paths: unknown): Promise<AttachmentContext> {
   if (!Array.isArray(paths) || paths.length === 0) throw new Error('没有附件')
   if (paths.length > 20) throw new Error('一次最多 20 个附件')
-  const root = resolve(attachmentsRoot())
+  const root = resolve(workspacePath())
   const blocks: AttachmentBlock[] = []
   let total = 0
   let truncated = false
@@ -179,7 +179,7 @@ export async function attachmentContext(paths: unknown): Promise<AttachmentConte
     const target = resolve(raw)
     const inside = relative(root, target)
     if (!inside || inside.startsWith('..') || isAbsolute(inside)) {
-      throw new Error('只能读取工作区里暂存的附件')
+      throw new Error('只能读取工作区里的文件')
     }
     const block = await extractOne(target)
     const room = Math.max(0, MAX_TOTAL_CHARS - total)

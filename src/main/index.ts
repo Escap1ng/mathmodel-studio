@@ -4,14 +4,18 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
 import { attachmentContext } from './extract'
-import { discardStaged, pickFiles, revealStaged, stageBlob, stageFiles } from './files'
+import { attachWorkspace, discardStaged, pickFiles, revealStaged, stageBlob, stageFiles } from './files'
 import {
   chooseWorkspace,
+  copyWorkspacePath,
   ensureWorkspace,
   listWorkspace,
   openWorkspaceEntry,
   resetWorkspace,
-  revealWorkspace
+  revealWorkspace,
+  revealWorkspaceEntry,
+  trashWorkspaceEntry,
+  workspacePath
 } from './workspace'
 import type {
   ChatStartInput,
@@ -227,7 +231,9 @@ ipcMain.handle('chat:start', async (event, raw: unknown) => {
     messages: input.messages,
     thinking: view.sendThinking ? input.thinking ?? view.thinkingDepth : '',
     contextTokens: input.contextTokens ?? view.contextLimit,
-    sendThinking: view.sendThinking
+    sendThinking: view.sendThinking,
+    // 阶段四要在工作区里找数据文件；路径由主进程给，渲染层不碰文件系统。
+    workspace: workspacePath()
   })
   attachStream(chatId, event.sender)
   return { ok: true, chatId }
@@ -235,7 +241,7 @@ ipcMain.handle('chat:start', async (event, raw: unknown) => {
 
 ipcMain.handle('chat:resume', async (event, raw: unknown) => {
   const input = parseResumeInput(raw)
-  await channel.resumeSession(input.sessionId, input.action, input.choice ?? '')
+  await channel.resumeSession(input.sessionId, input.action, input.choice ?? '', workspacePath())
   attachStream(input.sessionId, event.sender)
   return { ok: true, chatId: input.sessionId }
 })
@@ -272,6 +278,8 @@ ipcMain.handle('files:pick', (event) => pickFiles(BrowserWindow.fromWebContents(
 
 ipcMain.handle('files:stage', (_event, raw: unknown) => stageFiles(raw))
 
+ipcMain.handle('files:attach', (_event, raw: unknown) => attachWorkspace(raw))
+
 ipcMain.handle('files:stage-blob', (_event, raw: unknown) => stageBlob(raw))
 
 ipcMain.handle('files:discard', (_event, raw: unknown) => discardStaged(raw))
@@ -291,6 +299,12 @@ ipcMain.handle('workspace:reset', () => resetWorkspace())
 ipcMain.handle('workspace:reveal', () => revealWorkspace())
 
 ipcMain.handle('workspace:open', (_event, raw: unknown) => openWorkspaceEntry(raw))
+
+ipcMain.handle('workspace:reveal-entry', (_event, raw: unknown) => revealWorkspaceEntry(raw))
+
+ipcMain.handle('workspace:copy-path', (_event, raw: unknown) => copyWorkspacePath(raw))
+
+ipcMain.handle('workspace:trash', (_event, raw: unknown) => trashWorkspaceEntry(raw))
 
 function imageDataUrl(path: unknown): string | null {
   if (typeof path !== 'string' || !path) return null
