@@ -28,7 +28,8 @@
 
 ### 打包与仓库
 
-- **NSIS 安装包**：electron-builder 配置与随包工具链（便携 Python、pandoc）接线完成；本机构建 `mathmodel-studio-0.6.0-setup.exe`（约 264 MB，未签名、Electron 默认图标），尚未在干净机器上安装验证。
+- **NSIS 安装包**：electron-builder 配置与随包工具链（便携 Python、pandoc）接线完成；本机构建 `mathmodel-studio-0.6.0-setup.exe`（约 264 MB，自签名证书，证书根不受信任），尚未在干净机器上安装验证。
+- **图标**：应用、安装器与向导页头/侧栏图统一由 `build/icon.svg` 一处源生成，`scripts/make-icon.mjs` 同时产出 `icon.ico` 与两张 24 位 BMP。
 - **仓库收尾**：studio 历史并入原技能库并改名为 `Escap1ng/mathmodel-studio`，原私有仓改名为 `mathmodel-studio-archive`；旧 Release 与 tag 已清理，`skills/VENDOR.md` 记录同步。
 - **许可**：仓库与安装包整体改为 AGPL-3.0-only；`skills/` 中原 Apache-2.0 文件保留原许可与署名。
 
