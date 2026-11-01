@@ -182,6 +182,10 @@ M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.0-setup.exe`
 
 打包已配置：内置便携 Python 运行时（python-build-standalone，放在 `vendor/python`，不入库），pandoc 以 `vendor/pandoc/pandoc.exe` 随包放进 `resources/pandoc`；xelatex 仍需本机安装，TeX 没有内置。NSIS x64 配置见 `electron-builder.yml`，随包工具链由 `scripts/prepare-vendor.mjs` 准备。应用、安装器与向导页头/侧栏图共用 `build/icon.svg` 生成的图标；安装包用自签名证书，证书根不受信任，SmartScreen 会提示未知发布者。
 
+## 参与贡献
+
+欢迎提交 Issue 与 Pull Request。报告问题请写清版本号、Windows 版本、复现步骤与相关日志；改代码或文档前建议先开 Issue 说明意图，避免重复劳动。提交前请在本机跑通 `npm run typecheck`、`npm run build` 与上文「质量门禁与证据」中对应的门禁，并在 PR 描述里写明改动动机与验证方式。本仓库以 AGPL-3.0-only 发布，提交 PR 即表示同意你的贡献按同一许可分发。
+
 ## 合规声明
 
 本工具用于排版、出图、交付前自检和方法选型讨论，不代替建模判断，也不保证获奖。内置评分与结构自检默认采用国赛口径（对齐 2026 格式规范），美赛口径可通过参数切换；AI 痕迹检查仅清理模板腔与不可见字符，不将未完成的工作表述为已完成。伪造结果、编造文献与数据属于硬性红线。请遵守所在赛事对生成式工具的规定。
