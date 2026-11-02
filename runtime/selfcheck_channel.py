@@ -943,6 +943,71 @@ def tests_dsh() -> None:
         upstream.tool_name = None
         upstream.tool_args = '{"unused": true}'
 
+        # 供应商与思考档位映射：代码级断言 base_url/effort。
+        from mms import dsh_adapter, dsh_provider
+        from mms.provider import find_provider
+
+        deepseek = find_provider("deepseek")
+        check(
+            "D6a deepseek 思考档位映射",
+            dsh_provider.effort_table(deepseek, "deepseek-v4-pro")
+            == {"medium": "low", "high": "high", "max": "max"},
+            f"efforts={dsh_provider.effort_table(deepseek, 'deepseek-v4-pro')}",
+        )
+        qwen = find_provider("qwen")
+        check(
+            "D6b qwen 思考档位映射",
+            dsh_provider.effort_table(qwen, "qwen3.8-max")
+            == {"medium": "medium", "high": "high", "max": "max"},
+            f"efforts={dsh_provider.effort_table(qwen, 'qwen3.8-max')}",
+        )
+        kimi = find_provider("kimi")
+        check(
+            "D6c kimi-k2.x 关思考",
+            dsh_provider.effort_table(kimi, "kimi-k2.6") == {}
+            and dsh_provider.default_effort(kimi, "kimi-k2.6", "max", True) is None,
+            f"efforts={dsh_provider.effort_table(kimi, 'kimi-k2.6')}",
+        )
+        custom = find_provider("custom")
+        custom["base_url"] = base
+        patch = dsh_adapter.build_patch(custom, "custom-model", wsdir, 50_000, "max", True)
+        check(
+            "D6d custom 思考档位与 baseURL",
+            f'baseURL: {json.dumps(base)}' in patch
+            and 'reasoningEffort: "max"' in patch
+            and "reasoningEfforts:\n              off:\n" in patch,
+            f"baseURL={base in patch} effort={('reasoningEffort: \"max\"' in patch)}",
+        )
+
+        # DSH 线上行为： reasoning_effort/max 与 sendThinking=False
+        records_before = len(upstream.records)
+        status, started_effort = channel.start_chat(
+            {**body, "messages": [{"role": "user", "content": "深度演示"}], "thinking": "max"}
+        )
+        channel.events(started_effort.get("chatId", ""))
+        deep_bodies = [r["body"] for r in upstream.records[records_before:] if isinstance(r["body"], dict) and (r["body"].get("messages") or [])]
+        check(
+            "D6e thinking=max 发送 wire effort",
+            bool(deep_bodies) and any(b.get("reasoning_effort") == "max" for b in deep_bodies),
+            f"bodies={[b.get('reasoning_effort') for b in deep_bodies]}",
+        )
+        records_before = len(upstream.records)
+        status, started_off = channel.start_chat(
+            {
+                **body,
+                "messages": [{"role": "user", "content": "关闭思考"}],
+                "thinking": "max",
+                "sendThinking": False,
+            }
+        )
+        channel.events(started_off.get("chatId", ""))
+        off_bodies = [r["body"] for r in upstream.records[records_before:] if isinstance(r["body"], dict) and (r["body"].get("messages") or [])]
+        check(
+            "D6f sendThinking=false 不发送 effort",
+            bool(off_bodies) and all("reasoning_effort" not in b for b in off_bodies),
+            f"bodies={[b.get('reasoning_effort') for b in off_bodies]}",
+        )
+
         # 取消：慢速假模型，收到第一个 token 后调 /cancel
         upstream.delay = 0.4
         status, started2 = channel.start_chat(
