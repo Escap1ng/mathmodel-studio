@@ -57,10 +57,9 @@ def find_dsh(explicit: str = "") -> Path:
     candidates: list[Path] = []
     if explicit:
         candidates.append(Path(explicit))
-    for env_name in ("MMS_DSH_BIN",):
-        value = os.environ.get(env_name)
-        if value:
-            candidates.append(Path(value))
+    env_bin = os.environ.get("MMS_DSH_BIN")
+    if env_bin:
+        candidates.append(Path(env_bin))
     exe_dir = Path(sys.executable).resolve().parent
     candidates.extend(
         [
@@ -201,6 +200,7 @@ class WsClient:
                 elif length == 127:
                     length = struct.unpack(">Q", self._read_exact(8))[0]
                 if length > MAX_FRAME_BYTES:
+                    self.close()
                     raise DshError("WebSocket 帧超过 32MB")
                 mask = self._read_exact(4) if masked else b""
                 payload = self._read_exact(length)
@@ -705,7 +705,7 @@ class DshChatSession(ChatSession):
         self._runtime: DshRuntime | None = None
         self._follow: WsClient | None = None
         self._cancel_sent = False
-        self._turn_end: dict = {}
+        self._turn_end: dict | None = None
         self._usage: dict | None = None
         self._tool_started: dict[str, float] = {}
         self._tool_names: dict[str, str] = {}
@@ -724,7 +724,8 @@ class DshChatSession(ChatSession):
         self._cancel_sent = True
         try:
             self._runtime.cancel(self.session_id)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # 允许下一次重试，别卡在一次性标志位。# noqa: BLE001
+            self._cancel_sent = False
             print(f"[mms] dsh cancel failed: {exc}", file=sys.stderr)
 
     def _run(self) -> None:
@@ -775,11 +776,11 @@ class DshChatSession(ChatSession):
             now = time.monotonic()
             if self.cancelled:
                 self._send_cancel()
-            if self._turn_end and now >= grace_deadline:
+            if self._turn_end is not None and now >= grace_deadline:
                 return self._turn_end
             if now >= deadline:
                 raise DshError("等待 DSH 回合结束超时")
-            text = self._follow.recv(0.2 if self._turn_end else 1.0)
+            text = self._follow.recv(0.2 if self._turn_end is not None else 1.0)
             if text is None:
                 if self._follow.closed:
                     raise DshError("DSH 事件流提前关闭")
@@ -791,7 +792,7 @@ class DshChatSession(ChatSession):
             if self._handle_frame(frame):
                 grace_deadline = time.monotonic() + TURN_GRACE
 
-    def _finish_from_turn(self, turn: dict) -> None:
+    def _finish_from_turn(self, turn: dict | None) -> None:
         reason = turn.get("reason") if isinstance(turn, dict) else None
         kind = reason.get("kind") if isinstance(reason, dict) else ""
         if self.cancelled or kind == "aborted":
