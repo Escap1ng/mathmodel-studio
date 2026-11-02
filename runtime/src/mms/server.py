@@ -72,6 +72,10 @@ def fake_enabled() -> bool:
     return os.environ.get("MMS_FAKE_PROVIDER") == "1"
 
 
+def core_name() -> str:
+    return "dsh" if (os.environ.get("MMS_CORE") or "python").strip().lower() == "dsh" else "python"
+
+
 def provider_rows(fake: bool | None = None) -> list[dict]:
     rows = [dict(p) for p in load_providers()]
     for row in rows:
@@ -478,6 +482,7 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "version": __version__,
                     "fake": self.server.fake,
+                    "core": core_name(),
                     "pid": os.getpid(),
                 },
             )
@@ -731,6 +736,13 @@ class Handler(BaseHTTPRequestHandler):
         if mode not in ("chat", "workflow"):
             self._error(400, "mode", f"未知对话模式: {mode}")
             return
+        if mode == "chat" and core_name() == "dsh" and provider_id == "fake":
+            self._error(
+                400,
+                "core",
+                "MMS_CORE=dsh 不支持离线 fake provider；请切回 python 核心或选择真实服务商",
+            )
+            return
         workspace = str(body.get("workspace") or "")
         raw_goal = next((m["content"] for m in messages if m["role"] == "user"), "")
         goal = " ".join(str(raw_goal).split())[:80]
@@ -739,6 +751,21 @@ class Handler(BaseHTTPRequestHandler):
             record = self.server.store.create(chat_id, provider_id, model, problem)
             session: ChatSession = WorkflowSession(
                 chat_id, self.server.store, record, "start", "", workspace=workspace
+            )
+        elif core_name() == "dsh":
+            from .dsh_adapter import DshChatSession
+
+            session = DshChatSession(
+                chat_id,
+                provider,
+                api_key,
+                model,
+                messages,
+                depth=depth,
+                context_tokens=context_tokens,
+                send_thinking=send_thinking,
+                goal=goal,
+                workspace=workspace,
             )
         else:
             session = ChatSession(
@@ -878,7 +905,16 @@ def serve(port: int = 0) -> int:
 
     thread = threading.Thread(target=server.serve_forever, name="mms-http", daemon=True)
     thread.start()
-    stop.wait()
-    server.shutdown()
-    server.server_close()
+    try:
+        stop.wait()
+        server.shutdown()
+        server.server_close()
+    finally:
+        if core_name() == "dsh":
+            try:
+                from .dsh_adapter import shutdown_dsh_runtime
+
+                shutdown_dsh_runtime()
+            except Exception:
+                traceback.print_exc(file=sys.stderr)
     return 0
