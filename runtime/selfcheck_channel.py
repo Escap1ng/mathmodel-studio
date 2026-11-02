@@ -1008,6 +1008,56 @@ def tests_dsh() -> None:
             f"bodies={[b.get('reasoning_effort') for b in off_bodies]}",
         )
 
+        # 同一会话的续聊：第二轮只把新增 user 发给 provider，不重建 session。
+        upstream.tool_name = None
+        upstream.tool_args = '{"unused": true}'
+        upstream.delay = 0.0
+        status, started_first = channel.start_chat(
+            {**body, "messages": [{"role": "user", "content": "一轮"}]}
+        )
+        records_before = len(upstream.records)
+        first_events, _ = channel.events(started_first.get("chatId", ""))
+        first_user = [
+            m
+            for r in upstream.records[records_before:]
+            if isinstance(r["body"], dict)
+            for m in (r["body"].get("messages") or [])
+            if isinstance(m, dict) and m.get("role") == "user"
+        ]
+        check(
+            "D7a 首轮 prompt 只有第一问",
+            bool(first_user)
+            and started_first.get("chatId")
+            and first_user[0].get("content") == "一轮"
+            and len(first_events) > 0
+            and first_events[-1]["event"] == "done",
+            f"first_user={first_user[:1]} last_events={first_events[-1] if first_events else None}",
+        )
+        status, started_second = channel.start_chat(
+            {
+                **body,
+                "messages": [
+                    {"role": "user", "content": "一轮"},
+                    {"role": "assistant", "content": "第一句回复"},
+                    {"role": "user", "content": "两轮"},
+                ],
+            }
+        )
+        records_before2 = len(upstream.records)
+        second_events, _ = channel.events(started_second.get("chatId", ""))
+        tail_user = [
+            m
+            for r in upstream.records[records_before2:]
+            if isinstance(r["body"], dict)
+            for m in (r["body"].get("messages") or [])
+            if isinstance(m, dict) and m.get("role") == "user"
+        ]
+        check(
+            "D7b 续聊只发新增 user，不重发 transcript",
+            bool(tail_user) and tail_user[-1].get("content") == "两轮" and not tail_user[-1].get("content").endswith("一轮") and bool(second_events) and second_events[-1]["event"] == "done",
+            f"tail_user={tail_user[-1] if tail_user else None} last_events={second_events[-1] if second_events else None}",
+        )
+
         # 取消：慢速假模型，收到第一个 token 后调 /cancel
         upstream.delay = 0.4
         status, started2 = channel.start_chat(
