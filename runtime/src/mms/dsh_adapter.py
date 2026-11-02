@@ -33,6 +33,7 @@ from pathlib import Path
 
 from .server import ChatSession
 from .store import data_dir
+from . import dsh_provider
 
 READY_TIMEOUT = 40.0
 STDERR_LINES = 200
@@ -565,19 +566,31 @@ def _prompt_text(messages: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def build_patch(provider: dict, model: str, workspace: Path, context_tokens: int | None = None) -> str:
-    base_url = str(provider.get("base_url") or "").strip().rstrip("/")
-    if not base_url:
-        raise DshError("当前 provider 没有 base_url，不能交给 DSH")
-    context_window = int(provider.get("context_len") or 0) or 32768
-    if context_tokens:
-        context_window = max(32768, min(context_window, int(context_tokens)))
-    max_tokens = int(provider.get("max_out") or 0) or 8192
-    max_tokens = min(max_tokens, 32768, context_window)
-    skills = repo_root() / "skills"
+def build_patch(
+    provider: dict,
+    model: str,
+    workspace: Path,
+    context_tokens: int | None = None,
+    depth: str = "",
+    send_thinking: bool = True,
+) -> str:
+    base_url = dsh_provider.base_url(provider)
+    context_window = dsh_provider.context_window(provider, context_tokens)
+    max_tokens = dsh_provider.max_tokens(provider, context_window)
     thinking = ""
-    if provider.get("reasoning_field") == "reasoning_content":
-        thinking = "        compat:\n          thinkingFormat: deepseek\n"
+    thinking_format = dsh_provider.thinking_format(provider)
+    if thinking_format:
+        thinking = f"        compat:\n          thinkingFormat: {thinking_format}\n"
+    efforts = dsh_provider.effort_table(provider, model)
+    if efforts:
+        effort_block = "            reasoningEfforts:\n              off:\n"
+        for level, wire in efforts.items():
+            effort_block += f"              {level}: {json.dumps(wire)}\n"
+    else:
+        effort_block = "            reasoningEfforts: false\n"
+    effort = dsh_provider.default_effort(provider, model, depth, send_thinking)
+    effort_line = f"    reasoningEffort: {json.dumps(effort)}\n" if effort else ""
+    skills = repo_root() / "skills"
     persona = "你是 MathModel Studio 的数学建模助手。工具返回的数据以工具结果为准，不要编造没有运行过的结果；回答简洁，关键判断留给使用者确认。"
     skill_block = ""
     if skills.is_dir():
@@ -657,15 +670,12 @@ def build_patch(provider: dict, model: str, workspace: Path, context_tokens: int
         f"          - id: {json.dumps(model, ensure_ascii=False)}\n"
         f"            contextWindow: {context_window}\n"
         f"            maxTokens: {max_tokens}\n"
-        "            reasoningEfforts:\n"
-        "              off:\n"
-        "              medium: medium\n"
-        "              high: high\n"
-        "              max: max\n"
+        f"{effort_block}"
         "- id: agent-default-model\n"
         "  config:\n"
         "    provider: mms\n"
         f"    model: {json.dumps(model, ensure_ascii=False)}\n"
+        f"{effort_line}"
         "- id: sandbox-policy\n"
         "  config:\n"
         "    mode: read-only\n"
@@ -702,6 +712,8 @@ class DshChatSession(ChatSession):
             workspace=workspace,
         )
         self.session_id = _session_id(chat_id)
+        self.send_thinking = send_thinking
+        self.raw_depth = depth
         self._runtime: DshRuntime | None = None
         self._follow: WsClient | None = None
         self._cancel_sent = False
@@ -742,7 +754,14 @@ class DshChatSession(ChatSession):
                 if self.workspace.strip()
                 else home
             )
-            patch = build_patch(self.provider, self.model, workspace, self.context_tokens)
+            patch = build_patch(
+                self.provider,
+                self.model,
+                workspace,
+                self.context_tokens,
+                depth=self.raw_depth,
+                send_thinking=self.send_thinking,
+            )
             self._runtime = get_runtime(patch, home, workspace, self.api_key)
             if self.cancelled:
                 self.finish("cancelled")
