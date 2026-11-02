@@ -171,6 +171,8 @@ class Channel:
         env = {**os.environ}
         env.pop("MMS_FAKE_PROVIDER", None)
         env.pop("MMS_FAKE_DELAY_MS", None)
+        # 外壳环境可能带着 MMS_CORE；测试默认锁定到 python，除非显式覆盖。
+        env["MMS_CORE"] = (env_extra or {}).get("MMS_CORE") or "python"
         if fake:
             env["MMS_FAKE_PROVIDER"] = "1"
         env.update(env_extra or {})
