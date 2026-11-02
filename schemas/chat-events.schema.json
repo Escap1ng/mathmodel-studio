@@ -9,7 +9,7 @@
   "properties": {
     "id": { "type": "string", "pattern": "^[1-9][0-9]*$" },
     "event": {
-      "enum": ["token", "reasoning", "tool_call", "artifact", "interrupt", "gate", "phase", "error", "done"]
+      "enum": ["token", "reasoning", "tool_call", "compaction", "artifact", "interrupt", "gate", "phase", "error", "done"]
     },
     "data": { "type": "object" }
   },
@@ -56,6 +56,27 @@
               "result": { "type": "object" },
               "error": { "type": "string" },
               "duration_ms": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "compaction" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["reason", "before", "after", "pruned", "summarized", "dropped"],
+            "additionalProperties": false,
+            "properties": {
+              "reason": { "type": "string" },
+              "before": { "type": "integer", "minimum": 0 },
+              "after": { "type": "integer", "minimum": 0 },
+              "pruned": { "type": "integer", "minimum": 0 },
+              "summarized": { "type": "integer", "minimum": 0 },
+              "dropped": { "type": "integer", "minimum": 0 },
+              "summary": { "type": "string" }
             }
           }
         }

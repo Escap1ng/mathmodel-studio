@@ -23,6 +23,7 @@
     "check:cli": "python runtime/selfcheck.py",
     "check:channel": "python runtime/selfcheck_channel.py",
     "check:channel:negative": "python runtime/selfcheck_channel.py --selftest",
+    "check:channel:dsh": "python runtime/selfcheck_channel.py --core dsh",
     "check:orchestrator": "python runtime/selfcheck_orchestrator.py",
     "check:orchestrator:negative": "python runtime/selfcheck_orchestrator.py --selftest",
     "check:harness": "python runtime/selfcheck_harness.py",

@@ -4,7 +4,8 @@
 provider 路径用 127.0.0.1 上的假 OpenAI 端点（含 429 重试、reasoning_content 剥离、
 tool_calls 增量拼装）。
 
-每条断言都能失败；--selftest 用 7 份坏事件证明事件判据本身会拒绝它们。
+每条断言都能失败；--selftest 用多份坏事件证明事件判据本身会拒绝它们。
+--core dsh 另起本地假 OpenAI 与 dsh web，验证适配层的流式、工具与取消。
 退出码：0 全部通过 / 1 有断言失败 / 2 用法错误
 """
 
@@ -33,7 +34,7 @@ for _stream in (sys.stdout, sys.stderr):
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = ROOT / "schemas" / "chat-events.schema.json"
 SENTINEL = "sk-test-SENTINEL-DO-NOT-LEAK"
-EVENT_TYPES = {"token", "reasoning", "tool_call", "artifact", "interrupt", "gate", "phase", "error", "done"}
+EVENT_TYPES = {"token", "reasoning", "tool_call", "compaction", "artifact", "interrupt", "gate", "phase", "error", "done"}
 sys.path.insert(0, str(ROOT / "runtime" / "src"))
 from mms.provider import apply_reasoning, find_provider  # noqa: E402
 
@@ -71,6 +72,14 @@ def lint_event(ev) -> list[str]:
             problems.append("tool_call.status 非法")
         if "duration_ms" in data and not isinstance(data["duration_ms"], int):
             problems.append("tool_call.duration_ms 必须是整数")
+    elif event == "compaction":
+        for key in ("before", "after", "pruned", "summarized", "dropped"):
+            if not isinstance(data.get(key), int) or data.get(key) < 0:
+                problems.append(f"compaction.{key} 必须是非负整数")
+        if not isinstance(data.get("reason"), str) or not data.get("reason"):
+            problems.append("compaction 缺 reason")
+        if "summary" in data and not isinstance(data["summary"], str):
+            problems.append("compaction.summary 必须是字符串")
     elif event == "phase":
         if not isinstance(data.get("phase"), int) or not 0 <= data["phase"] <= 6:
             problems.append("phase 必须是 0..6 的整数")
@@ -258,7 +267,7 @@ class FakeOpenAI(BaseHTTPRequestHandler):
         self.server.records.append(
             {"auth": self.headers.get("Authorization"), "body": body}
         )
-        if len(self.server.records) == 1:
+        if getattr(self.server, "rate_limit", True) and len(self.server.records) == 1:
             self.send_response(429)
             self.send_header("Retry-After", "0")
             self.end_headers()
@@ -270,12 +279,10 @@ class FakeOpenAI(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
         messages = body.get("messages") or []
-        if any(m.get("role") == "tool" for m in messages):
-            chunks = [
-                {"choices": [{"delta": {"content": "共 25 个模板。"}, "finish_reason": None}]},
-                {"choices": [{"delta": {}, "finish_reason": "stop"}]},
-            ]
-        else:
+        tool_name = getattr(self.server, "tool_name", "list_templates")
+        tool_args = getattr(self.server, "tool_args", '{"unused": true}')
+        has_tool_result = any(m.get("role") == "tool" for m in messages)
+        if tool_name and not has_tool_result:
             chunks = [
                 {"choices": [{"delta": {"reasoning_content": "想一想。"}, "finish_reason": None}]},
                 {"choices": [{"delta": {"content": "查模板。"}, "finish_reason": None}]},
@@ -288,7 +295,7 @@ class FakeOpenAI(BaseHTTPRequestHandler):
                                         "index": 0,
                                         "id": "call_live_1",
                                         "type": "function",
-                                        "function": {"name": "list_templates", "arguments": ""},
+                                        "function": {"name": tool_name, "arguments": ""},
                                     }
                                 ]
                             },
@@ -301,7 +308,7 @@ class FakeOpenAI(BaseHTTPRequestHandler):
                         {
                             "delta": {
                                 "tool_calls": [
-                                    {"index": 0, "function": {"arguments": '{"unused": true}'}}
+                                    {"index": 0, "function": {"arguments": tool_args}}
                                 ]
                             },
                             "finish_reason": "tool_calls",
@@ -309,16 +316,31 @@ class FakeOpenAI(BaseHTTPRequestHandler):
                     ]
                 },
             ]
+        else:
+            chunks = [
+                {"choices": [{"delta": {"reasoning_content": "想一想。"}, "finish_reason": None}]},
+                {"choices": [{"delta": {"content": "第一段"}, "finish_reason": None}]},
+                {"choices": [{"delta": {"content": "第二段"}, "finish_reason": None}]},
+                {"choices": [{"delta": {}, "finish_reason": "stop"}]},
+            ]
+        delay = float(getattr(self.server, "delay", 0.0) or 0.0)
         for chunk in chunks:
             self.wfile.write(("data: " + json.dumps(chunk, ensure_ascii=False) + "\n\n").encode("utf-8"))
+            self.wfile.flush()
+            if delay:
+                time.sleep(delay)
         self.wfile.write(b"data: [DONE]\n\n")
         self.wfile.flush()
 
 
-def fake_openai() -> ThreadingHTTPServer:
+def fake_openai(tool_name="list_templates", delay: float = 0.0, rate_limit: bool = True) -> ThreadingHTTPServer:
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeOpenAI)
     server.daemon_threads = True
     server.records = []  # type: ignore[attr-defined]
+    server.tool_name = tool_name  # type: ignore[attr-defined]
+    server.tool_args = '{"unused": true}'  # type: ignore[attr-defined]
+    server.delay = delay  # type: ignore[attr-defined]
+    server.rate_limit = rate_limit  # type: ignore[attr-defined]
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
@@ -336,6 +358,14 @@ def run_fake_chat(channel: Channel, api_key: str = "") -> tuple[list[dict], str,
     chat_id = started.get("chatId", "")
     events, raw = channel.events(chat_id)
     return events, raw, started
+
+
+def finish() -> None:
+    failed = [r for r in results if not r["ok"]]
+    for row in results:
+        print(f"{'PASS' if row['ok'] else 'FAIL'} {row['name']}\n       {row['detail']}")
+    print(f"\n{len(results) - len(failed)}/{len(results)} 条通道契约断言通过")
+    raise SystemExit(0 if not failed else 1)
 
 
 def tests() -> None:
@@ -772,11 +802,174 @@ def tests() -> None:
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
-    failed = [r for r in results if not r["ok"]]
-    for row in results:
-        print(f"{'PASS' if row['ok'] else 'FAIL'} {row['name']}\n       {row['detail']}")
-    print(f"\n{len(results) - len(failed)}/{len(results)} 条通道契约断言通过")
-    raise SystemExit(0 if not failed else 1)
+    finish()
+
+
+def tests_dsh() -> None:
+    try:
+        from mms.dsh_adapter import find_dsh
+
+        dsh = find_dsh()
+    except Exception as exc:  # noqa: BLE001
+        check("D0 找到 dsh 可执行文件", False, f"设置 MMS_DSH_BIN 或装到 vendor/python/Scripts：{exc}")
+        finish()
+
+    workdir = Path(tempfile.mkdtemp(prefix="mms-dsh-core-"))
+    wsdir = workdir / "ws"
+    wsdir.mkdir()
+    home = workdir / "dsh"
+    upstream = fake_openai(tool_name=None, rate_limit=False)
+    channel = None
+    try:
+        try:
+            channel = Channel(
+                fake=False,
+                env_extra={
+                    "MMS_CORE": "dsh",
+                    "MMS_DSH_BIN": str(dsh),
+                    "MMS_DSH_HOME": str(home),
+                    "MMS_DATA_DIR": str(workdir),
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            check("D1 DSH sidecar 能启动", False, repr(exc))
+            finish()
+        status, health = channel.json("GET", "/health")
+        check(
+            "D1 /health 报告 core=dsh",
+            status == 200 and health.get("core") == "dsh",
+            f"HTTP {status} {health}",
+        )
+
+        base = f"http://127.0.0.1:{upstream.server_address[1]}/v1"
+        body = {
+            "providerId": "custom",
+            "model": "fake-model",
+            "apiKey": SENTINEL,
+            "baseUrl": base,
+            "workspace": str(wsdir),
+            "messages": [{"role": "user", "content": "你好"}],
+        }
+        status, started = channel.start_chat(body)
+        check("D2 DSH 对话能启动", status == 200 and started.get("ok") is True, f"HTTP {status} {started}")
+        events, raw = channel.events(started.get("chatId", ""))
+        problems, how = schema_validate(events)
+        check("D2 事件符合契约", not problems, f"判据 {how}；{problems[:3]}")
+        ids = [int(e["id"]) for e in events]
+        check("D2 事件 id 从 1 连续递增", ids == list(range(1, len(events) + 1)), f"{ids[:5]}…{ids[-2:]}")
+        kinds = [e["event"] for e in events]
+        check(
+            "D2 同时出现 reasoning/token/done",
+            {"reasoning", "token", "done"} <= set(kinds) and kinds.count("token") >= 2,
+            f"{kinds}",
+        )
+        check(
+            "D2 done.reason=stop 且 done 在最后",
+            bool(events) and events[-1]["event"] == "done" and events[-1]["data"].get("reason") == "stop",
+            str(events[-1] if events else None),
+        )
+        check("D2 密钥不进入 SSE", SENTINEL not in raw, "已扫描整条 SSE")
+
+        upstream.tool_name = "skill"
+        upstream.tool_args = '{"name":"mathmodel-core"}'
+        upstream.delay = 0.0
+        status, started_tool = channel.start_chat(
+            {**body, "messages": [{"role": "user", "content": "加载核心技能"}]}
+        )
+        tool_events, _ = channel.events(started_tool.get("chatId", ""))
+        tool_problems, _ = schema_validate(tool_events)
+        running = [e for e in tool_events if e["event"] == "tool_call" and e["data"].get("status") == "running"]
+        finished_tool = [e for e in tool_events if e["event"] == "tool_call" and e["data"].get("status") in ("ok", "error")]
+        check(
+            "D2b DSH 工具先 running 后结束",
+            status == 200 and bool(running) and bool(finished_tool) and not tool_problems,
+            f"HTTP {status} running={len(running)} finished={len(finished_tool)} problems={tool_problems[:2]}",
+        )
+        check(
+            "D2b 技能工具执行成功",
+            bool(finished_tool)
+            and finished_tool[0]["data"].get("status") == "ok"
+            and "mathmodel-core" in json.dumps(finished_tool[0]["data"], ensure_ascii=False),
+            str(finished_tool[:1])[:300],
+        )
+        tool_kinds = [e["event"] for e in tool_events]
+        check(
+            "D2b 工具回合仍有 token 与 done",
+            "token" in tool_kinds and tool_kinds[-1] == "done",
+            f"{tool_kinds}",
+        )
+        upstream.tool_name = None
+        upstream.tool_args = '{"unused": true}'
+
+        # 取消：慢速假模型，收到第一个 token 后调 /cancel
+        upstream.delay = 0.4
+        status, started2 = channel.start_chat(
+            {
+                **body,
+                "messages": [{"role": "user", "content": "慢速演示"}],
+            }
+        )
+        chat2 = started2.get("chatId", "")
+        conn, resp = channel.open_events(chat2)
+        frames = []
+        first_token = None
+        try:
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                frame = read_frame(resp)
+                if frame is None:
+                    break
+                frames.append(frame)
+                if frame["event"] == "token":
+                    first_token = frame
+                    break
+            check("D3 取消前收到 token", first_token is not None, f"已读 {len(frames)} 帧")
+            cancel_start = time.monotonic()
+            status_cancel, _ = channel.json("POST", f"/chats/{chat2}/cancel")
+            check("D3 取消请求被接受", status_cancel == 200, f"HTTP {status_cancel}")
+            while time.monotonic() - cancel_start < 10:
+                frame = read_frame(resp)
+                if frame is None:
+                    break
+                frames.append(frame)
+        finally:
+            conn.close()
+        latency = time.monotonic() - cancel_start if first_token is not None else -1
+        check(
+            "D3 3 秒内 done=cancelled 且 done 在最后",
+            bool(frames)
+            and frames[-1]["event"] == "done"
+            and frames[-1]["data"].get("reason") == "cancelled"
+            and latency <= 3.0,
+            f"最后事件 {frames[-1] if frames else None}，延迟 {latency:.2f}s",
+        )
+        cancel_problems, _ = schema_validate(frames)
+        check("D3 取消后的事件仍符合契约", not cancel_problems, f"{cancel_problems[:3]}")
+        cancel_ids = [int(e["id"]) for e in frames]
+        check(
+            "D3 取消后 id 仍连续递增",
+            cancel_ids == list(range(1, len(cancel_ids) + 1)),
+            f"{cancel_ids[:5]}…{cancel_ids[-2:]}",
+        )
+    finally:
+        if channel is not None:
+            channel.stop()
+
+    leaks = []
+    for path in home.rglob("*"):
+        if not path.is_file():
+            continue
+        try:
+            if SENTINEL.encode("utf-8") in path.read_bytes():
+                leaks.append(str(path))
+        except OSError:
+            continue
+    check("D4 密钥不落在 DSH_HOME", not leaks, f"命中 {leaks[:3]}")
+    check("D5 密钥不进入 DSH stderr", SENTINEL not in (channel.stderr if channel else ""), "已扫描 stderr")
+    upstream.shutdown()
+    upstream.server_close()
+    shutil.rmtree(workdir, ignore_errors=True)
+    finish()
 
 
 def selftest() -> None:
@@ -792,6 +985,16 @@ def selftest() -> None:
         ("phase 状态非法", {"id": "1", "event": "phase", "data": {"phase": 3, "status": "done"}}, False),
         ("phase 越界", {"id": "1", "event": "phase", "data": {"phase": 7, "status": "running"}}, False),
         ("done.waiting 合法", {"id": "1", "event": "done", "data": {"reason": "waiting"}}, True),
+        (
+            "compaction 合法",
+            {"id": "1", "event": "compaction", "data": {"reason": "auto", "before": 10, "after": 5, "pruned": 1, "summarized": 0, "dropped": 0}},
+            True,
+        ),
+        (
+            "compaction 缺字段",
+            {"id": "1", "event": "compaction", "data": {"reason": "auto", "before": 10}},
+            False,
+        ),
     ]
     rows = []
     for label, ev, want_pass in cases:
@@ -804,11 +1007,33 @@ def selftest() -> None:
     raise SystemExit(0 if not bad else 1)
 
 
-if __name__ == "__main__":
-    if "--selftest" in sys.argv[1:]:
+def main(argv: list[str] | None = None) -> int:
+    args = list(argv if argv is not None else sys.argv[1:])
+    core = "python"
+    rest: list[str] = []
+    index = 0
+    while index < len(args):
+        if args[index] == "--core":
+            if index + 1 >= len(args):
+                print("用法错误: --core 需要 python 或 dsh", file=sys.stderr)
+                return 2
+            core = args[index + 1]
+            index += 2
+            continue
+        rest.append(args[index])
+        index += 1
+    if "--selftest" in rest:
         selftest()
-    unknown = [a for a in sys.argv[1:] if a != "--selftest"]
-    if unknown:
-        print(f"用法错误: 未知参数 {unknown}", file=sys.stderr)
-        raise SystemExit(2)
-    tests()
+    unknown = [value for value in rest if value != "--selftest"]
+    if unknown or core not in ("python", "dsh"):
+        print(f"用法错误: 未知参数 {unknown or core}", file=sys.stderr)
+        return 2
+    if core == "dsh":
+        tests_dsh()
+    else:
+        tests()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
