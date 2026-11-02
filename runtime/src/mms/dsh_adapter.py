@@ -29,6 +29,7 @@ import threading
 import time
 import traceback
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 from .server import ChatSession
@@ -255,6 +256,7 @@ class DshRuntime:
         self._stdout: list[str] = []
         self._stderr: list[str] = []
         self._lock = threading.Lock()
+        self.runtime_id = uuid.uuid4().hex
 
     def alive(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
@@ -551,6 +553,19 @@ def _session_id(chat_id: str) -> str:
     return value[:64] or f"chat-{secrets.token_hex(4)}"
 
 
+@dataclass(frozen=True)
+class _Delivery:
+    """同一会话被 DSH 处理过的 Round；开会话时决定是续还是重开。"""
+
+    patch_hash: str
+    runtime_id: str
+    session_id: str
+    messages: tuple[dict, ...]
+
+
+DELIVERY: _Delivery | None = None
+
+
 def _prompt_text(messages: list[dict]) -> str:
     convo = [m for m in messages if m.get("role") != "system"]
     if not convo:
@@ -683,6 +698,14 @@ def build_patch(
     )
 
 
+def _prompt_delta(messages: list[dict], delivered: tuple[dict, ...]) -> str:
+    tail = [m for m in messages[len(delivered) :] if m.get("role") == "user"]
+    text = "\n\n".join(str(m.get("content") or "") for m in tail)
+    if not text.strip():
+        return _prompt_text(messages)
+    return text
+
+
 class DshChatSession(ChatSession):
     """把 DSH 的 follow 流映射成现有 9 类聊天事件。"""
 
@@ -740,7 +763,27 @@ class DshChatSession(ChatSession):
             self._cancel_sent = False
             print(f"[mms] dsh cancel failed: {exc}", file=sys.stderr)
 
+    def _matched_delivery(self, patched_hash: str) -> _Delivery | None:
+        """新一轮请求建立在上一轮 DSH round 上（继续会话，不再重发 transcript）。"""
+        prior = DELIVERY
+        if prior is None:
+            return None
+        if prior.patch_hash != patched_hash:
+            return None
+        if self._runtime is None or prior.runtime_id != self._runtime.runtime_id:
+            return None
+        messages = tuple(self.messages)
+        if len(messages) <= len(prior.messages):
+            return None
+        if messages[: len(prior.messages)] != prior.messages:
+            return None
+        tail = [m for m in messages[len(prior.messages) :] if m.get("role") == "user"]
+        if not tail:
+            return None
+        return prior
+
     def _run(self) -> None:
+        global DELIVERY
         try:
             if self.cancelled:
                 self.finish("cancelled")
@@ -766,14 +809,33 @@ class DshChatSession(ChatSession):
             if self.cancelled:
                 self.finish("cancelled")
                 return
-            self._runtime.create_session(self.session_id, str(workspace))
+            patch_hash = hashlib.sha256(patch.encode("utf-8")).hexdigest()
+            delivered = self._matched_delivery(patch_hash)
+            if delivered is not None:
+                # 复用同一个 DSH session，只把新增 user 内容补给它。
+                self.session_id = delivered.session_id
+            else:
+                self._runtime.create_session(self.session_id, str(workspace))
             self._follow = self._runtime.follow(self.session_id)
             if self.cancelled:
                 self._send_cancel()
                 self.finish("cancelled")
                 return
-            self._runtime.prompt(self.session_id, _prompt_text(self.messages))
+            self._runtime.prompt(
+                self.session_id,
+                _prompt_text(self.messages) if delivered is None else _prompt_delta(self.messages, delivered.messages),
+            )
             turn = self._consume()
+            reason = turn.get("reason") if isinstance(turn, dict) else None
+            kind = reason.get("kind") if isinstance(reason, dict) else ""
+            ok = not self.cancelled and kind not in ("aborted", "error", "blocked")
+            if ok:
+                DELIVERY = _Delivery(
+                    patch_hash,
+                    self._runtime.runtime_id,
+                    self.session_id,
+                    tuple(self.messages),
+                )
             self._finish_from_turn(turn)
         except DshError as exc:
             self.append("error", {"message": str(exc)})
