@@ -898,6 +898,46 @@ def tests_dsh() -> None:
             "token" in tool_kinds and tool_kinds[-1] == "done",
             f"{tool_kinds}",
         )
+
+        upstream.tool_name = "mcp__mms__list_templates"
+        upstream.tool_args = "{}"
+        upstream.delay = 0.0
+        status, started_mcp = channel.start_chat(
+            {**body, "messages": [{"role": "user", "content": "列出模板"}]}
+        )
+        mcp_events, _ = channel.events(started_mcp.get("chatId", ""))
+        mcp_problems, _ = schema_validate(mcp_events)
+        running_mcp = [e for e in mcp_events if e["event"] == "tool_call" and e["data"].get("status") == "running"]
+        finished_mcp = [e for e in mcp_events if e["event"] == "tool_call" and e["data"].get("status") in ("ok", "error")]
+        check(
+            "D2c MCP 工具可用并跑完",
+            status == 200 and bool(running_mcp) and bool(finished_mcp) and not mcp_problems,
+            f"HTTP {status} running={len(running_mcp)} finished={len(finished_mcp)} problems={mcp_problems[:2]}",
+        )
+        result = finished_mcp[0]["data"].get("result") if finished_mcp else {}
+        check(
+            "D2c MCP 工具 result.total == 25",
+            isinstance(result, dict) and result.get("total") == 25,
+            f"{json.dumps(result, ensure_ascii=False)[:300]}",
+        )
+        try:
+            from mms.invoke import list_templates
+
+            expected_templates = list_templates()
+        except Exception as exc:  # noqa: BLE001
+            expected_templates = None
+        expected_counts: dict[str, int] = {}
+        for row in expected_templates or []:
+            skill = str(row.get("skill") or "")
+            expected_counts[skill] = expected_counts.get(skill, 0) + 1
+        check(
+            "D2c MCP 工具结果与 CLI 逐字段一致",
+            isinstance(expected_templates, list)
+            and isinstance(result, dict)
+            and result.get("templates") == expected_templates
+            and result.get("by_skill") == expected_counts,
+            f"result.templates={len((result or {}).get('templates') or [])} expected={len(expected_templates or [])} by_skill={result.get('by_skill') if isinstance(result, dict) else None}",
+        )
         upstream.tool_name = None
         upstream.tool_args = '{"unused": true}'
 

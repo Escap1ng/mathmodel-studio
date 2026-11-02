@@ -591,6 +591,22 @@ def build_patch(provider: dict, model: str, workspace: Path, context_tokens: int
             "          - id: tool-skill\n"
             "            name: '@deepseek-ai/dsh-tool-skill'\n"
         )
+    python_bin = os.environ.get("MMS_PYTHON") or sys.executable
+    mcp_script = repo_root() / "runtime" / "mcp" / "mms_server.py"
+    mcp_block = ""
+    if mcp_script.is_file():
+        mcp_block = (
+            "          - id: mcp-mms\n"
+            "            name: '@deepseek-ai/dsh-mcp-client'\n"
+            "            config:\n"
+            "              transport: stdio\n"
+            "              serverName: mms\n"
+            f"              command: {json.dumps(str(python_bin), ensure_ascii=False)}\n"
+            "              args:\n"
+            f"                - {json.dumps(str(mcp_script), ensure_ascii=False)}\n"
+            f"              cwd: {json.dumps(str(repo_root()), ensure_ascii=False)}\n"
+            "              failOnStartupError: true\n"
+        )
     return (
         "- insert:\n"
         "    - id: preset-mms\n"
@@ -615,6 +631,7 @@ def build_patch(provider: dict, model: str, workspace: Path, context_tokens: int
         "            config:\n"
         "              sampleOverCapGlobResults: false\n"
         f"{skill_block}"
+        f"{mcp_block}"
         "          - id: compaction\n"
         "            name: cordis:group\n"
         "            group: true\n"
