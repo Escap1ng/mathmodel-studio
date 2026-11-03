@@ -55,13 +55,20 @@ def repo_root() -> Path:
 
 
 def find_dsh(explicit: str = "") -> Path:
-    """按显式路径、环境变量、当前解释器、PATH 的顺序找 dsh。"""
+    """按显式路径、环境变量、当前解释器、PATH 的顺序找 dsh。
+
+    显式设置过 `MMS_DSH_BIN` 但路径不存在时，比找不到更糟：说明部署不小
+    心开裂。此处失败而不是静默考虑其他路径，方便桌面端立刻看到根因。
+    """
     candidates: list[Path] = []
     if explicit:
         candidates.append(Path(explicit))
     env_bin = os.environ.get("MMS_DSH_BIN")
     if env_bin:
-        candidates.append(Path(env_bin))
+        env_path = Path(env_bin)
+        if not env_path.is_file():
+            raise DshError(f"MMS_DSH_BIN 指向的文件不存在：{env_path}")
+        candidates.append(env_path)
     exe_dir = Path(sys.executable).resolve().parent
     candidates.extend(
         [
@@ -84,6 +91,16 @@ def find_dsh(explicit: str = "") -> Path:
 
 def _origin(port: int) -> str:
     return f"http://127.0.0.1:{port}"
+
+
+def dsh_version() -> str | None:
+    """读已安装的 deepseek-harness-sdk 版本；未装时是 None。"""
+    try:
+        from importlib.metadata import version
+
+        return version("deepseek-harness-sdk")
+    except Exception:
+        return None
 
 
 def _auth_cookie(port: int, token: str) -> str:
