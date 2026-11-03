@@ -842,6 +842,11 @@ def tests_dsh() -> None:
             status == 200 and health.get("core") == "dsh",
             f"HTTP {status} {health}",
         )
+        check(
+            "D1b /health 报告 dshVersion",
+            status == 200 and (health.get("dshVersion") or "").startswith("0.2."),
+            f"dshVersion={health.get('dshVersion')}",
+        )
 
         base = f"http://127.0.0.1:{upstream.server_address[1]}/v1"
         body = {
@@ -1108,6 +1113,47 @@ def tests_dsh() -> None:
             cancel_ids == list(range(1, len(cancel_ids) + 1)),
             f"{cancel_ids[:5]}…{cancel_ids[-2:]}",
         )
+
+        # 负向：DSH 二进制指向不存在路径，启动应明确报错，不能静默回退。
+        negative = Channel(
+            fake=False,
+            env_extra={
+                "MMS_CORE": "dsh",
+                "MMS_DSH_BIN": str(workdir / "missing" / "dsh.exe"),
+                "MMS_DSH_HOME": str(home),
+                "MMS_DATA_DIR": str(workdir),
+            },
+        )
+        try:
+            status, neg_started = negative.start_chat(
+                {
+                    **body,
+                    "messages": [{"role": "user", "content": "缺 DSH"}],
+                }
+            )
+            neg_events, neg_raw = negative.events(neg_started.get("chatId", ""))
+            neg_errors = [e for e in neg_events if e["event"] == "error"]
+            neg_tail = neg_events[-1] if neg_events else None
+            check(
+                "D8 DSH 缺失时明确报错",
+                status == 200
+                and any(
+                    "找不到 dsh" in json.dumps(e["data"], ensure_ascii=False)
+                    or "MMS_DSH_BIN" in json.dumps(e["data"], ensure_ascii=False)
+                    for e in neg_errors
+                )
+                and neg_tail is not None
+                and neg_tail["event"] == "done"
+                and neg_tail["data"].get("reason") == "error",
+                f"errors={[e['data'] for e in neg_errors][:1]} tail={neg_tail}",
+            )
+            check(
+                "D8 报错不含密钥",
+                SENTINEL not in neg_raw and SENTINEL not in (negative.stderr or ""),
+                "已扫描事件与 stderr",
+            )
+        finally:
+            negative.stop()
     finally:
         if channel is not None:
             channel.stop()

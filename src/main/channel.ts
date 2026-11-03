@@ -97,6 +97,12 @@ export class Channel {
         ...process.env,
         MMS_HOME: this.root,
         ...(this.dataDir ? { MMS_DATA_DIR: this.dataDir } : {}),
+        // DSH 只作备用内核；未显式选择时保持 python
+        MMS_CORE: process.env['MMS_CORE'] ?? 'python',
+        ...(this.dataDir ? { MMS_DSH_HOME: join(this.dataDir, 'dsh') } : {}),
+        MMS_DSH_PROFILE: 'mms',
+        MMS_PYTHON: this.python,
+        MMS_DSH_BIN: join(this.root, 'vendor', 'python', 'Scripts', 'dsh.exe'),
         // 打包后 runtime 在只读的安装目录里；.pyc 统一写到 userData，别污染 resources
         ...(this.dataDir ? { PYTHONPYCACHEPREFIX: join(this.dataDir, 'pycache') } : {}),
         PYTHONIOENCODING: 'utf-8',

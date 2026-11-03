@@ -15,6 +15,7 @@
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -36,6 +37,22 @@ const PY_EXE = join(PY_DIR, 'python.exe')
 const PANDOC_DIR = join(VENDOR, 'pandoc')
 const PANDOC_EXE = join(PANDOC_DIR, 'pandoc.exe')
 const MODULES = ['matplotlib', 'numpy', 'seaborn', 'docx', 'fitz', 'jsonschema']
+const DSH_REQUIREMENT = /^(deepseek-harness-sdk==[^#\s]+)/m
+const DSH_RUNTIME_EXE = join(
+  PY_DIR,
+  'Lib',
+  'site-packages',
+  'deepseek_harness_runtime',
+  'runtime',
+  'deepseek-harness-sdk-runtime-win-x64.exe'
+)
+
+function requirementPin() {
+  const text = readFileSync(join(ROOT, 'requirements.txt'), 'utf8')
+  const match = DSH_REQUIREMENT.exec(text)
+  if (!match) return null
+  return match[1]
+}
 
 function log(message) {
   console.log(`[vendor] ${message}`)
@@ -160,10 +177,36 @@ async function preparePython(force) {
   const bytes = Number(String(size.stdout).trim())
   log(`vendor/python 体积 ${(bytes / 1024 / 1024).toFixed(0)} MB`)
 
+  const pin = requirementPin()
+  const sitePackages = join(PY_DIR, 'Lib', 'site-packages')
+  let dsh = null
+  if (pin && (await exists(DSH_RUNTIME_EXE))) {
+    const shaDsh = createHash('sha256')
+      .update(await readFile(DSH_RUNTIME_EXE))
+      .digest('hex')
+    const dists = await readdir(sitePackages)
+    const dist = dists.find((name) => name.startsWith('deepseek-harness-sdk-') && name.endsWith('.dist-info')) || ''
+    dsh = {
+      requirement: pin,
+      version: dist.slice('deepseek-harness-sdk-'.length, -'.dist-info'.length) || null,
+      runtimeExe: DSH_RUNTIME_EXE,
+      runtimeSha256: shaDsh
+    }
+    log(`DSH 适配层：${dsh.version ?? '(未知版本)'} 与 runtime sha256 已记录`)
+  }
+
   await writeFile(
     join(PY_DIR, '.mms-runtime.json'),
     JSON.stringify(
-      { python: PY_VERSION, tag: PBS_TAG, asset: PY_ASSET, url: PY_URL, sha256: sha, index: PIP_INDEX },
+      {
+        python: PY_VERSION,
+        tag: PBS_TAG,
+        asset: PY_ASSET,
+        url: PY_URL,
+        sha256: sha,
+        index: PIP_INDEX,
+        ...(dsh ? { dsh } : {})
+      },
       null,
       2
     ) + '\n',

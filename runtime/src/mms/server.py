@@ -476,6 +476,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         parsed = urlparse(self.path)
         if parsed.path == "/health":
+            try:
+                from .dsh_adapter import dsh_version
+            except Exception:
+                dsh_version = None
             self._json(
                 200,
                 {
@@ -483,6 +487,7 @@ class Handler(BaseHTTPRequestHandler):
                     "version": __version__,
                     "fake": self.server.fake,
                     "core": core_name(),
+                    "dshVersion": dsh_version() if dsh_version else None,
                     "pid": os.getpid(),
                 },
             )
