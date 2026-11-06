@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.6.1-2B4C7E?style=flat" alt="version">
+  <img src="https://img.shields.io/badge/version-0.1.0-2B4C7E?style=flat" alt="version">
   <img src="https://github.com/Escap1ng/mathmodel-studio/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI">
   <img src="https://img.shields.io/badge/platform-Windows%20x64-4A5568?style=flat" alt="platform">
   <img src="https://img.shields.io/badge/skills-7-7B5FD6?style=flat" alt="skills">
@@ -61,11 +61,11 @@ Screenshots come from the real UI at 1.5× pixel density: the first is a maximiz
 
 ## Status
 
-**0.6.1 (2026-11-01)**. Phase four now actually runs: after a model choice it locates a CSV in the workspace, generates and executes a baseline script, and registers PNG/PDF/SVG as figure versions, falling back to bundled sample data with an explicit note when the workspace is empty. Long sessions compact earlier turns against the context budget and insert a divider in the conversation; a failed chat turn can be retried. Attachments read every xlsx worksheet, and workspace files can be dragged or right-clicked into the conversation without deleting the original. The previous release's features remain: multi-conversation management, five provider entry types (DeepSeek, Qwen, Kimi, Zhipu GLM and OpenAI-format endpoints), 200k / 400k / 1m context budgets, medium / high / max thinking depth, and a collapsible right-hand workspace.
+**0.1.0 (2026-11-06)**. The app opens in free chat; a single "Full workflow" button in the composer enters the guided seven-phase track (problem confirmation → model choice → baseline → paper) and returns to chat when pressed again. Asking which model to use brings up three candidate cards, and picking one continues the conversation with that choice; after the choice, phase four runs a real baseline and registers the figure. Settings can switch between the Python and DeepSeek Harness kernels. Core features remain: multi-conversation management, five provider entry types (DeepSeek, Qwen, Kimi, Zhipu GLM and OpenAI-format endpoints), 200k / 400k / 1m context budgets, medium / high / max thinking depth, attachment reading, and a collapsible right-hand workspace.
 
 The paper tab runs the full typesetting chain: xelatex twice → pandoc to DOCX → Word restyle → de-AI phrasing, structural metrics and chapter-structure gates; PDFs are previewed page by page with pdf.js. The current build target is the bundled demo paper; the phase machine does not mark phase five passed merely because a build succeeded.
 
-M6 packaging is wired up: electron-builder with a bundled portable Python and pandoc; an NSIS x64 installer has been built locally but not yet verified on a clean machine.
+Packaging is wired up: electron-builder bundles a portable Python and pandoc; the 0.1.0 NSIS x64 installer has not been built yet, and clean-machine installation remains unverified.
 
 Milestones are listed in [PLAN.md](PLAN.md) §7; verified claims and open items are recorded in [docs/HANDOFF.md](docs/HANDOFF.md).
 
@@ -151,7 +151,7 @@ Every gate ships with negative coverage: a checker that only ever returns zero i
 | G2 contract validation | registry validated against JSON Schema Draft 2020-12; degrades with a printed note when `jsonschema` is absent | two deliberately invalid registries must be rejected |
 | G2b version parity | `VERSION`, `package.json`, `pyproject.toml` and `mms/__init__.py` agree | any missing or differing value fails |
 | G3 CLI contract | exit codes 0/1/2 are reachable; the renderer is actually invoked and PNG/PDF/SVG artifacts are verified | out-of-vocabulary values, invalid JSON, empty `MMS_HOME`, unknown subcommands/templates and a renderer that fakes success are all rejected (`runtime/selfcheck.py`) |
-| G4 event stream | handshake, Bearer token, loopback Host/Origin allow-list, nine SSE event types, replay and cancellation; covers K2/K3 pause-and-resume and cross-process recovery; 0.6.0 adds thinking depth, the off switch and context trimming (52 assertions) | ten malformed events must be rejected; missing token, wrong Host and resuming without a pending decision are refused (`python runtime/selfcheck_channel.py --selftest`) |
+| G4 event stream | handshake, Bearer token, loopback Host/Origin allow-list, nine SSE event types, replay and cancellation; covers K2/K3 pause-and-resume, cross-process recovery, thinking depth and context trimming (55 assertions) | ten malformed events must be rejected; missing token, wrong Host and resuming without a pending decision are refused (`python runtime/selfcheck_channel.py --selftest`) |
 | G5 provider offline contract | a local fake endpoint covers 429 backoff, `reasoning_content` separation, split `tool_calls` assembly, reasoning stripped from history and key transmission boundaries | key sentinels must never reach the event stream or stderr; the fake provider is refused when offline mode is off |
 | G6 desktop scaffold | typecheck and build, plus verification that the bundle contains this project's Chinese copy and design tokens | any failed assertion exits 1 (`scripts/smoke-dist.mjs`) |
 | G9 workbench | two real renders, version history and rollback, unknown template/theme/version rejected without adding a version; three scoring rounds, deduction targets, chapter sample and veto example (13 assertions) | unknown template/theme/version are negative controls (`runtime/selfcheck_workbench.py`) |
@@ -159,16 +159,16 @@ Every gate ships with negative coverage: a checker that only ever returns zero i
 | G11 orchestration state machine | start, K2 confirmation, K3 reroll and choice; choosing runs phase 4 for real: locate a workspace CSV, generate and run the baseline script, register PNG/PDF/SVG as a figure version, and fall back to bundled sample data with an explicit note when the workspace is empty (13 assertions) | two seeded breakages must turn red: the default family written as a one-element tuple, and the keyword families cleared (`python runtime/selfcheck_orchestrator.py --selftest`) |
 | G12 long-session harness | budget accounting, tool-result pruning before a structured summary, a hard size cap on the summary itself, summaries merged across compactions, per-turn anchor replacement, overflow detection, and oldest-first dropping when a single message exceeds the budget; 50 rounds compacted under budget with the last six messages kept verbatim (14 assertions) | disabling compaction or tool pruning must turn red (`python runtime/selfcheck_harness.py --selftest`) |
 | G13 attachment xlsx | unzips the workbook and reads every sheet: shared strings and rich text, sparse columns, booleans/errors, cached formula values, date and time formats (including the 1904 date system); at most 300 rows × 60 columns per sheet (10 assertions) | a non-ZIP file and a ZIP without a workbook must be rejected; a 301-row sheet must be cut to 300 rows (`npm run check:xlsx`) |
-| G7 real launch | launches the production entry and asserts built artifact, 1440×900, non-white pixels, IPC, real CJK glyphs and that keys are never echoed; covers K2→K3→explain→choose, real phase four and automatic figure registration, figure re-render and rollback, scoring, paper build and preview, attachments and xlsx, workspace-file drag and context menu, multi-conversation, five provider presets, context and thinking depth, and the collapsed workspace (100 assertions) | blank screenshots, self-built windows, tofu glyphs and deleted key assertions have all been caught (`tests/window-smoke.cjs`) |
+| G7 real launch | launches the production entry and asserts built artifact, 1440×900, non-white pixels, IPC, real CJK glyphs and that keys are never echoed; covers K2→K3→explain→choose, real phase four and automatic figure registration, figure re-render and rollback, scoring, paper build and preview, attachments and xlsx, workspace-file drag and context menu, multi-conversation, five provider presets, context and thinking depth, the collapsed workspace, kernel switching and chat-first mode (106 assertions) | blank screenshots, self-built windows, tofu glyphs and deleted key assertions have all been caught (`tests/window-smoke.cjs`) |
 | G6b result audit | reads the smoke JSON and recomputes the readings: content size, non-white ratio, assertion floor, key assertions and self-reported counts | `--selftest` with 12 synthetic results proves that fake greens are rejected (`scripts/check-window-smoke.mjs`) |
 
 ## Verification status
 
-Local verification for 0.6.1 covers typecheck, build, the full `npm run gate` (G4 52/52, G11 13/13, G12 14/14, G13 10/10, G9 13/13, G10 10/10) and G7 100/100, with an agreeing independent G6b audit (1440×900, 3.83% non-white pixels). CI run [`41289813731`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41289813731) is green in all three jobs: ubuntu real launch 100/100 at 1440×900 with 4.43% non-white pixels and an agreeing G6b audit; both the ubuntu and windows gate jobs pass, with the Windows G10 explicitly skipped and marked unverified.
+Local verification for 0.1.0 (Windows) covers typecheck, build, the full `npm run gate` (G4 55/55, G11 13/13, G12 14/14, G13 10/10, G9 13/13, G10 10/10), the DSH kernel selfcheck at 31/31, and G7 real launch at 106/106, with an agreeing independent G6b audit (1440×900). The 0.1.0 tree has not been re-run on CI yet.
 
-The M6 NSIS x64 installer has been built locally (`mathmodel-studio-0.6.1-setup.exe`, about 265 MB, self-signed with an untrusted root, so SmartScreen still warns about an unknown publisher) but not yet installed on a clean machine.
+The 0.1.0 NSIS x64 installer has not been built yet; packaging bundles a portable Python and pandoc, and the real packaged-resources negative check for a missing DSH passed 17/17.
 
-Not covered: real networked conversations with any of the five providers (no key is included in this repository), launching a window on Windows in CI, active probing of CSP violations, and installing/running the installer on a clean machine. Historical CI runs and readings are recorded in [CHANGELOG.md](CHANGELOG.md).
+Not covered: real networked conversations with any of the five providers (no key is included in this repository), launching a window on Windows in CI, active probing of CSP violations, and installing/running the installer on a clean machine. Release records live in [CHANGELOG.md](CHANGELOG.md); the release format is specified in [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Dependencies
 

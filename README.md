@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-0.6.1-2B4C7E?style=flat" alt="版本">
+  <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-0.1.0-2B4C7E?style=flat" alt="版本">
   <img src="https://github.com/Escap1ng/mathmodel-studio/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI">
   <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-4A5568?style=flat" alt="平台">
   <img src="https://img.shields.io/badge/%E6%8A%80%E8%83%BD-7-7B5FD6?style=flat" alt="技能">
@@ -61,11 +61,11 @@ MathModel Studio 面向正在推进建模工作、准备交付的参赛者与研
 
 ## 当前状态
 
-**0.6.1（2026-11-01）**。这一版让阶段四真的跑起来：选模确认后定位工作区里的 CSV、生成并执行基线脚本，把 PNG/PDF/SVG 登记成图表版本；工作区没有数据时回落到内置示例并说明。长会话按上下文预算自动压缩较早轮次，对话流里插入压缩分隔线；失败的问答可以直接重试。附件支持读取 xlsx 全部工作表；文件页的工作区文件可以拖进中栏或右键加入，移除附件不会删掉原文件。上一版的底色不变：多会话管理、五类模型入口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenAI 格式端点）、200k / 400k / 1m 上下文预算、中 / 高 / 最大思维深度，以及可收起的右侧工作台。
+**0.1.0（2026-11-06）**。默认进入自由对话；输入区一个「全流程建模」按钮进入题面确认 → 选模 → 基线 → 论文的七阶段引导，再按一次退回对话。对话里问「该用什么模型」时会出现三张候选卡，点一张就按它继续；选模后阶段四真跑基线并把图登记成图表版本。设置里可以在 Python 与 DeepSeek Harness 两个内核之间切换。基础能力：多会话管理、五类模型入口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenAI 格式端点）、200k / 400k / 1m 上下文预算、中 / 高 / 最大思维深度、附件读取与可收起的右侧工作台。
 
 论文页完成整条排版链路：xelatex 两遍 → pandoc 转 DOCX → Word 版式后处理 → 去 AI 措辞、结构指标和章节结构三道门禁；PDF 用 pdf.js 逐页预览。当前编译的是仓库自带的演示稿，构建成功也不会自动把阶段五标记为通过。
 
-M6 打包已配置完成：electron-builder 把便携 Python 和 pandoc 一起装进安装包，NSIS x64 安装包已在本机构建，尚未在干净机器上安装验证。
+打包已配置完成：electron-builder 把便携 Python 和 pandoc 一起装进安装包；0.1.0 的 NSIS x64 安装包尚未构建，干净机安装仍是未证项。
 
 里程碑见 [PLAN.md](PLAN.md) §7；已验证结论与未证事项见 [docs/HANDOFF.md](docs/HANDOFF.md)。
 
@@ -151,7 +151,7 @@ npm run gate
 | G2 契约校验 | 注册表按 JSON Schema Draft 2020-12 校验；`jsonschema` 缺席时降级并说明 | 两份非法注册表必须被拒 |
 | G2b 版本同源 | `VERSION`、`package.json`、`pyproject.toml`、`mms/__init__.py` 四处一致 | 任一缺项或取值不同即失败 |
 | G3 CLI 契约 | 退出码 0/1/2 均可达；实际调用渲染器并核验 PNG/PDF/SVG 三件产物 | 词表外取值、非法 JSON、空 `MMS_HOME`、未知子命令/模板与渲染器假成功均被拦截（`runtime/selfcheck.py`） |
-| G4 事件流 | 握手、Bearer token、回环 Host/Origin 白名单、九类 SSE 事件、续传与取消；覆盖 K2/K3 暂停恢复与进程重启后恢复；0.6.0 增加思维深度、关闭开关和上下文裁剪（52 条） | 10 种坏事件必须被拒；无 token、错误 Host、无待决恢复均被拒（`python runtime/selfcheck_channel.py --selftest`） |
+| G4 事件流 | 握手、Bearer token、回环 Host/Origin 白名单、九类 SSE 事件、续传与取消；覆盖 K2/K3 暂停恢复与进程重启后恢复、思维深度与上下文裁剪（55 条） | 10 种坏事件必须被拒；无 token、错误 Host、无待决恢复均被拒（`python runtime/selfcheck_channel.py --selftest`） |
 | G5 provider 离线契约 | 本地假端点覆盖 429 退避、`reasoning_content` 分离、分片 `tool_calls` 拼装、历史消息剥离和 Key 传递边界 | Key 哨兵不得进入事件流与 stderr；未开启离线模式时假 provider 被拒 |
 | G6 桌面骨架 | 类型检查、构建，并校验产物包含本项目中文文案与设计令牌 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
 | G9 工作台 | 真实渲染两版图、版本历史与回滚，未知模板、主题或版本不会写入历史；三轮评分、扣分定位、章节样例和一票否决（13 条） | 未知模板/主题/版本均为反向控制（`runtime/selfcheck_workbench.py`） |
@@ -159,16 +159,16 @@ npm run gate
 | G11 编排状态机 | 起题、K2 确认、K3 换一批与选模，选模后阶段四真跑：定位工作区 CSV、生成并执行基线脚本、PNG/PDF/SVG 登记成图表版本；工作区无数据时回落到内置示例并说明（13 条） | 默认方法族写成单元素元组、关键词族被清空两种破坏必须变红（`python runtime/selfcheck_orchestrator.py --selftest`） |
 | G12 长会话 harness | 预算核算、工具结果先裁剪再结构化摘要、摘要本身有长度上限、二次压缩并入旧摘要、锚点每轮替换、溢出识别、单条超预算时从最早处丢；50 轮压到预算内且最近 6 条原文保留（14 条） | 拆掉压缩、关掉工具裁剪两种破坏必须变红（`python runtime/selfcheck_harness.py --selftest`） |
 | G13 附件 xlsx | 解压工作簿读出全部工作表：共享字符串与富文本、稀疏列、布尔/错误值、公式缓存值、日期与时间格式（含 1904 日期系统）；单表最多 300 行 × 60 列（10 条） | 非 ZIP 与缺工作簿两种坏文件必须报错；301 行的表必须截到 300 行（`npm run check:xlsx`） |
-| G7 真启动冒烟 | 以生产入口起窗，验证构建产物、1440×900、非白像素、IPC、中文真字形与 Key 不回显；覆盖 K2→K3→解释→选择、阶段四真跑与自动出图、图表重渲与回滚、评分、论文构建与预览、附件与 xlsx、工作区文件拖入与右键、多会话、五家预设、上下文与思维深度、右栏收起（100 条） | 空白截图、自建窗口、缺字（方框字形）和删除关键断言都会被拦截（`tests/window-smoke.cjs`） |
+| G7 真启动冒烟 | 以生产入口起窗，验证构建产物、1440×900、非白像素、IPC、中文真字形与 Key 不回显；覆盖 K2→K3→解释→选择、阶段四真跑与自动出图、图表重渲与回滚、评分、论文构建与预览、附件与 xlsx、工作区文件拖入与右键、多会话、五家预设、上下文与思维深度、右栏收起、内核切换与对话优先（106 条） | 空白截图、自建窗口、缺字（方框字形）和删除关键断言都会被拦截（`tests/window-smoke.cjs`） |
 | G6b 结果核验 | 读取冒烟 JSON 并复算读数：内容尺寸、非白像素、断言下限、关键断言与自述计数 | `--selftest` 用 12 份合成结果证明假通过会被拒（`scripts/check-window-smoke.mjs`） |
 
 ## 验证状态
 
-0.6.1 在本机验证了类型检查、构建、完整 `npm run gate`（G4 52/52、G11 13/13、G12 14/14、G13 10/10、G9 13/13、G10 10/10）与 G7 100/100，G6b 独立复算一致（内容尺寸 1440×900、非白像素 3.83%）。CI run [`41289813731`](https://github.com/Escap1ng/mathmodel-studio/actions/runs/41289813731) 的三个任务全部通过：ubuntu 真启动 100/100、内容尺寸 1440×900、非白像素 4.43%，G6b 复算一致；ubuntu 与 windows 门禁均通过，Windows 上的 G10 显式跳过并标注未验证。
+0.1.0 在本机（Windows）验证了类型检查、构建、完整 `npm run gate`（G4 55/55、G11 13/13、G12 14/14、G13 10/10、G9 13/13、G10 10/10）、DSH 内核自检 31/31 与 G7 真启动 106/106，G6b 独立复算一致（内容尺寸 1440×900）。0.1.0 尚未在 CI 上复跑。
 
-M6 的 NSIS x64 安装包已在本机构建（`mathmodel-studio-0.6.1-setup.exe`，约 265 MB，自签名证书，未受信任的根，SmartScreen 会提示未知发布者），尚未在干净机器上安装验证。
+0.1.0 的 NSIS x64 安装包尚未构建；打包配置已把便携 Python 与 pandoc 接入，真实 packaged resources 的 DSH 缺失负向验证 17/17 通过。
 
-未覆盖范围：五家服务商的真实联网对话（本仓库不包含 Key）、CI 的 Windows 真起窗、CSP 违规场景的主动探测、安装包在干净机器上的安装与运行。历史 CI run 与读数见 [CHANGELOG.md](CHANGELOG.md)。
+未覆盖范围：五家服务商的真实联网对话（本仓库不包含 Key）、CI 的 Windows 真起窗、CSP 违规场景的主动探测、安装包在干净机器上的安装与运行。发布记录见 [CHANGELOG.md](CHANGELOG.md)，发布格式见 [docs/RELEASE.md](docs/RELEASE.md)。
 
 ## 依赖
 
