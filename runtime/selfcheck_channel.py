@@ -1248,6 +1248,26 @@ def selftest() -> None:
     raise SystemExit(0 if not bad else 1)
 
 
+def run_with_dsh_python(argv: list[str]) -> int | None:
+    """DSH 自检要用随包解释器：SDK 与 dsh.exe 都装在 vendor/python。
+
+    系统 python 未必装过 deepseek-harness-sdk，这时 /health 的 dshVersion 会是 None，
+    验的就不是要发布的组合。返回 None 表示已经在目标解释器里，继续跑。
+    Windows 上 os.execve 会把含空格的路径拼坏，所以走 subprocess 转发。
+    """
+    if os.environ.get("MMS_CHECK_REEXEC") == "1":
+        return None
+    vendor = ROOT / "vendor" / "python" / ("python.exe" if os.name == "nt" else "bin/python3")
+    if not vendor.is_file() or Path(sys.executable).resolve() == vendor.resolve():
+        return None
+    env = {**os.environ, "MMS_CHECK_REEXEC": "1"}
+    return subprocess.run(
+        [str(vendor), str(Path(__file__).resolve()), *argv],
+        cwd=str(ROOT),
+        env=env,
+    ).returncode
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(argv if argv is not None else sys.argv[1:])
     core = "python"
@@ -1270,6 +1290,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"用法错误: 未知参数 {unknown or core}", file=sys.stderr)
         return 2
     if core == "dsh":
+        forwarded = run_with_dsh_python([*args])
+        if forwarded is not None:
+            return forwarded
         tests_dsh()
     else:
         tests()
