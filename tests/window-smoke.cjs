@@ -16,6 +16,7 @@
  *   7 M3 闭环：新赛题停在 K2 → 确认后 K3 三张候选 → 解释抽屉不清待选 →
  *     runtime 重启后待选仍在 → 换一批 → 选择后进入阶段 4
  *   8 M2 回归：自由问答仍能流式出字、list_templates 工具卡走到完成、设置页不回显 Key
+ *   9 内核切换：设置里点 DSH → settings.json 落盘 → runtime 用新内核重启 → 切回 python
  *
  * 假 provider 只在本脚本进程里打开（MMS_FAKE_PROVIDER=1），不联网、不需要 Key；
  * 真实 DeepSeek/Kimi 需要用户自己的 Key，不能在这里代跑。
@@ -839,11 +840,115 @@ async function main() {
   )
   if (!backToFake) throw new Error('切回离线演示 provider 失败，拒绝继续以免带着假 Key 联网')
 
-  // —— M3：从赛题到选模卡，再到持久化恢复 ——
-  const defaultMode = await win.webContents.executeJavaScript(
-    `document.querySelector('.mode-switch__btn[data-mode="workflow"]')?.getAttribute('aria-pressed')`
+  // —— 内核切换：点 DSH → 落盘 → runtime 重启 → 切回 python ——
+  // 不真聊 DSH（那需要 dsh 二进制与真实模型）；这里验的是设置 → IPC → 子进程环境 → 重启这条链。
+  await win.webContents.executeJavaScript(`document.querySelector('.pill--model')?.click()`)
+  await sleep(250)
+  const coreUi = await win.webContents.executeJavaScript(`({
+    buttons: [...document.querySelectorAll('.settings .seg__btn[data-value="python"], .settings .seg__btn[data-value="dsh"]')].map((b) => b.dataset.value),
+    pressed: document.querySelector('.settings .seg__btn[data-value="python"]')?.getAttribute('aria-pressed')
+  })`)
+  record(
+    'G7-11 设置页出现内核选择且当前是 python',
+    coreUi.buttons.join(',') === 'python,dsh' && coreUi.pressed === 'true',
+    JSON.stringify(coreUi)
   )
-  record('G7-7 默认进入建模模式', defaultMode === 'true', `aria-pressed=${defaultMode}`)
+  const readCore = () => {
+    try {
+      return JSON.parse(readFileSync(join(userDataDir, 'settings.json'), 'utf8')).chatCore ?? null
+    } catch {
+      return null
+    }
+  }
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.settings .seg__btn[data-value="dsh"]')?.click()`
+  )
+  const switchedToDsh = await waitFor(
+    win,
+    `(document.querySelector('.settings .seg__btn[data-value="dsh"]')?.getAttribute('aria-pressed') === 'true') &&
+     (document.querySelector('.statusbar')?.textContent || '').includes('运行时已连接')`,
+    25000
+  )
+  const coreAfterDsh = await win.webContents.executeJavaScript(`window.studio.chat.getCore()`)
+  record(
+    'G7-11 切到 DSH 后落盘并重启就绪',
+    switchedToDsh && coreAfterDsh === 'dsh' && readCore() === 'dsh',
+    `pressed=${switchedToDsh} ipc=${coreAfterDsh} disk=${readCore()}`
+  )
+  const availability = await win.webContents.executeJavaScript(`(async () => {
+    const list = await window.studio.providers.list()
+    const fake = list.providers.find((p) => p.id === 'fake')
+    const chip = [...document.querySelectorAll('.settings .provider-chip')].find((b) => b.textContent.includes('离线演示'))
+    return {
+      core: list.core,
+      fakeUnavailable: Boolean(fake?.unavailable),
+      reason: fake?.unavailable ?? '',
+      active: list.activeProvider,
+      chipDisabled: Boolean(chip?.disabled)
+    }
+  })()`)
+  record(
+    'G7-11 DSH 内核下离线演示明确不可用',
+    availability.core === 'dsh' &&
+      availability.fakeUnavailable &&
+      availability.reason.length > 0 &&
+      availability.active !== 'fake' &&
+      availability.chipDisabled,
+    JSON.stringify(availability)
+  )
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.settings .seg__btn[data-value="python"]')?.click()`
+  )
+  const switchedBack = await waitFor(
+    win,
+    `(document.querySelector('.settings .seg__btn[data-value="python"]')?.getAttribute('aria-pressed') === 'true') &&
+     (document.querySelector('.statusbar')?.textContent || '').includes('运行时已连接')`,
+    25000
+  )
+  const coreAfterPython = await win.webContents.executeJavaScript(`window.studio.chat.getCore()`)
+  record(
+    'G7-11 切回 python 后落盘并重启就绪',
+    switchedBack && coreAfterPython === 'python' && readCore() === 'python',
+    `pressed=${switchedBack} ipc=${coreAfterPython} disk=${readCore()}`
+  )
+  const restoredAvailability = await win.webContents.executeJavaScript(`(async () => {
+    const list = await window.studio.providers.list()
+    const fake = list.providers.find((p) => p.id === 'fake')
+    const chip = [...document.querySelectorAll('.settings .provider-chip')].find((b) => b.textContent.includes('离线演示'))
+    return { core: list.core, fakeUnavailable: Boolean(fake?.unavailable), chipDisabled: Boolean(chip?.disabled) }
+  })()`)
+  record(
+    'G7-11 切回 python 后离线演示恢复可用',
+    restoredAvailability.core === 'python' && !restoredAvailability.fakeUnavailable && !restoredAvailability.chipDisabled,
+    JSON.stringify(restoredAvailability)
+  )
+  await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.settings .btn')].find((b) => b.textContent.trim() === '取消')?.click()`
+  )
+  await sleep(200)
+
+  // —— M3：从赛题到选模卡，再到持久化恢复 ——
+  // 现在默认是自由对话；用「全流程建模」按钮显式进入建模模式。
+  const defaultMode = await win.webContents.executeJavaScript(`({
+    label: document.querySelector('.mode-switch__btn')?.textContent.trim(),
+    pressed: document.querySelector('.mode-switch__btn')?.getAttribute('aria-pressed')
+  })`)
+  record(
+    'G7-7 默认进入自由对话',
+    defaultMode.label === '全流程建模' && defaultMode.pressed === 'false',
+    JSON.stringify(defaultMode)
+  )
+  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="workflow"]')?.click()`)
+  await sleep(200)
+  const workflowMode = await win.webContents.executeJavaScript(`({
+    label: document.querySelector('.mode-switch__btn')?.textContent.trim(),
+    pressed: document.querySelector('.mode-switch__btn')?.getAttribute('aria-pressed')
+  })`)
+  record(
+    'G7-7 全流程建模按钮激活建模模式',
+    workflowMode.label === '退出全流程' && workflowMode.pressed === 'true',
+    JSON.stringify(workflowMode)
+  )
 
   // 把一份 PDF 留在输入区，验证附件跟 K2 一起送给模型
   const k2Pdf = join(userDataDir, 'k2-problem.pdf')

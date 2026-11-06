@@ -433,6 +433,11 @@ def _model_payload(problem: str, batch: int) -> dict:
     }
 
 
+def model_candidates(problem: str, batch: int = 1) -> list[dict]:
+    """对话式选模卡与全流程编排共用同一份候选，避免两套口径。"""
+    return _candidates(problem, batch)
+
+
 def start(store: SessionStore, record: dict) -> list[dict]:
     payload = _problem_payload(record["problem"])
     set_phase(record, 0, "passed")
