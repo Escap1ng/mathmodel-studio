@@ -629,6 +629,44 @@ def tests() -> None:
                 and qwen.get("reasoning_effort") == "medium",
                 f"deepseek={deep} kimi-k2.6={kimi} qwen={qwen}",
             )
+
+            # C15 上下文卡片：用户在对话里问该用什么模型，工具推送选模卡
+            upstream.tool_name = "suggest_models"
+            upstream.tool_args = '{"batch": 1, "question": "预测未来三个月的销量"}'
+            status, started_card = channel2.start_chat(
+                {
+                    "providerId": "custom",
+                    "model": "test-model",
+                    "apiKey": SENTINEL,
+                    "baseUrl": base,
+                    "messages": [{"role": "user", "content": "这道销量预测题该用什么模型？"}],
+                }
+            )
+            card_events, card_raw = channel2.events(started_card.get("chatId", ""))
+            card_problems, card_how = schema_validate(card_events)
+            interrupts = [e for e in card_events if e["event"] == "interrupt"]
+            payload = interrupts[0]["data"].get("payload", {}) if interrupts else {}
+            cards = payload.get("candidates") or []
+            from mms import orchestrator as _orch
+
+            expected = _orch.model_candidates("预测未来三个月的销量", 1)
+            check(
+                "C15 选模卡通过 interrupt 事件推送",
+                status == 200
+                and bool(interrupts)
+                and interrupts[0]["data"].get("card") == "model-choice"
+                and len(cards) == 3
+                and not card_problems,
+                f"HTTP {status} interrupts={len(interrupts)} cards={len(cards)} 判据={card_how} {card_problems[:2]}",
+            )
+            check(
+                "C15 卡片候选与编排器同源",
+                [c.get("name") for c in cards] == [c.get("name") for c in expected],
+                f"cards={[c.get('name') for c in cards]} expected={[c.get('name') for c in expected]}",
+            )
+            check("C15 卡片事件不含密钥", SENTINEL not in card_raw, "已扫描 SSE")
+            upstream.tool_name = "list_templates"
+            upstream.tool_args = '{"unused": true}'
             channel2.stop()
             check("C11 密钥不出现在服务器 stderr", SENTINEL not in channel2.stderr, "已扫描 stderr")
         finally:

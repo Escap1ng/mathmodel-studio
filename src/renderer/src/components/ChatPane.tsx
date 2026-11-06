@@ -742,20 +742,16 @@ export default function ChatPane({
             <button
               type="button"
               className="mode-switch__btn"
-              data-mode="workflow"
+              data-mode={mode === 'workflow' ? 'chat' : 'workflow'}
               aria-pressed={mode === 'workflow'}
-              onClick={() => onModeChange('workflow')}
+              title={
+                mode === 'workflow'
+                  ? '回到自由对话，不再按七阶段推进'
+                  : '进入固定流程：题面确认 → 选模 → 基线 → 论文'
+              }
+              onClick={() => onModeChange(mode === 'workflow' ? 'chat' : 'workflow')}
             >
-              建模
-            </button>
-            <button
-              type="button"
-              className="mode-switch__btn"
-              data-mode="chat"
-              aria-pressed={mode === 'chat'}
-              onClick={() => onModeChange('chat')}
-            >
-              问答
+              {mode === 'workflow' ? '退出全流程' : '全流程建模'}
             </button>
           </div>
           <button

@@ -150,7 +150,7 @@ export default function App() {
   const [entries, setEntries] = useState<ChatEntry[]>([])
   const [streaming, setStreaming] = useState(false)
   const [phases, setPhases] = useState<Record<number, PhaseState>>({})
-  const [mode, setMode] = useState<'workflow' | 'chat'>('workflow')
+  const [mode, setMode] = useState<'workflow' | 'chat'>('chat')
   const [explain, setExplain] = useState<ModelCandidate | null>(null)
   const [paneWidth, setPaneWidth] = useState<number | null>(readPaneWidth)
   const [resizingPane, setResizingPane] = useState(false)
@@ -317,6 +317,7 @@ export default function App() {
         sessionId.current = session.id
         setEntries(entriesFromSnapshot(session))
         setPhases(phaseMap(session))
+        setMode('workflow')
         setActiveKind('workflow')
         setActiveId(session.id)
       })
@@ -406,6 +407,7 @@ export default function App() {
   const canSend =
     runtime.state === 'ready' &&
     Boolean(provider) &&
+    !provider?.unavailable &&
     (!provider?.requiresKey || Boolean(provider?.configured))
 
   const conversations = useMemo<ConversationItem[]>(() => {
@@ -627,6 +629,37 @@ export default function App() {
     }
   }
 
+  // 自由对话里的卡片不重开 orchestrator：选一张卡就等于发一条消息，由模型接着聊。
+  const decideInChat = async (action: DecisionAction, choice?: string): Promise<void> => {
+    if (streaming) return
+    const pendingEntry = [...entries]
+      .reverse()
+      .find((entry) => entry.interrupt && !entry.interrupt.resolved)
+    const picked = choice
+      ? candidatesOf(pendingEntry?.interrupt?.payload ?? {}).find((c) => c.id === choice)
+      : undefined
+    const label =
+      action === 'choose'
+        ? `已选：${picked?.name ?? choice ?? ''}`
+        : action === 'reroll'
+          ? '已换一批'
+          : '已确认'
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.interrupt && !entry.interrupt.resolved
+          ? { ...entry, interrupt: { ...entry.interrupt, resolved: label } }
+          : entry
+      )
+    )
+    const text =
+      action === 'choose'
+        ? `我选「${picked?.name ?? choice ?? ''}」。请按这个模型继续。`
+        : action === 'reroll'
+          ? '换一批候选模型（batch 加 1）。'
+          : '确认。'
+    await send(text)
+  }
+
   const resume = async (action: DecisionAction, choice?: string): Promise<void> => {
     const sid = sessionId.current
     if (!sid || streaming) return
@@ -836,7 +869,9 @@ export default function App() {
         onSend={(text, extras) => void send(text, extras)}
         onRetry={retry}
         onStop={stop}
-        onDecision={(action, choice) => void resume(action, choice)}
+        onDecision={(action, choice) =>
+          mode === 'workflow' ? void resume(action, choice) : void decideInChat(action, choice)
+        }
         onExplain={setExplain}
         onOpenSettings={() => setSettingsOpen(true)}
         onRestart={() => void restart()}

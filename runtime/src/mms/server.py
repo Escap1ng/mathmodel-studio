@@ -60,7 +60,33 @@ TOOLS = [
             "description": "列出本机技能内置的图表与示意图模板（只读注册表，不渲染）。",
             "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
         },
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "suggest_models",
+            "description": (
+                "用户讨论该用什么模型/方法时调用：向界面推送三张可选模型卡，由用户自己点选。"
+                "用户要求换一批时，把 batch 加 1 再调用；不要替用户做选择，也不要编造用户已选。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "要建模的子问题或用户原话；省略时用最近一条用户消息。",
+                    },
+                    "batch": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9,
+                        "description": "第几批候选，默认 1；换一批时递增。",
+                    },
+                },
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 
@@ -103,7 +129,7 @@ def provider_rows(fake: bool | None = None) -> list[dict]:
     return rows
 
 
-def run_tool(name: str, args: dict | None) -> tuple[dict, bool]:
+def run_tool(name: str, args: dict | None, context: str = "") -> tuple[dict, bool]:
     if name == "list_templates":
         try:
             rows = list_templates()
@@ -113,6 +139,18 @@ def run_tool(name: str, args: dict | None) -> tuple[dict, bool]:
         for row in rows:
             counts[row["skill"]] = counts.get(row["skill"], 0) + 1
         return {"ok": True, "total": len(rows), "by_skill": counts, "templates": rows}, True
+    if name == "suggest_models":
+        args = args or {}
+        question = str(args.get("question") or context or "").strip()
+        if not question:
+            return {"ok": False, "error": "没有可用的建模问题文本"}, False
+        try:
+            batch = int(args.get("batch") or 1)
+        except (TypeError, ValueError):
+            batch = 1
+        batch = min(max(batch, 1), 9)
+        candidates = orchestrator.model_candidates(question, batch)
+        return {"ok": True, "batch": batch, "candidates": candidates}, True
     return {"ok": False, "error": f"未知工具: {name}"}, False
 
 
@@ -271,6 +309,12 @@ class ChatSession:
                     self._context_plan(ratio=harness.OVERFLOW_RATIO, reason="overflow")
                 )
 
+    def _tool_context(self) -> str:
+        for message in reversed(self.messages):
+            if message.get("role") == "user" and isinstance(message.get("content"), str):
+                return message["content"]
+        return ""
+
     def _run(self) -> None:
         tools = TOOLS if self.provider.get("tool_calling") else None
         self._apply_plan(self._context_plan())
@@ -313,7 +357,7 @@ class ChatSession:
                             result = {**seen[key], "note": "重复调用，返回上次结果"}
                             ok = bool(seen[key].get("ok"))
                         else:
-                            result, ok = run_tool(name, args)
+                            result, ok = run_tool(name, args, self._tool_context())
                             seen[key] = result
                     duration = int((time.monotonic() - started) * 1000)
                     self.append(
@@ -327,6 +371,20 @@ class ChatSession:
                             "duration_ms": duration,
                         },
                     )
+                    if name == "suggest_models" and ok:
+                        # 卡片是给界面的插层，工具结果仍照常回给模型。
+                        self.append(
+                            "interrupt",
+                            {
+                                "card": "model-choice",
+                                "payload": {
+                                    "title": "算法选择",
+                                    "intro": "这三条路线来自本机方法库；点一张卡就按它继续，也可以再换一批。",
+                                    "batch": result.get("batch", 1),
+                                    "candidates": result.get("candidates", []),
+                                },
+                            },
+                        )
                     content = json.dumps(result, ensure_ascii=False)
                     if len(content) > MAX_TOOL_RESULT_CHARS:
                         content = content[:MAX_TOOL_RESULT_CHARS] + "…[工具结果已截断]"
