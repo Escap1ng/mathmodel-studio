@@ -1,12 +1,7 @@
 import { app, safeStorage } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { ChatCore, ThinkingDepth } from '../shared/api'
-
-export type { ChatCore }
-
-// 对话内核：python 是主线，dsh 是 DeepSeek 备用内核（env 显式设置时优先于该设置）。
-const CORES = new Set<ChatCore>(['python', 'dsh'])
+import type { ThinkingDepth } from '../shared/api'
 
 // 磁盘上只有 safeStorage 的密文。safeStorage 不可用时**拒绝保存**，
 // 不退回明文——这条比"让用户先存上"重要。
@@ -23,7 +18,6 @@ interface SettingsFile {
   version: 1
   activeProvider?: string
   workspace?: string
-  chatCore?: ChatCore
   providers: Record<string, StoredProvider>
 }
 
@@ -52,7 +46,6 @@ export function loadSettings(): SettingsFile {
       version: 1,
       activeProvider: typeof raw.activeProvider === 'string' ? raw.activeProvider : undefined,
       workspace: typeof raw.workspace === 'string' && raw.workspace ? raw.workspace : undefined,
-      chatCore: CORES.has(raw.chatCore as ChatCore) ? (raw.chatCore as ChatCore) : undefined,
       providers
     }
   } catch {
@@ -176,14 +169,4 @@ export function saveWorkspace(path: string | undefined): void {
   if (path) next.workspace = path
   else delete next.workspace
   persist(next)
-}
-
-/** 未设置时回退 python；MMS_CORE 环境变量优先权在 channel 启动处处理。 */
-export function savedChatCore(): ChatCore {
-  return loadSettings().chatCore ?? 'python'
-}
-
-export function saveChatCore(core: ChatCore): void {
-  if (!CORES.has(core)) throw new Error('对话内核只能是 python / dsh')
-  persist({ ...loadSettings(), chatCore: core })
 }

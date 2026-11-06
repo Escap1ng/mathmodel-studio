@@ -89,6 +89,15 @@ def find_dsh(explicit: str = "") -> Path:
     )
 
 
+def dsh_available() -> bool:
+    """自动路由用：能定位到 dsh 就认为可用；不启动进程。"""
+    try:
+        find_dsh()
+        return True
+    except DshError:
+        return False
+
+
 def _origin(port: int) -> str:
     return f"http://127.0.0.1:{port}"
 
@@ -1016,6 +1025,20 @@ class DshChatSession(ChatSession):
         if is_error:
             payload["error"] = text[:800] or "工具执行失败"
         self.append("tool_call", payload)
+        candidates = result.get("candidates") if isinstance(result, dict) else None
+        if not is_error and name.endswith("suggest_models") and isinstance(candidates, list) and candidates:
+            self.append(
+                "interrupt",
+                {
+                    "card": "model-choice",
+                    "payload": {
+                        "title": "算法选择",
+                        "intro": "这三条路线来自本机方法库；点一张卡就按它继续，也可以再换一批。",
+                        "batch": result.get("batch", 1),
+                        "candidates": candidates,
+                    },
+                },
+            )
         self._tool_names.pop(call_id, None)
 
     def _handle_compaction(self, data: dict) -> None:

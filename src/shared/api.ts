@@ -36,8 +36,6 @@ export interface ProviderView {
   toolCalling: boolean
   custom: boolean
   configured: boolean
-  /** 非空表示当前内核下不可用，内容就是给用户看的原因。 */
-  unavailable?: string
   /** 界面选定的上下文预算（token），只影响历史回放，不改变模型本身的上限。 */
   contextLimit: number
   /** 该服务商模型的上下文上限，用来提示选择是否超出。 */
@@ -51,14 +49,11 @@ export interface ProviderView {
   note?: string
 }
 
-export type ChatCore = 'python' | 'dsh'
-
 export interface ProviderList {
   ok: true
   providers: ProviderView[]
   activeProvider: string
   fake: boolean
-  core: ChatCore
 }
 
 export interface SaveProviderPayload {

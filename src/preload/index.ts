@@ -46,8 +46,6 @@ const studioApi = {
     start: (input: ChatStartInput): Promise<ChatStartResult> => ipcRenderer.invoke('chat:start', input),
     resume: (input: ResumeInput): Promise<ChatStartResult> => ipcRenderer.invoke('chat:resume', input),
     cancel: (chatId: string): Promise<{ ok: true }> => ipcRenderer.invoke('chat:cancel', chatId),
-    getCore: (): Promise<'python' | 'dsh'> => ipcRenderer.invoke('chat:core:get'),
-    setCore: (core: 'python' | 'dsh'): Promise<'python' | 'dsh'> => ipcRenderer.invoke('chat:core:set', core),
     onEvent: (cb: (event: ChatEvent) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, payload: ChatEvent): void => cb(payload)
       ipcRenderer.on('chat:event', handler)

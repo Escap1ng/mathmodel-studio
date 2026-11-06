@@ -98,8 +98,25 @@ def fake_enabled() -> bool:
     return os.environ.get("MMS_FAKE_PROVIDER") == "1"
 
 
+def explicit_core() -> str | None:
+    value = (os.environ.get("MMS_CORE") or "").strip().lower()
+    return value if value in ("python", "dsh") else None
+
+
 def core_name() -> str:
-    return "dsh" if (os.environ.get("MMS_CORE") or "python").strip().lower() == "dsh" else "python"
+    """当前默认对话内核：显式 MMS_CORE 优先，否则有 dsh 就用 DSH。
+
+    聊天路由另有一条：离线演示固定走 python，不依赖 dsh 是否安装。
+    """
+    forced = explicit_core()
+    if forced:
+        return forced
+    try:
+        from .dsh_adapter import dsh_available
+
+        return "dsh" if dsh_available() else "python"
+    except Exception:
+        return "python"
 
 
 def provider_rows(fake: bool | None = None) -> list[dict]:
@@ -799,13 +816,16 @@ class Handler(BaseHTTPRequestHandler):
         if mode not in ("chat", "workflow"):
             self._error(400, "mode", f"未知对话模式: {mode}")
             return
-        if mode == "chat" and core_name() == "dsh" and provider_id == "fake":
+        forced = explicit_core()
+        if mode == "chat" and forced == "dsh" and provider_id == "fake":
             self._error(
                 400,
                 "core",
-                "MMS_CORE=dsh 不支持离线 fake provider；请切回 python 核心或选择真实服务商",
+                "显式 MMS_CORE=dsh 时离线演示不可用；请去掉该环境变量或选择真实服务商",
             )
             return
+        # 自动路由：离线演示固定走 python；其余用默认内核（有 dsh 即 DSH）。
+        backend = forced or ("python" if provider_id == "fake" else core_name())
         workspace = str(body.get("workspace") or "")
         raw_goal = next((m["content"] for m in messages if m["role"] == "user"), "")
         goal = " ".join(str(raw_goal).split())[:80]
@@ -815,7 +835,7 @@ class Handler(BaseHTTPRequestHandler):
             session: ChatSession = WorkflowSession(
                 chat_id, self.server.store, record, "start", "", workspace=workspace
             )
-        elif core_name() == "dsh":
+        elif backend == "dsh":
             from .dsh_adapter import DshChatSession
 
             session = DshChatSession(
