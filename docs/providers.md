@@ -70,7 +70,7 @@ G7 真启动冒烟会在自己的进程里打开这个开关，并把 `userData`
 
 已验证（本机 + 自检脚本）：
 
-- 握手、Bearer 鉴权、回环 Host/Origin 白名单、SSE 续传与取消（G4；0.6.0 起 52 条，含思考深度映射、关闭开关、上下文截断）。
+- 握手、Bearer 鉴权、回环 Host/Origin 白名单、SSE 续传与取消（G4；55 条，含思考深度映射、关闭开关、上下文裁剪）。
 - OpenAI 兼容协议本身：429 退避、`reasoning_content` 与正文分离、分片 `tool_calls` 拼装、历史剥离 reasoning、Key 只出现在 Authorization（G5，用本地假端点，不联网）。
 - 界面端到端：设置页打开/关闭、五家预设与模型胶囊、上下文/深度选择器、不回显 Key、哨兵 Key 经 UI 保存后磁盘上只有密文（G7 共 97 条，本机 Windows 真启动）。
 - 离线 provider 的文字真的流进气泡，`list_templates` 工具卡从 running 走到 ok，结束后按钮回到「发送」（G7 同一轮）。

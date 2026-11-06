@@ -178,7 +178,7 @@ LangGraph `interrupt()` + `SqliteSaver`（`thread_id` = 赛题会话）。选它
 
 ### 5.7 便携 Python
 
-照 Cherry 的做法：bundled `uv` + python-build-standalone **3.12.13**（不是本机 3.14——科学计算 wheel 面在 3.12 最厚，且这是上游已验证的钉法），装进应用自有目录，npmmirror 优先再回落官方源，**绝不收养系统解释器**。体积代价预估安装包 300–400 MB（Electron ~100 + Python+whl ~200）；0.6.0 实测为 264 MB，原估偏高。
+照 Cherry 的做法：bundled `uv` + python-build-standalone **3.12.13**（不是本机 3.14——科学计算 wheel 面在 3.12 最厚，且这是上游已验证的钉法），装进应用自有目录，npmmirror 优先再回落官方源，**绝不收养系统解释器**。体积代价预估安装包 300–400 MB（Electron ~100 + Python+whl ~200）；早期实测为 264 MB，原估偏高。
 
 LaTeX 路线已在 2026-10-30 定为 **xelatex 优先**（接 kit 现状），Word 由 pandoc 转换；Tectonic/Typst 不作为 v1 路径。打包方式（要求本机装 / 内置）留到 M6。中文排版另有一条暗坑：`xeCJK` 依赖本机 SimHei/SimSun 存在，`plot_style.pick_cjk_font` 的字体回退要同样用于预览。
 
@@ -230,7 +230,7 @@ Escap1ng/<仓库名>/
 | **M5** 排版全链路 | xelatex/pandoc 接入、交付门禁、`tmp` 清理、一票否决红线 | 一题进、`paper.pdf`+`paper.docx` 出，deai/score 全绿 |
 | **M6** 发布 | 便携打包（NSIS + 可选全内置大包）、截图、示例赛题、Release | Windows 干净机装完填 key 即可跑通一道真题 |
 
-签名与公证不在 M6 默认项里：MathModelAgent 的 Windows 包至今未签名、README 里专门写了如何绕过 SmartScreen。0.6.0 起改用自签名证书，证书根不受信任，SmartScreen 的告警照旧；是否花钱买受信任的证书留给你决定（macOS 侧它是 Developer ID 签名 + 公证都做齐了）。
+签名与公证不在 M6 默认项里：MathModelAgent 的 Windows 包至今未签名、README 里专门写了如何绕过 SmartScreen。打包起改用自签名证书，证书根不受信任，SmartScreen 的告警照旧；是否花钱买受信任的证书留给你决定（macOS 侧它是 Developer ID 签名 + 公证都做齐了）。
 
 ---
 
@@ -243,7 +243,7 @@ Escap1ng/<仓库名>/
 | LangGraph 拖入 langchain-core 语义 | 中 | 只用 `interrupt`/`SqliteSaver` 两点，把依赖面写死在 G6；不可控则自研 200 行状态机（已识别为可退让项） |
 | provider 工具调用漂移（尤其国产 + Ollama） | 高 | 能力矩阵按数据登记，UI 在缺 `tool_calling` 时降级为"建议式工具调用"，不谎报 |
 | 中文 LaTeX 缺字体 / matplotlib 方框 | 中 | 阶段零把字体也当依赖检测；复用 `pick_cjk_font` |
-| 安装包体积与签名告警 | 中 | 0.6.0 实测 264 MB；自签名证书根不受信任，SmartScreen 仍告警，要消除得换受信任证书 |
+| 安装包体积与签名告警 | 中 | 早期实测 264 MB；自签名证书根不受信任，SmartScreen 仍告警，要消除得换受信任证书 |
 | 单人维护、面铺太宽 | 高 | v1 边界已收窄到 M3/M4；排版与 EI 改稿后置；每步有可运行判据 |
 
 ---

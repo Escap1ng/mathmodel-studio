@@ -1,28 +1,22 @@
-# 交接 · 0.6.0 发布时的状态
+# 交接 · 当前状态（0.1.0）
 
-给接手的人（或下一轮会话的我）。日期 2026-10-31。
-提交数与文件数不要信我抄在这里的数字，跑 `git rev-list --count HEAD` 和 `git ls-files | wc -l` 自己取；HEAD 以 `git log -1` 为准。
+给接手的人（或下一轮会话的我）。日期 2026-11-06。
+提交数与文件数不要信这里抄的数字，跑 `git rev-list --count HEAD` 和 `git ls-files | wc -l` 自己取；HEAD 以 `git log -1` 为准。
 
 ## 0 一句话现状
 
-0.6.0 是多对话与多模型版本：左栏会话列表、五家模型预设、上下文预算与思维深度、可收起右栏；论文页继续执行 xelatex → pandoc → 三道交付门禁。CI run `41172805948` 三 job 全绿（ubuntu 真启动 97/97、1440x900、非白 4.16%，G6b 一致；Windows G10 显式跳过）；NSIS 0.6.0 安装包已在本机构建（自签名证书、新星环图标，含向导页头与侧栏图），未在干净机验证。仓库已完成收尾：studio 历史并入原技能库并改名为 `Escap1ng/mathmodel-studio`，私有原仓改名 `mathmodel-studio-archive`，旧 Release 与 tag 已清理。
-
-M5 论文页：右栏「论文」能真跑 **xelatex 两遍 → pandoc 转 DOCX → Word 版式微调 → 去 AI 措辞 / 结构指标 / 章节结构三道门禁**，并用 pdf.js 做页级预览。本机演示稿真编 7 页（PDF 284 KB、DOCX 151 KB），三道门禁全绿；门禁条变成图表 / 评分 / 章节 / 论文排版四项。
-**论文构建是工作台动作，不是阶段机的第五阶段**：阶段五不会因构建成功自动标为已过，K1 环境预检卡也没接；编译的是仓库里的演示稿，不会替你写正文。里程碑见 [../PLAN.md](../PLAN.md) §7。
-**附件随消息送入模型**：文件复制到工作区（默认桌面「赛题」），发送前主进程抽正文（PDF 走 pdfjs、文本/CSV 直读并报行列），界面只显示胶囊；数据角色核对（目标列是否为空、行数、时间范围）仍未接入。
+0.1.0 是对话优先的工作台：默认自由对话，输入区的「全流程建模」按钮才进入题面确认 → 选模 → 基线 → 论文的七阶段引导；对话里问「该用什么模型」会由 `suggest_models` 工具推出三张候选卡，点卡即继续对话。设置页可在 Python 与 DeepSeek Harness 两个内核间切换，DSH 经本机 `dsh web` 的 HTTP + WebSocket 接入，事件仍映射为原有九类。论文页执行 xelatex → pandoc → 三道交付门禁；图表、评分、附件与多会话能力保留。
 
 三句必须保留的限制：
 
 - **没有用真实 DeepSeek / 通义千问 / Kimi / 智谱 GLM Key 跑过联网对话。** 已验证的是 OpenAI 兼容协议（本地假端点）与整条本机链路；各服务的当下行为不在证据里。
 - **论文样例不是对真实赛题的解答。** 内容是演示稿，评分卡也是演示数据；PDF/Word 一致性核对没有自动化。
-- 仓库已公开为 `Escap1ng/mathmodel-studio`；私有原仓保留为 `mathmodel-studio-archive`。拓扑执行记录见 §3。
-
-**0.6.0 界面批次（2026-10-31，CI 已绿）**：左栏变成会话列表（建模会话从 SQLite 读，问答会话进 `localStorage`），支持新建、切换、单条删除与清空；中栏顶部显示会话标题与上下文用量，发送前按 200k/400k/1m 预算截断回放历史。设置页改为左侧服务商列表，预设 DeepSeek / 通义千问 / Kimi / 智谱 GLM / OpenAI 格式（模型名按官网 2026-10 核对），并提供上下文与思维深度选择器；深度按各家映射到 `reasoning_effort` 或 `thinking.type`。右栏可收成 56px 图标条，标签按产出/评审/资料分组，门禁摘要并入栏头。本机与 CI 的 G7 均 97/97、G6b 核验一致（run `41172805948`）。
+- **0.1.0 的安装包尚未构建，也没有在 CI 上复跑。** 现有安装包读数与 CI 读数均来自版本重置之前，只作参考。
 
 ## 1 怎么验（命令 → 期望）
 
 需要先装两侧依赖：`npm install`（可加 `ELECTRON_SKIP_BINARY_DOWNLOAD=1`，CI 不启动窗口时用）与
-`python -m pip install -r requirements.txt -i https://registry.npmmirror.com/pypi/simple/`。
+`python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/`。
 
 论文自检还需要 **xelatex 与 pandoc**（见 `docs/env-setup.md`）：xelatex 走 PATH 或 `MMS_XELATEX`；pandoc 走 PATH、`MMS_PANDOC`，最后回落到 `%LOCALAPPDATA%\mms-tools\pandoc.exe`。缺件时 G10 退出 1 并打印缺什么；只有显式 `MMS_PAPER_SKIP=1` 才跳过，且会打印「未验证 G10」。
 
@@ -36,144 +30,129 @@ node scripts/check-skills.mjs --self            # 7/7 条自检通过（含基�
 node scripts/check-window-smoke.mjs --selftest  # 12/12 条核验自测                  → exit 0
 python scripts/validate_contracts.py            # 9/9 项通过（jsonschema）         → exit 0
 python runtime/selfcheck.py                     # 13/13 条 CLI 断言，含真渲一张图  → exit 0
-python runtime/selfcheck_channel.py             # 52/52 条通道断言（含 M3 恢复与 0.6.0 思考深度/上下文截断）  → exit 0
+python runtime/selfcheck_channel.py             # 55/55 条通道断言（含 C15 选模卡）→ exit 0
 python runtime/selfcheck_channel.py --selftest  # 10/10 条坏事件被拒                → exit 0
+python runtime/selfcheck_channel.py --core dsh  # 31/31 条 DSH 断言                 → exit 0
 python runtime/selfcheck_workbench.py           # 13/13 条工作台断言（真渲两版）  → exit 0
 python runtime/selfcheck_paper.py               # 10/10 条论文断言（真编 PDF/DOCX）→ exit 0
 ```
 
-`selfcheck.py`、`selfcheck_workbench.py` 与 `selfcheck_paper.py` 会真调 matplotlib / xelatex / pandoc（各十几秒），需要 `requirements.txt` 与本机排版工具；`selfcheck_channel.py` 只起本机 Python 子进程与 127.0.0.1 上的假 OpenAI 端点，不需要排版工具、也不联网。
+`--core dsh` 会自动转发到 `vendor/python`（SDK 与 `dsh.exe` 都装在那里）；系统解释器缺 SDK 时不再误报 `dshVersion`。`selfcheck.py`、`selfcheck_workbench.py` 与 `selfcheck_paper.py` 会真调 matplotlib / xelatex / pandoc（各十几秒）。
 
 需要显示器的部分：
 
 ```bash
-npm run smoke:window   # 真起窗口，97/97，写 screenshots/window-smoke.{png,json}、conversation.png、settings.png、decision.png、drawer.png、figure.png、score.png、paper.png、dropzone.png、files.png、attachments.png
+npm run smoke:window   # 真起窗口，106/106，写 screenshots/window-smoke.{png,json} 与各页截图
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
 
-`smoke:window` 自己设置 `MMS_FAKE_PROVIDER=1`，并把 Electron `userData` 指到临时目录，所以它不会用你已保存的真实 provider，也不会带着哨兵 Key 发请求；图表版本、论文工作区与日志也都写在这个临时目录。它还设 `MMS_WORKSPACE` 指向临时目录，避免在真实桌面建「赛题」；正常启动时默认工作区是桌面「赛题」，附件落在 `<工作区>/附件/日期/`。G7-9 会真编一遍演示稿，因此跑 G7 的机器必须有 xelatex 与 pandoc。
-跑完可以直接看 `screenshots/paper.png`；断言通过不等于观感合格。
+`smoke:window` 自己设置 `MMS_FAKE_PROVIDER=1`，并把 Electron `userData` 与 `MMS_WORKSPACE` 指到临时目录，所以不会用你已保存的真实 provider，也不会在真实桌面建「赛题」。G7-9 会真编一遍演示稿，跑 G7 的机器必须有 xelatex 与 pandoc。G7-11 会切换内核并重启运行时。
 
 一把梭：`npm run gate`（顺序见 `package.json` 的 scripts；G7 不在 gate 里，因为它要显示器和 Electron 二进制）。
 
 **本机跑 G7 前去掉 `ELECTRON_RUN_AS_NODE`**：本会话 shell 里它是 `1`，会让 `electron` 退化成 Node 并报 `app.setPath` 不存在。用 `env -u ELECTRON_RUN_AS_NODE npx electron tests/window-smoke.cjs`。
 
-CI：<https://github.com/Escap1ng/mathmodel-studio/actions> —— 三 job：`门禁 · ubuntu-latest`、`门禁 · windows-latest`、`真启动冒烟 · ubuntu`。
-0.3.0 的 run `40982728779` 三 job 全绿；ubuntu 真启动 42/42、非白像素 3.15%（M2 的历史 run `40658227855` 为 27/27）。0.3.1 的 run `41000678500` 三 job 全绿，ubuntu 真启动 43/43、非白像素 3.12%。0.4.0 的 run `41008695577` 三 job 全绿，ubuntu 真启动 53/53、非白像素 3.98%。**0.5.0 的 run `41017241564` 三 job 全绿**：ubuntu 真启动 57/57、1440x900、非白像素 2.96%，G10 10/10、G9 13/13、G6 14/14；Windows 的 G10 显式跳过。取回截图：
-
-```bash
-gh run download <run-id> -n window-smoke --dir screenshots-m5-ci
-```
+CI：<https://github.com/Escap1ng/mathmodel-studio/actions>。0.1.0 尚未在 CI 上复跑；此前 run 的读数只作历史参考。
 
 ## 2 已证 / 未证（别混）
 
 | 结论 | 证据来源 | 强度 |
 | --- | --- | --- |
-| 注册表、技能规范、契约与 CLI 仍自洽 | 本机 gate + CI 双平台（M1 起） | 强 |
-| 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消；0.6.0 思考深度与上下文截断 | `selfcheck_channel.py` 52/52（本机 Windows） | 强（本机） |
-| 编排闭环：K2→K3→换一批→选择→阶段四 | 同上的 C12，事件与快照双向核对 | 强（本机） |
-| 跨进程恢复：换一个服务器进程仍停在 K2 | 同上的 C13 | 强（本机） |
-| 界面端到端：97 条，含论文构建、预览、可拖拽布局、附件拖放与正文送入、工作区文件页、按钮行固定、粘贴截图；0.6.0 追加多对话历史/切换/删除/清空、五家预设与上下文/深度选择器、右栏收起与分组 | G7 97/97；本机 Windows 与 CI ubuntu 均真启动（run `41172805948`） | 强（本机 + CI） |
-| 图表工作台：真渲两版、换主题、版本历史与回滚 | G9 W2–W4；G7 工作台段 | 强（本机） |
-| 评分卡：三轮、五维、扣分定位、熔断、一票否决 | G9 W6；G7 评分段；演示数据 | 强（演示数据，非真实论文） |
-| 论文排版：xelatex 两遍、pandoc DOCX、Word 后处理 | G10 P2/P3/P5；G7-9；本机真编 7 页 | 强（演示稿） |
-| 论文门禁：去 AI 措辞、结构指标、章节结构 | G10 P4；G7-9 三门禁 chips | 强（演示稿） |
-| 门禁能抓住坏稿 | G10 P7：注入两处过渡词后 phrasing 判红，PDF 仍生成 | 强（反向） |
-| 缺工具 / 坏 TeX / 缺稿件 | G10 P6/P8/P9：分别退出 2 / 1 / 2，不产出假 PDF | 强（反向） |
-| pdf.js 页级预览 | G7-9：画布尺寸与截图墨迹；`screenshots/paper.png` | 强（本机） |
-| M5 在 CI 上真编 | run `41017241564`：ubuntu G10 10/10、G7 57/57、G6b 核验一致 | 强（ubuntu） |
-| 0.5.2 在 CI 上真起窗 | run `41065088121`：ubuntu G7 78/78、非白像素 3.81%、G6b 核验一致；双平台 G4 47/47、G9 13/13、G3 13/13，ubuntu G10 10/10 | 强（ubuntu） |
-| Windows CI 跑 G10 | 未装 MiKTeX，gates job 显式跳过并打印「未验证 G10」 | **未证**（执行层跳过，不是通过） |
-| PDF 与 Word 版式一致性 | 未自动化；只做 docx 生成与后处理 | **未证** |
-| 阶段五由构建驱动 / K1 环境预检 | 未接；论文页构建不推进阶段机 | **未证** |
-| 论文 PDF/Word 之外的正文自动生成 | 未做；只编演示稿 | **未证** |
-| 真实 DeepSeek / 通义千问 / Kimi / GLM 联网对话 | 无 Key，未跑 | **未证** |
+| 注册表、技能规范、契约与 CLI 自洽 | `npm run gate`（本机 Windows，2026-11-06） | 强（本机） |
+| 本机通道：握手、Bearer、Host/Origin、SSE 契约、续传、取消、思考深度与上下文截断 | `selfcheck_channel.py` 55/55 | 强（本机） |
+| 上下文选模卡：工具调用后推送 `interrupt`，候选与编排器同源 | 同上 C15 三条 | 强（本机） |
+| 编排闭环：K2→K3→换一批→选择→阶段四；跨进程恢复 | 同上 C12/C13 | 强（本机） |
+| DSH 内核：流式、工具、取消、续聊复用、缺少 dsh 时明确报错 | `selfcheck_channel.py --core dsh` 31/31 | 强（本机） |
+| 打包后 DSH 缺失的报错与密钥边界 | 真实 packaged resources 负向 17/17（2026-11-04，改名后已恢复） | 强（本机） |
+| 内核切换：设置落盘、运行时重启、DSH 下离线演示禁用、切回恢复 | G7-11 五条 | 强（本机） |
+| 界面端到端 106 条：K2→K3→解释→选择、阶段四真跑、图表、评分、论文、附件、多会话、右栏、内核切换 | G7 106/106 | 强（本机） |
+| 图表工作台、评分卡、论文排版与三道门禁 | G9 13/13、G10 10/10、G7 对应段落 | 强（演示数据/演示稿） |
+| 门禁能抓住坏稿；缺工具 / 坏 TeX / 缺稿件 | G10 反向 P6–P9 | 强（反向） |
+| 0.1.0 的 NSIS 安装包 | 未构建 | **未证** |
+| 0.1.0 在 CI 上的门禁与真启动 | 未复跑 | **未证** |
+| DSH 内核下的选模卡 | `suggest_models` 只在 python 内核接；DSH 走 MCP 尚无对应工具 | **未证** |
+| DSH 内核下旧 python 内核会话 resume | 未验证 | **未证** |
+| 跨 sidecar 重启续聊（DSH 不重载 session） | 未做 | **未证** |
+| 真实厂商联网对话 | 无 Key，未跑 | **未证** |
+| Windows CI 真起窗、干净机安装 | 无 | **未证** |
 | Linux 桌面 `safeStorage` 可用分支 | 只证了「不可用就拒绝保存」 | **未证** |
-| Windows CI 真起窗 | 无 | **未证**；Windows 证据来自本机 |
-| 安装包在干净机安装运行 | 0.6.0 NSIS 已在本机构建（便携 Python 与 pandoc 随包，TeX 未内置，自签名证书，证书根不受信任）；未在干净机验证 | **未证** |
 
 ## 3 待维护者定的项
 
-1. **仓库拓扑（2026-10-31 已执行）**：studio 历史以 `--allow-unrelated-histories -s ours` 并入原技能库，合并提交 `4716b52`，两个来源的提交与 VENDOR 出处均保留；原私有 studio 仓改名为 `mathmodel-studio-archive`，原技能库改名为 `mathmodel-studio`。star 与 issue 跟随被改名的仓库对象，`mathmodel-kit` 旧名不复用；未 force-push。旧 Release 与 tag 已全部删除。
-2. **TeX 与 pandoc 在安装包里怎么存在**（M6）：要求用户本机装 / 内置 Tectonic / 两者都支持并让环境检测决定。M5 只做了检测与明确拒绝；便携 Python 的 300–400 MB 预估也要在打包时回填真实数字。
-3. **provider 列表的维护方式**：现在三家写死在 `runtime/src/mms/providers.json`，界面允许手填模型名与自定义端点。是否改成用户可增删的服务商列表，取决于你想把「选模型」做成多重的决策点。
-4. **Key 的 Linux 兜底**：当前规则是安全存储不可用就拒绝保存，不退回明文。如果目标用户里有 Linux 桌面且没有 Secret Service，是保持拒绝、还是明确提示后允许「本次会话内存保存」，需要你拍板。
-5. **阶段机怎么接论文**：现在「构建论文」是工作台按钮，左侧阶段五仍显示「未开始」。是构建成功后把阶段五标为已过，还是把阶段五留给真正的「正文生成 + 交付打包」，二者语义不同，界面也应该不同。
+1. **TeX 与 pandoc 在安装包里怎么存在**：要求用户本机装 / 内置 Tectonic / 两者都支持并让环境检测决定。当前只做了检测与明确拒绝。
+2. **provider 列表的维护方式**：三家写死在 `runtime/src/mms/providers.json`，界面允许手填模型名与自定义端点。是否改成用户可增删的服务商列表，取决于「选模型」要多重。
+3. **Key 的 Linux 兜底**：当前规则是安全存储不可用就拒绝保存，不退回明文。保持拒绝还是允许「本次会话内存保存」，需要拍板。
+4. **阶段机怎么接论文**：现在「构建论文」是工作台按钮，左侧阶段五仍显示「未开始」。构建成功是否推进阶段五，语义不同，界面也应不同。
+5. **DSH 内核要不要补齐工具面**：选模卡、技能与工作台端点目前只在 python 内核可用；补齐要扩 `runtime/mcp/mms_server.py` 并在适配层映射卡片事件。
 
 ## 4 界面待判的观感问题（我只报，没改）
 
-`screenshots/window-smoke.png`、`conversation.png`、`settings.png`、`decision.png`、`drawer.png`、`figure.png`、`score.png`、`paper.png` 都是 1440×900、本机 Windows 下渲染。
+`screenshots/` 下的截图均为 1440×900、本机 Windows 渲染。
 
-M1/M2/M3 已报、仍未改：
-
-- 左栏 240px 装不下最长的阶段名时靠收紧占位解决；阶段圆点仍是 `1.5px` 描边，在白底上很淡。
+- 左栏 240px 装不下最长的阶段名时靠收紧占位解决；阶段圆点描边较淡。
 - 中栏空态文字偏上，下方到输入框之间空隙大。
-- 状态栏右侧三枚色块与「墨青」间距 5px 偏小。
-- 工具卡灰底与白底只差一点；模型条最长 300px，长名字会被截断。
-- 设置页四个服务商是等宽胶囊，没有分组。
+- 状态栏右侧色块与文字间距偏小。
+- 工具卡灰底与白底差别小；模型条最长 300px，长名字会被截断。
+- 设置页服务商是等宽胶囊，没有分组；新增的「对话内核」段落与模型字段的视觉层级是否合适，需要看过再定。
+- 评分页信息密度较高；论文页 A4 缩到约 370px 宽，正文可辨但字号很小。
+- 对话优先后，阶段轨道常驻左侧但默认没有活跃会话，是否要弱化或折叠，属于产品选择。
 
-M4 已报、仍适用：
+## 5 已做与仍欠
 
-- 图表页已改为单图 + 历史条（0.6.0），原「两图并排 diff」的尺寸问题不再适用。
-- 评分页信息密度较高；「较上一轮」是否折起来属于视觉选择。
+已做：
 
-M5 新增：
-
-- 论文页把 A4 页缩到约 370px 宽，正文可辨但字号很小；要不要加缩放或全屏预览，你定。
-- 构建后右栏同时有步骤、门禁 chips 与折叠日志，面板偏长；日志默认折叠。
-- 只预览 PDF，没有 DOCX 预览；Word 产物只显示体积。
-- 左侧阶段五显示「未开始」而右侧论文已经编好，这个矛盾是否需要现在处理，见 §3 第 5 条。
-
-## 5 M5 做完的与仍欠的
-
-已完成：
-
-1. `paper_build.py`：工作区、xelatex 两遍、PDF/DOCX 核验、pandoc、`word_postprocess.py`，每步耗时与日志尾部。
-2. 演示稿 `paper_sample/paper.tex`：完整章节、三线表、公式、配图、参考文献、带代码附录；真编 7 页。
-3. 三道门禁按 JSON 解析成门禁条；缺件、坏稿、坏 TeX、缺稿件都有反向覆盖。
-4. 通道 `/workbench/paper/build`、`paper` 状态、门禁条第四项；主进程下发 PDF data URL，渲染层不碰路径。
-5. 论文页：构建按钮、步骤、门禁、日志、pdf.js 预览。
-6. G10 10 条、G7 97 条、G6b 下限 97 与 59 条关键断言；CI 装 TeX/pandoc。
-7. 文档：README/README_EN、CHANGELOG 0.5.0、HANDOFF、env-setup。
+1. 对话优先工作台：默认 chat，单按钮进入/退出全流程。
+2. `suggest_models` 工具与选模卡事件；chat 模式点卡转消息。
+3. DSH 适配层：进程管理、WS follow、事件映射、取消、续聊复用、闲置回收。
+4. 设置页内核切换、`settings.json` 持久化、`providerViews` 的 `unavailable` 约束。
+5. 打包布线：SDK 版本记录、`MMS_DSH_*` 环境、resources 路径探测。
+6. 门禁：G4 55、G7 106、DSH 31、G9 13、G10 10、G11 13、G12 14、G13 10。
+7. 发布规范 `docs/RELEASE.md`；版本重置为 0.1.0，旧 Release/tag 已删。
 
 仍欠：
 
-- **阶段机接论文与 K1 环境预检**（§3 第 5 条）。
-- **正文生成**：现在是固定演示稿，不读用户赛题。
-- **PDF/Word 一致性核对**与 Word 预览。
-- **TeX/pandoc 打包**与便携 Python。
-- 真实厂商连通性、Linux 桌面 safeStorage 可用分支、Windows CI 起窗、Windows 上的 G10。
-- `docs/env-setup.md` 英文版。
+- 0.1.0 安装包重建与干净机安装验证。
+- CI 在 0.1.0 上复跑（含 Windows 真起窗）。
+- DSH 侧选模卡、技能与工作台端点。
+- DSH 内核下旧会话 resume 兼容、跨 sidecar 重启续聊。
+- 真实厂商连通性、Linux 桌面 safeStorage 可用分支。
+- 正文生成：论文页仍是演示稿。
 
-## 6 这一轮踩过的坑（别再踩）
+## 6 踩过的坑（别再踩）
 
-**POST 处理器必须读请求体，否则 keep-alive 会中毒**：`/workbench/paper/build` 第一版没调 `self._body()`，客户端发来的 `{}` 留在连接里，下一条 `GET /workbench/state` 被解析成 `{}GET ...`，服务端回 501，界面报「运行时 HTTP 501」。凡是 `do_POST` 分支，先读体再处理。
+**POST 处理器必须读请求体，否则 keep-alive 会中毒**：`/workbench/paper/build` 第一版没调 `self._body()`，客户端发来的 `{}` 留在连接里，下一条 `GET /workbench/state` 被解析成 `{}GET ...`，服务端回 501。凡是 `do_POST` 分支，先读体再处理。
 
-**pdf.js 不要传 `data:` URL**：`getDocument({url: dataUrl})` 会去 fetch，CSP 的 `connect-src` 不放行 `data:`，报 `Unexpected server response (0)`。改成把 base64 解成 `Uint8Array` 传给 `getDocument({data})`；worker 由 Vite 打包，CSP 需要 `worker-src 'self' blob:`。
+**pdf.js 不要传 `data:` URL**：`getDocument({url: dataUrl})` 会去 fetch，CSP 的 `connect-src` 不放行 `data:`。改成把 base64 解成 `Uint8Array` 传给 `getDocument({data})`；worker 由 Vite 打包，CSP 需要 `worker-src 'self' blob:`。
 
-**pandoc 不在 PATH 时要有回落，但覆盖变量指向不存在的路径必须判缺**：本机装在 `%LOCALAPPDATA%\mms-tools\pandoc.exe`。`MMS_PANDOC` 设了但文件不存在时直接判缺（不回落到 PATH），否则「缺件反例」会被 PATH 里的 pandoc 悄悄救活。
+**pandoc 不在 PATH 时要有回落，但覆盖变量指向不存在的路径必须判缺**：`MMS_PANDOC` 设了但文件不存在时直接判缺（不回落到 PATH），否则「缺件反例」会被 PATH 里的 pandoc 悄悄救活。
 
-**xelatex 能编模板不等于模板能过门禁**：vendored `paper.tex` 是骨架，章节门禁 hard 失败 8 项是预期。要让门禁真绿，需要一份完整样例，并按 `check_style.py` 的段落节奏调长度（相邻合格段落字数差需 ≥20%；LaTeX 表格行也会被当成段落统计）。
+**xelatex 能编模板不等于模板能过门禁**：`check_style.py` 的段落节奏要求相邻合格段落字数差 ≥20%；LaTeX 表格行也会被当成段落统计。`check_phrasing.py` 会扫注释，样例稿注释也要避开词表。
 
-**`check_phrasing.py` 会扫注释**：模板里的写作提示（「随着…的发展」）会被当成命中。样例稿的注释也要避开词表。`transition-abuse` 的 `max_per_document` 是 1，全文用一次「综上所述」算合规，反例要注入两次。
+**G7 新增断言要同步三处**：`tests/window-smoke.cjs` 的断言、`scripts/check-window-smoke.mjs` 的 `MIN_ASSERTIONS` 与 `REQUIRED_ASSERTIONS`、以及文档里的条数。分组编号先 grep 现有 `G7-*`，G7-9 已被论文页占用。
 
-**G7 新增断言要同步三处**：`tests/window-smoke.cjs` 的断言、`scripts/check-window-smoke.mjs` 的 `MIN_ASSERTIONS` 与 `REQUIRED_ASSERTIONS`、以及文档里的条数。门禁条从三项变四项时，G7 的 gate 断言也要改。
+**默认模式改了要查恢复路径**：默认从 workflow 改成 chat 后，`session.latest()` 恢复待决会话时如果只设 `activeKind` 不设 `mode`，点确认会走成聊天消息（冒烟 8 项红）。恢复时必须 `setMode('workflow')`。
 
-**窗口 resize 时的夹取要防抖**：从 1440 拉到 2400 的过程中会触发多次中间尺寸的 resize，立刻按当前 innerWidth 夹取会把用户保存的宽度永久压到最小值（G7 曾读到右栏 380px）。现在等 180ms 尺寸稳定后再夹，测试也在断言前等右栏 >800px。
+**DSH 路径在 dev 与 packaged 不同**：dev 在 `vendor/python/Scripts/dsh.exe`，packaged 在 `resources/python/Scripts/dsh.exe`。`MMS_DSH_BIN` 设置过但文件不存在时 `find_dsh` 直接报错，所以 Electron 只在探测到文件时才注入。
 
-**分隔条高亮用 CSS 变量定位**：`--grip-y` 由 pointermove/pointerenter 写在工作台栏边界上，`::after` 用 `radial-gradient(... at 50% var(--grip-y))` 当遮罩，光带以指针为中心向两端渐隐；不要固定 50%，也不要在 pointerleave 清空它（淡出时会闪回中点）。拖拽时窗口级 pointermove 也要继续更新它。输入框上沿的空心描边长条固定居中、不跟随鼠标，只随 hover/拖拽变色；左栏固定 240px，没有分隔条。
+**DSH 自检要用随包解释器**：系统 python 没装 SDK，`dshVersion` 会是 None。自检在 `--core dsh` 时用 subprocess 转发到 `vendor/python`；Windows 上 `os.execve` 会拼坏含空格路径，不要用。
 
-**CI 的排版依赖是硬依赖**：gates 的 ubuntu job 装 `pandoc` 与 `texlive-xetex/texlive-lang-chinese/texlive-latex-extra`；window-smoke job 同样要装，否则 G7-9 会红。Windows gates 没有 TeX，G10 用 `MMS_PAPER_SKIP=1` 显式跳过，跳过必须打印「未验证」，不能算通过。
+**工具卡片的通道**：选模卡走 `interrupt` 事件（`card=model-choice`），不是 `gate`；`gate` 是技能门禁的 `{skill, ok, exit}`。chat 模式的点卡由渲染层转成用户消息，不复用 orchestrator 的 resume。
+
+**窗口 resize 时的夹取要防抖**：从 1440 拉到 2400 的过程中会触发多次中间尺寸，立刻夹取会把保存宽度永久压到最小值。现在等 180ms 稳定后再夹。
+
+**分隔条高亮用 CSS 变量定位**：`--grip-y` 由 pointermove 写入，`::after` 用 `radial-gradient(... at 50% var(--grip-y))`；不要固定 50%，也不要在 pointerleave 清空它。
+
+**CI 的排版依赖是硬依赖**：gates 的 ubuntu job 与 window-smoke job 都要装 pandoc 与 TeX；Windows gates 没有 TeX，G10 用 `MMS_PAPER_SKIP=1` 显式跳过，跳过必须打印「未验证」。
 
 **上一轮的坑仍然有效**：SSE 流要显式 `Connection: close`；事件可能比 `chat.start` 返回值先到；G7 的假 provider 必须在 `require` 生产入口之前设；`app.exit(1)` 会被 `window-all-closed` 顶掉，结论必须落 JSON 由 G6b 独立判；Windows 控制台 cp1252 会因中文崩溃，入口要 reconfigure UTF-8；本机 shell 可能带 `ELECTRON_RUN_AS_NODE=1`；safeStorage 的「不可用」是正常分支；`git` 通道会瞬时断，先探本机代理端口并重试，不要改 remote。
 
-**0.6.0 新增的坑**：
+**近期新增的坑**：
 
-- `capturePage()` 在窗口被遮挡时会抛 `UnknownVizError`，G7 的截图全部走 `capture(win)` 重试封装；不要退回裸调用。
-- 会话列表有两套来源：`GET /sessions` 只返回建模会话的摘要，问答会话在渲染层 `localStorage`（`mms.chatConversations.v1`）。清空历史必须两边一起删，否则列表会「复活」。
-- 上下文估算在 TS（`lib/context.ts`）与 Python（`server.py` 的 `estimate_tokens`）各有一份；改公式必须两边同步，G4 的 C14 用 200k 预算下的截断验证 Python 侧。
-- 左栏宽度仍是 240px，`.tab` 仍是 7 个；右栏分组只加 `.tabs__group`/`.tabs__label`，不要把标签并成 6 个，G6b 点名了标签数量与左栏固定。
-- 面板标题与门禁条已并入栏头/面板内 `.panel__bar`；G7 不再有 `.gatebar` 断言，但门禁页的 `[data-gate-row]` 仍必须 4 条。
+- `capturePage()` 在窗口被遮挡时会抛 `UnknownVizError`，G7 的截图全部走 `capture(win)` 重试封装。
+- 会话列表有两套来源：`GET /sessions` 只返回建模会话摘要，问答会话在渲染层 `localStorage`（`mms.chatConversations.v1`）。清空历史必须两边一起删。
+- 上下文估算在 TS（`lib/context.ts`）与 Python（`server.py` 的 `estimate_tokens`）各有一份；改公式必须两边同步。
+- 左栏宽度 240px、`.tab` 7 个是 G6b 点名项；右栏分组用 `.tabs__group`/`.tabs__label`。
+- 面板标题与门禁条已并入栏头/`.panel__bar`；门禁页 `[data-gate-row]` 仍必须 4 条。
 
 ## 7 结构速查
 
@@ -181,46 +160,43 @@ M5 新增：
 skills/                     7 个 vendor 进来的技能（原样）+ manifest.json + VENDOR.md
 schemas/                    skill-manifest.schema.json、chat-events.schema.json
 runtime/src/mms/
-  server.py                 本机通道：握手、鉴权、SSE、会话、workflow、工作台与论文端点
+  server.py                 本机通道：握手、鉴权、SSE、会话、workflow、工具与工作台端点
+  dsh_adapter.py             DSH 子进程、HTTP/WS、事件映射、取消与续聊复用
+  dsh_provider.py            供应商与思考档位到 DSH patch 的映射
   store.py                  SQLite：阶段、待决卡、消息、轮次
-  orchestrator.py           K2/K3/K4 的确定性状态机
+  orchestrator.py           K2/K3 状态机与基线；chat 选模卡共用候选
   workbench_figure.py       图表渲染、主题、版本与回滚
   workbench_score.py        评分卡、扣分定位、章节样例与一票否决
   paper_build.py            论文流水线：xelatex、pandoc、Word 后处理、三道门禁
-  paper_sample/paper.tex    M5 演示稿（真编 7 页）
-  demo_scores.json          三轮演示评分卡
-  themes/                   studio-ink / studio-amber 主题
   provider.py               OpenAI 兼容流式客户端 + 离线假 provider
   providers.json            DeepSeek / 通义千问 / Kimi / 智谱 GLM / OpenAI 格式预设与思考参数映射
-  registry.py / invoke.py   技能注册表与 subprocess 调用
   cli.py                    serve / templates / invoke
+runtime/mcp/mms_server.py   DSH 侧 stdio MCP（当前只有 list_templates）
 runtime/cli.py              开发期入口（npm run mms）
-runtime/selfcheck_channel.py G4/G5 自检与 10 条反向覆盖（含跨进程恢复）
+runtime/selfcheck_channel.py G4/G5 自检、DSH 自检与反向覆盖
 runtime/selfcheck_workbench.py G9 工作台自检（真渲两版）
 runtime/selfcheck_paper.py  G10 论文自检（真编 PDF/DOCX + 四条反向）
 src/main/
   index.ts                  窗口、IPC、provider 合并视图、SSE 转发、resume、PDF data URL
-  channel.ts                Python 子进程生命周期、HTTP/SSE 客户端
-  settings.ts               safeStorage 密文读写
+  channel.ts                Python 子进程生命周期、HTTP/SSE 客户端、内核选择
+  settings.ts               safeStorage 密文、工作区、对话内核与 provider 设置
 src/preload/index.ts        window.studio 窄接口
 src/shared/api.ts           主进程与渲染层共享的纯类型
 src/renderer/src/
-  App.tsx                   运行时状态、provider、对话事件归并、快照恢复
-  components/ChatPane.tsx   流式消息、工具卡、输入区、阶段胶囊
+  App.tsx                   运行时状态、provider、对话事件归并、快照恢复、卡片决策分流
+  components/ChatPane.tsx   流式消息、工具卡、输入区、全流程按钮
   components/DecisionCard.tsx  K2 确认卡与 K3 选模卡
-  components/ExplainDrawer.tsx K4 右栏抽屉
-  components/WorkspacePane.tsx 图表/论文/门禁/代码/评分/日志工作台 + pdf.js 预览
-  components/SettingsDialog.tsx  服务商/模型/Key 设置
+  components/SettingsDialog.tsx  服务商/模型/Key 与对话内核设置
   lib/chat.ts               事件折叠的纯函数
-  lib/phases.ts             阶段名与状态文案
-  styles/workbench.css      M4 工作台与 M5 论文页样式
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
-tests/window-smoke.cjs      真启动断言（97 条）+ 截图与 JSON 结论
-.github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu，装图表与排版依赖）
+tests/window-smoke.cjs      真启动断言（106 条）+ 截图与 JSON 结论
+docs/RELEASE.md             发布格式规范
+.github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu）
 ```
 
 会话库位置：Electron `userData/sessions.db`；命令行直接起 runtime 时是 `<MMS_HOME>/.mms/sessions.db`，可用 `MMS_DATA_DIR` 覆盖。库内只有阶段、待决卡与消息，没有 Key。
+DSH 状态：`MMS_DSH_HOME`（默认 `userData/dsh`），profile 名 `mms`。
 图表版本位置：`userData/workbench/figure/versions/<v>`，`state.json` 记当前版与上一版。
-论文工作区：`userData/workbench/paper/`，含 `paper.tex`、`paper.pdf`、`paper.docx`、`figures/final/`、`logs/` 与 `build.json`；同样随 `MMS_DATA_DIR` 走。
+论文工作区：`userData/workbench/paper/`，含 `paper.tex`、`paper.pdf`、`paper.docx`、`figures/final/`、`logs/` 与 `build.json`。
 
 一处刻意的设计：`runtime` 只用 subprocess 调技能脚本、按退出码与产物双重判定，不 import 技能内部函数——这样 `skills/` 仍可被 Claude Code 等宿主单独装载。改这条要先想清楚代价。
