@@ -172,7 +172,11 @@ class Channel:
         env.pop("MMS_FAKE_PROVIDER", None)
         env.pop("MMS_FAKE_DELAY_MS", None)
         # 外壳环境可能带着 MMS_CORE；测试默认锁定到 python，除非显式覆盖。
-        env["MMS_CORE"] = (env_extra or {}).get("MMS_CORE") or "python"
+        # 传 "" 表示不设置，用来验证自动路由。
+        core = (env_extra or {}).get("MMS_CORE")
+        env["MMS_CORE"] = "python" if core is None else core
+        if not env["MMS_CORE"]:
+            del env["MMS_CORE"]
         if fake:
             env["MMS_FAKE_PROVIDER"] = "1"
         env.update(env_extra or {})
@@ -983,6 +987,29 @@ def tests_dsh() -> None:
             and result.get("by_skill") == expected_counts,
             f"result.templates={len((result or {}).get('templates') or [])} expected={len(expected_templates or [])} by_skill={result.get('by_skill') if isinstance(result, dict) else None}",
         )
+
+        upstream.tool_name = "mcp__mms__suggest_models"
+        upstream.tool_args = '{"question": "预测未来三个月的销量", "batch": 1}'
+        upstream.delay = 0.0
+        status, started_card = channel.start_chat(
+            {**body, "messages": [{"role": "user", "content": "该用什么模型？"}]}
+        )
+        card_events, _ = channel.events(started_card.get("chatId", ""))
+        interrupts = [e for e in card_events if e["event"] == "interrupt"]
+        payload = interrupts[0]["data"].get("payload", {}) if interrupts else {}
+        cards = payload.get("candidates") or []
+        from mms import orchestrator as _orch
+
+        expected_cards = _orch.model_candidates("预测未来三个月的销量", 1)
+        check(
+            "D2d DSH 选模卡通过 interrupt 推送",
+            status == 200
+            and bool(interrupts)
+            and interrupts[0]["data"].get("card") == "model-choice"
+            and len(cards) == 3
+            and [c.get("name") for c in cards] == [c.get("name") for c in expected_cards],
+            f"HTTP {status} interrupts={len(interrupts)} cards={[c.get('name') for c in cards]}",
+        )
         upstream.tool_name = None
         upstream.tool_args = '{"unused": true}'
 
@@ -1192,6 +1219,38 @@ def tests_dsh() -> None:
             )
         finally:
             negative.stop()
+
+        # 自动路由：不设 MMS_CORE 时默认 DSH；离线演示固定走 python，不需要 Key 与 dsh 对话。
+        auto = Channel(
+            fake=True,
+            env_extra={"MMS_CORE": "", "MMS_DSH_HOME": str(home), "MMS_DATA_DIR": str(workdir)},
+        )
+        try:
+            status, health_auto = auto.json("GET", "/health")
+            check(
+                "D9 未指定内核时 /health 报 dsh",
+                status == 200 and health_auto.get("core") == "dsh",
+                f"HTTP {status} {health_auto}",
+            )
+            status, started_auto = auto.start_chat(
+                {
+                    "providerId": "fake",
+                    "model": "fake-stream",
+                    "messages": [{"role": "user", "content": "离线演示"}],
+                }
+            )
+            auto_events, auto_raw = auto.events(started_auto.get("chatId", ""))
+            check(
+                "D9 离线演示自动落到 python 并跑完",
+                status == 200
+                and bool(auto_events)
+                and auto_events[-1]["event"] == "done"
+                and auto_events[-1]["data"].get("reason") == "stop"
+                and SENTINEL not in auto_raw,
+                f"HTTP {status} tail={auto_events[-1] if auto_events else None}",
+            )
+        finally:
+            auto.stop()
     finally:
         if channel is not None:
             channel.stop()

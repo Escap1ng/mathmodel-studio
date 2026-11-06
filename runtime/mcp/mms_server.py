@@ -24,7 +24,31 @@ TOOLS = [
         "name": "list_templates",
         "description": "列出本机技能内置的图表与示意图模板（只读注册表，不渲染）。",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-    }
+    },
+    {
+        "name": "suggest_models",
+        "description": (
+            "用户讨论该用什么模型/方法时调用：向界面推送三张可选模型卡，由用户自己点选。"
+            "用户要求换一批时，把 batch 加 1 再调用；不要替用户做选择，也不要编造用户已选。"
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "要建模的子问题或用户原话；必填。",
+                },
+                "batch": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9,
+                    "description": "第几批候选，默认 1；换一批时递增。",
+                },
+            },
+            "required": ["question"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 
@@ -84,6 +108,26 @@ def list_templates() -> dict:
     return result
 
 
+def suggest_models(args: dict) -> dict:
+    question = str(args.get("question") or "").strip()
+    if not question:
+        return {"ok": False, "error": "缺少建模问题文本"}
+    try:
+        batch = int(args.get("batch") or 1)
+    except (TypeError, ValueError):
+        batch = 1
+    batch = min(max(batch, 1), 9)
+    src = _root() / "runtime" / "src"
+    if str(src) not in sys.path:
+        sys.path.insert(0, str(src))
+    try:
+        from mms import orchestrator
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"无法加载方法库：{exc}"}
+    candidates = orchestrator.model_candidates(question, batch)
+    return {"ok": True, "batch": batch, "candidates": candidates}
+
+
 def send(payload: dict) -> None:
     sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
     sys.stdout.flush()
@@ -129,7 +173,12 @@ def main() -> int:
         if method == "tools/call":
             params = message.get("params") or {}
             name = str(params.get("name") or "")
-            if name != "list_templates":
+            args = params.get("arguments") if isinstance(params.get("arguments"), dict) else {}
+            if name == "list_templates":
+                result = list_templates()
+            elif name == "suggest_models":
+                result = suggest_models(args)
+            else:
                 send(
                     {
                         "jsonrpc": "2.0",
@@ -138,7 +187,6 @@ def main() -> int:
                     }
                 )
                 continue
-            result = list_templates()
             send(
                 {
                     "jsonrpc": "2.0",

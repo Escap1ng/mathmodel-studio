@@ -2,7 +2,6 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ReasoningSpec } from '../shared/api'
-import type { ChatCore } from './settings'
 
 // 与 runtime/src/mms/server.py 的握手契约。渲染层永远拿不到 port 与 token。
 export interface ChannelHandshake {
@@ -58,10 +57,6 @@ function dshBin(root: string): string | null {
   return null
 }
 
-function coreFrom(value: string | undefined): ChatCore | null {
-  return value === 'python' || value === 'dsh' ? value : null
-}
-
 export class Channel {
   private child: ChildProcessWithoutNullStreams | null = null
   private handshake: ChannelHandshake | null = null
@@ -73,17 +68,8 @@ export class Channel {
   constructor(
     private readonly root: string,
     private readonly python: string,
-    private readonly dataDir?: string,
-    private core: ChatCore = 'python'
+    private readonly dataDir?: string
   ) {}
-
-  setCore(core: ChatCore): void {
-    this.core = core
-  }
-
-  coreName(): ChatCore {
-    return coreFrom(process.env['MMS_CORE']) ?? this.core
-  }
 
   onStatus(cb: (s: RuntimeStatus) => void): () => void {
     this.listeners.add(cb)
@@ -123,8 +109,7 @@ export class Channel {
         ...process.env,
         MMS_HOME: this.root,
         ...(this.dataDir ? { MMS_DATA_DIR: this.dataDir } : {}),
-        // 环境变量显式设置时优先，留给开发与自检；否则用设置里的内核
-        MMS_CORE: this.coreName(),
+        // 内核由 runtime 自动路由（真实服务商走 DSH，离线演示走 python），这里不再注入 MMS_CORE
         ...(this.dataDir ? { MMS_DSH_HOME: join(this.dataDir, 'dsh') } : {}),
         MMS_DSH_PROFILE: 'mms',
         MMS_PYTHON: this.python,

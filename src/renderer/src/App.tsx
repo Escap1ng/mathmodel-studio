@@ -407,7 +407,6 @@ export default function App() {
   const canSend =
     runtime.state === 'ready' &&
     Boolean(provider) &&
-    !provider?.unavailable &&
     (!provider?.requiresKey || Boolean(provider?.configured))
 
   const conversations = useMemo<ConversationItem[]>(() => {

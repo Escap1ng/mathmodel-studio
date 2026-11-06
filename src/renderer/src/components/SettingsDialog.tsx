@@ -33,34 +33,6 @@ export default function SettingsDialog({ list, onClose, onChanged }: Props) {
   const [sendThinking, setSendThinking] = useState(view?.sendThinking ?? true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [core, setCore] = useState<'python' | 'dsh' | null>(null)
-  const [coreBusy, setCoreBusy] = useState(false)
-
-  useEffect(() => {
-    let alive = true
-    window.studio.chat
-      .getCore()
-      .then((value) => {
-        if (alive) setCore(value)
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const pickCore = async (value: 'python' | 'dsh'): Promise<void> => {
-    if (coreBusy || value === core) return
-    setCoreBusy(true)
-    setError(null)
-    try {
-      setCore(await window.studio.chat.setCore(value))
-    } catch (err) {
-      setError(messageOf(err))
-    } finally {
-      setCoreBusy(false)
-    }
-  }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -142,7 +114,7 @@ export default function SettingsDialog({ list, onClose, onChanged }: Props) {
   }
 
   const canSave =
-    !view.unavailable && model.trim().length > 0 && (!view.custom || baseUrl.trim().length > 0)
+    model.trim().length > 0 && (!view.custom || baseUrl.trim().length > 0)
 
   return (
     <div
@@ -162,17 +134,11 @@ export default function SettingsDialog({ list, onClose, onChanged }: Props) {
                 type="button"
                 className="provider-chip provider-chip--row"
                 aria-pressed={p.id === view.id}
-                disabled={Boolean(p.unavailable)}
-                title={p.unavailable}
                 onClick={() => select(p.id)}
               >
                 <span className={`provider-chip__dot${p.configured ? ' is-on' : ''}`} aria-hidden="true" />
                 <span className="provider-chip__name">{p.display}</span>
-                {p.unavailable ? (
-                  <span className="provider-chip__state">不可用</span>
-                ) : p.configured ? (
-                  <span className="provider-chip__state">已保存</span>
-                ) : null}
+                {p.configured ? <span className="provider-chip__state">已保存</span> : null}
               </button>
             ))}
             <p className="settings__nav-note">
@@ -191,38 +157,6 @@ export default function SettingsDialog({ list, onClose, onChanged }: Props) {
             </header>
 
             <div className="settings__body">
-              <div className="field">
-                <span className="field__label">
-                  对话内核
-                  <span className="field__badge">{core === 'dsh' ? 'DSH' : 'Python'}</span>
-                </span>
-                <div className="seg" role="group" aria-label="对话内核">
-                  <button
-                    type="button"
-                    className="seg__btn"
-                    data-value="python"
-                    aria-pressed={core === 'python'}
-                    disabled={coreBusy || busy}
-                    onClick={() => void pickCore('python')}
-                  >
-                    Python
-                  </button>
-                  <button
-                    type="button"
-                    className="seg__btn"
-                    data-value="dsh"
-                    aria-pressed={core === 'dsh'}
-                    disabled={coreBusy || busy}
-                    onClick={() => void pickCore('dsh')}
-                  >
-                    DeepSeek Harness
-                  </button>
-                </div>
-                <span className="field__hint">
-                  切换后运行时立即重启，正在进行的对话会中断。DSH 为实验内核，工具与技能通过 MCP 提供。
-                </span>
-              </div>
-
               <div className="field">
                 <span className="field__label">模型</span>
                 <input

@@ -34,16 +34,13 @@ import {
   apiKeyFor,
   clearProviderKey,
   publicProviders,
-  saveChatCore,
-  savedChatCore,
   saveProvider,
-  type ChatCore,
   type SaveProviderInput
 } from './settings'
 
 // 开发时 electron-vite 会注入 ELECTRON_RENDERER_URL；打包后走 out/renderer/index.html。
 const DEV_SERVER_URL = process.env['ELECTRON_RENDERER_URL']
-const channel = new Channel(APP_ROOT, runtimePython(), app.getPath('userData'), savedChatCore())
+const channel = new Channel(APP_ROOT, runtimePython(), app.getPath('userData'))
 const activeStreams = new Map<string, AbortController>()
 
 type ChatInput = ChatStartInput
@@ -59,7 +56,6 @@ channel.onStatus(broadcastStatus)
 async function providerViews(): Promise<ProviderList> {
   const { providers, fake } = await channel.providers()
   const saved = publicProviders()
-  const core = channel.coreName()
   const views: ProviderView[] = providers.map((row: ProviderRow) => {
     const isFake = row.id === 'fake'
     const stored = saved[row.id]
@@ -74,8 +70,6 @@ async function providerViews(): Promise<ProviderList> {
       toolCalling: Boolean(row.tool_calling),
       custom: Boolean(row.custom),
       configured: isFake || Boolean(stored?.configured),
-      // 离线演示是 python 内核的本地假流；DSH 内核下明确禁用而不是让聊天开始后才 400。
-      ...(isFake && core === 'dsh' ? { unavailable: 'DSH 内核不支持离线演示，请选一个真实服务商或切回 Python 内核' } : {}),
       contextLimit: stored?.context ?? 200_000,
       contextMax: row.context_len ?? 1_000_000,
       modelContexts: row.model_context,
@@ -87,12 +81,11 @@ async function providerViews(): Promise<ProviderList> {
   })
   const preferred = activeProviderId()
   const active =
-    views.find((v) => v.id === preferred && !v.unavailable) ??
-    views.find((v) => v.configured && !v.unavailable) ??
-    views.find((v) => v.id === 'fake' && !v.unavailable) ??
-    views.find((v) => !v.unavailable) ??
+    views.find((v) => v.id === preferred) ??
+    views.find((v) => v.configured) ??
+    views.find((v) => v.id === 'fake') ??
     views[0]
-  return { ok: true, providers: views, activeProvider: active?.id ?? '', fake, core }
+  return { ok: true, providers: views, activeProvider: active?.id ?? '', fake }
 }
 
 function parseSaveInput(raw: unknown): SaveProviderInput {
@@ -206,17 +199,6 @@ ipcMain.handle('runtime:restart', async () => {
   return providerViews()
 })
 
-ipcMain.handle('chat:core:get', () => savedChatCore())
-
-ipcMain.handle('chat:core:set', async (_event, raw: unknown) => {
-  const core: ChatCore | null = raw === 'dsh' ? 'dsh' : raw === 'python' ? 'python' : null
-  if (!core) throw new Error('对话内核只能是 python / dsh')
-  saveChatCore(core)
-  channel.setCore(core)
-  await channel.restart()
-  return savedChatCore()
-})
-
 ipcMain.handle('providers:list', () => providerViews())
 
 ipcMain.handle('providers:save', async (_event, raw: unknown) => {
@@ -236,7 +218,6 @@ ipcMain.handle('chat:start', async (event, raw: unknown) => {
   const list = await providerViews()
   const view = list.providers.find((p) => p.id === input.providerId)
   if (!view) throw new Error('未知服务商')
-  if (view.unavailable) throw new Error(view.unavailable)
   if (view.custom && !view.baseUrl) throw new Error('自定义端点还没填 base URL')
   const apiKey = view.id === 'fake' ? '' : apiKeyFor(view.id)
   if (view.requiresKey && !apiKey) throw new Error('还没配置 API Key')
