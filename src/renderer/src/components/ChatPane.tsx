@@ -357,18 +357,20 @@ export default function ChatPane({
     event.preventDefault()
     const startY = event.clientY
     const startHeight = composerRef.current?.getBoundingClientRect().height ?? 140
+    let last = startHeight
     setResizingComposer(true)
     document.body.style.userSelect = 'none'
     const move = (moveEvent: PointerEvent): void => {
-      setComposerHeight(
-        clampComposerHeight(startHeight - (moveEvent.clientY - startY), chatRef.current)
-      )
+      // 拖动期间只写 DOM 高度：流式重渲不会回写这个值，拖动不被每帧 setEntries 卡住。
+      last = clampComposerHeight(startHeight - (moveEvent.clientY - startY), chatRef.current)
+      if (composerRef.current) composerRef.current.style.height = `${last}px`
     }
     const stop = (): void => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', stop)
       window.removeEventListener('pointercancel', stop)
       document.body.style.userSelect = ''
+      setComposerHeight(last)
       setResizingComposer(false)
     }
     window.addEventListener('pointermove', move)
