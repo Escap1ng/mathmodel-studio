@@ -311,7 +311,7 @@ export default function App() {
           const latestChat = localChats[0]
           if (latestChat && entriesRef.current.length === 0) {
             setEntries(latestChat.entries)
-            setMode('chat')
+            changeMode('chat')
             setActiveKind('chat')
             setActiveId(latestChat.id)
           }
@@ -322,7 +322,7 @@ export default function App() {
         sessionId.current = session.id
         setEntries(entriesFromSnapshot(session))
         setPhases(phaseMap(session))
-        setMode('workflow')
+        changeMode('workflow')
         setActiveKind('workflow')
         setActiveId(session.id)
       })
@@ -489,6 +489,13 @@ export default function App() {
   const selectedContextLabel = contextLabel(provider?.contextLimit ?? 200_000)
   const selectedDepthLabel = depthLabel(provider?.thinkingDepth ?? 'high')
 
+  // 切模式时右栏先给模式默认形态：问答收成图标条腾出对话宽度，建模要展开工作台。
+  // S2-3 会换成按模式分偏好并迁移旧键。
+  const changeMode = (next: 'workflow' | 'chat'): void => {
+    setMode(next)
+    setWorkspaceCollapsed(next === 'chat')
+  }
+
   const newConversation = (): void => {
     if (streaming) {
       setNotice('正在生成，先停止再新建会话')
@@ -527,7 +534,7 @@ export default function App() {
         activeAssistant.current = null
         setEntries(entriesFromSnapshot(session))
         setPhases(phaseMap(session))
-        setMode('workflow')
+        changeMode('workflow')
         setActiveKind('workflow')
         setActiveId(session.id)
       } catch (err) {
@@ -546,7 +553,7 @@ export default function App() {
     activeAssistant.current = null
     setEntries(chat.entries)
     setPhases({})
-    setMode('chat')
+    changeMode('chat')
     setActiveKind('chat')
     setActiveId(chat.id)
   }
@@ -907,6 +914,7 @@ export default function App() {
       ref={shellRef}
       data-resizing={resizingPane ? 'col' : undefined}
       data-pane={workspaceCollapsed ? 'collapsed' : 'expanded'}
+      data-mode={mode}
       style={paneWidth == null ? undefined : ({ '--pane-w': `${paneWidth}px` } as CSSProperties)}
     >
       <PhaseRail
@@ -936,7 +944,7 @@ export default function App() {
         depthLabel={selectedDepthLabel}
         usedTokens={usedTokens}
         trimNote={trimNote}
-        onModeChange={setMode}
+        onModeChange={changeMode}
         onSend={(text, extras) => void send(text, extras)}
         onRetry={retry}
         onStop={stop}
