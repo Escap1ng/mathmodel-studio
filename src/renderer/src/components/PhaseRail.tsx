@@ -40,6 +40,9 @@ export default function PhaseRail({
   const [asking, setAsking] = useState<string | null>(null)
   const [askClear, setAskClear] = useState(false)
   const timer = useRef(0)
+  // 进入数模瞬间给一次圆点逐个点亮：只播一遍，播完回到实时状态色。
+  const [phasesEntering, setPhasesEntering] = useState(false)
+  const prevMode = useRef(mode)
 
   useEffect(
     () => () => {
@@ -47,6 +50,15 @@ export default function PhaseRail({
     },
     []
   )
+
+  useEffect(() => {
+    const was = prevMode.current
+    prevMode.current = mode
+    if (was === 'workflow' || mode !== 'workflow') return
+    setPhasesEntering(true)
+    const stagger = window.setTimeout(() => setPhasesEntering(false), 700)
+    return () => window.clearTimeout(stagger)
+  }, [mode])
 
   const arm = (key: string): void => {
     setAsking(key)
@@ -184,7 +196,7 @@ export default function PhaseRail({
               {summary}
             </p>
           </div>
-          <div className="phases">
+          <div className="phases" data-entering={phasesEntering ? 'true' : undefined}>
             {PHASES.map((p) => {
               const state = states[p.num] ?? 'idle'
               return (
