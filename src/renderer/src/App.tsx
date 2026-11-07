@@ -974,6 +974,7 @@ export default function App() {
       style={paneWidth == null ? undefined : ({ '--pane-w': `${paneWidth}px` } as CSSProperties)}
     >
       <PhaseRail
+        mode={mode}
         states={phases}
         current={currentPhase}
         conversations={conversations}

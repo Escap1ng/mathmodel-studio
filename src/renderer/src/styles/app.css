@@ -49,6 +49,11 @@ button {
   transition: grid-template-columns var(--t-layout) var(--ease-emphasized);
 }
 
+/* 左栏的内容换手（会话列表 ⇄ 阶段轨道）跟着同一拍变形 */
+.shell[data-mode-animating='true'] .rail {
+  transition: grid-template-rows var(--t-layout) var(--ease-emphasized);
+}
+
 .shell[data-mode-animating='true'] .splitter--col {
   pointer-events: none;
 }
@@ -144,11 +149,46 @@ button {
   grid-row: 1;
   grid-column: 1;
   border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr);
   min-height: 0;
   background: var(--bg);
 }
+
+/* 左栏变阵：内容都不卸载，只是两种内容轮流 0fr/1fr。
+   chat 露会话列表、阶段轨道收起；workflow 反过来；
+   workflow 里再点「会话列表」可临时展开为整栏。 */
+.rail[data-mode='chat'],
+.rail[data-mode='workflow'][data-convs-open='true'] {
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 0fr);
+}
+
+.rail[data-mode='workflow'][data-convs-open='false'] {
+  grid-template-rows: auto auto minmax(0, 0fr) minmax(0, 1fr);
+}
+
+.rail__convs,
+.rail__phases {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rail__convs-inner,
+.rail__phases-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rail__convs-toggle {
+  margin-left: auto;
+}
+
+/* ——— 会话列表折叠容器 ——— */
 
 .rail__head {
   padding: 14px 16px 10px;
@@ -1722,10 +1762,8 @@ button:disabled {
   color: var(--accent);
 }
 
-.rail__convs {
-  flex: 0 1 auto;
-  max-height: 46%;
-  min-height: 0;
+/* 列表本体滚到内层：外层折叠容器已收走尺寸控制 */
+.rail__convs-inner {
   overflow: auto;
   padding: 8px 8px 6px;
 }
@@ -1855,7 +1893,7 @@ button:disabled {
 
 .phases {
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 0;
 }
 
 /* —— 中栏会话头 —— */
