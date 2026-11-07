@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ClipboardEvent as ReactClipboardEvent,
   CSSProperties,
@@ -274,6 +274,10 @@ export default function ChatPane({
   const handleRetry = useCallback((): void => {
     handlers.current.onRetry()
   }, [])
+  const rounds = useMemo(
+    () => entries.reduce((count, entry) => (entry.role === 'user' ? count + 1 : count), 0),
+    [entries]
+  )
   const ready = runtime.state === 'ready'
   const phaseDef = PHASES.find((p) => p.num === currentPhase)
   const phaseText = phaseDef
@@ -627,9 +631,7 @@ export default function ChatPane({
             title="按估算 token 显示；历史回放按这个预算截断，不是模型硬上限"
           >
             上下文约 {formatTokens(usedTokens)} / {contextLabel}
-            {entries.some((entry) => entry.role === 'user')
-              ? ` · ${entries.filter((entry) => entry.role === 'user').length} 轮`
-              : ''}
+            {rounds > 0 ? ` · ${rounds} 轮` : ''}
           </span>
           {entries.length > 0 ? (
             <button type="button" className="linkbtn" data-action="clear-current" onClick={onClearCurrent}>
