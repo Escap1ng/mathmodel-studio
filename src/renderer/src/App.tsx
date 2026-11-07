@@ -827,9 +827,13 @@ export default function App() {
         ? '运行时启动中'
         : '运行时未连接'
 
-  const pendingCard = [...entries]
-    .reverse()
-    .find((entry) => entry.interrupt && !entry.interrupt.resolved)?.interrupt
+  const pendingCard = useMemo(() => {
+    for (let index = entries.length - 1; index >= 0; index--) {
+      const entry = entries[index]
+      if (entry.interrupt && !entry.interrupt.resolved) return entry.interrupt
+    }
+    return null
+  }, [entries])
   const pending = Boolean(pendingCard)
   const currentPhase = currentPhaseOf(phases)
   const measuredPane = (): number =>

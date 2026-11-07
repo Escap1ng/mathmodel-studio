@@ -60,30 +60,41 @@ export function formatTokens(tokens: number): string {
 
 /**
  * 会话用量只做显示，按字符数直读，避免流式时每个 token 都把整段历史重扫一遍。
+ * 条目不可变，单条结果按引用缓存在 WeakMap：流式期间只有活跃条目重算，
+ * 历史条目不再重复 JSON.stringify 工具参数。
  * 回放预算（fitHistory）仍用 estimateTokens，与原文字节分类一致。
  */
-export function conversationTokens(entries: ChatEntry[]): number {
-  let total = 0
-  for (const entry of entries) {
-    if (entry.role === 'user') {
-      const text = entry.context ?? entry.parts.map((p) => (p.kind === 'text' ? p.text : '')).join('')
-      total += text.length
-    } else {
-      total += assistantText(entry).length + entry.reasoning.length
-      for (const part of entry.parts) {
-        if (part.kind === 'tool') {
-          try {
-            total += JSON.stringify(part.tool.args ?? {}).length
-            if (part.tool.result !== undefined) {
-              total += JSON.stringify(part.tool.result).length
-            }
-          } catch {
-            /* 序列化不了的参数不计入，估算只用于显示 */
+const entryCharCache = new WeakMap<ChatEntry, number>()
+
+function entryCharCount(entry: ChatEntry): number {
+  const cached = entryCharCache.get(entry)
+  if (cached !== undefined) return cached
+  let count = 0
+  if (entry.role === 'user') {
+    const text = entry.context ?? entry.parts.map((p) => (p.kind === 'text' ? p.text : '')).join('')
+    count = text.length
+  } else {
+    count = assistantText(entry).length + entry.reasoning.length
+    for (const part of entry.parts) {
+      if (part.kind === 'tool') {
+        try {
+          count += JSON.stringify(part.tool.args ?? {}).length
+          if (part.tool.result !== undefined) {
+            count += JSON.stringify(part.tool.result).length
           }
+        } catch {
+          /* 序列化不了的参数不计入，估算只用于显示 */
         }
       }
     }
   }
+  entryCharCache.set(entry, count)
+  return count
+}
+
+export function conversationTokens(entries: ChatEntry[]): number {
+  let total = 0
+  for (const entry of entries) total += entryCharCount(entry)
   return total
 }
 
