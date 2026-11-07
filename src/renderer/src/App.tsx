@@ -860,17 +860,21 @@ export default function App() {
     const startX = event.clientX
     const startWidth = measuredPane()
     const rail = measuredRail()
+    let last = startWidth
     setResizingPane(true)
     document.body.style.userSelect = 'none'
     const move = (moveEvent: PointerEvent): void => {
       positionGrip(handle, moveEvent.clientY)
-      setPaneWidth(clampPaneWidth(startWidth - (moveEvent.clientX - startX), rail))
+      // 拖动期间只写 DOM 变量：流式重渲不会回写这个值，拖动不被每帧 setEntries 卡住。
+      last = clampPaneWidth(startWidth - (moveEvent.clientX - startX), rail)
+      shellRef.current?.style.setProperty('--pane-w', `${last}px`)
     }
     const stop = (): void => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', stop)
       window.removeEventListener('pointercancel', stop)
       document.body.style.userSelect = ''
+      setPaneWidth(last)
       setResizingPane(false)
     }
     window.addEventListener('pointermove', move)
