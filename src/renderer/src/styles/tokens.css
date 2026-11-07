@@ -34,8 +34,11 @@
   --font-cjk: 'HarmonyOS Sans SC', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-mono: 'Maple Mono NF CN', 'JetBrains Mono', 'Cascadia Mono', ui-monospace, 'SFMono-Regular', monospace;
 
-  /* 只做状态变化，不做常驻动画 */
+  /* 状态过渡 + 等待期动画；所有 keyframes 都在 prefers-reduced-motion 下归零 */
   --t: 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  --t-layout: 400ms;
+  --ease-emphasized: cubic-bezier(0.3, 0.9, 0.25, 1);
+  --stagger: 40ms;
 
   --rail-w: 240px;
   --pane-w: 440px;
