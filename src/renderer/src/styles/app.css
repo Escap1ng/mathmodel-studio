@@ -1367,6 +1367,45 @@ button:disabled {
   }
 }
 
+/* 进入数模时的逐个点亮：一次性播报当前到哪儿了，播完回落到状态色 */
+.phases[data-entering='true'] .phase:not([data-state='idle']) .phase__dot {
+  animation: phase-dot-flash 480ms ease-out both;
+}
+
+@keyframes phase-dot-flash {
+  0% {
+    transform: translateY(-1px) scale(0.4);
+    opacity: 0.15;
+  }
+  60% {
+    transform: translateY(-1px) scale(1.35);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-1px) scale(1);
+    opacity: 1;
+  }
+}
+
+.phases[data-entering='true'] .phase:nth-child(2):not([data-state='idle']) .phase__dot {
+  animation-delay: calc(1 * var(--stagger));
+}
+.phases[data-entering='true'] .phase:nth-child(3):not([data-state='idle']) .phase__dot {
+  animation-delay: calc(2 * var(--stagger));
+}
+.phases[data-entering='true'] .phase:nth-child(4):not([data-state='idle']) .phase__dot {
+  animation-delay: calc(3 * var(--stagger));
+}
+.phases[data-entering='true'] .phase:nth-child(5):not([data-state='idle']) .phase__dot {
+  animation-delay: calc(4 * var(--stagger));
+}
+.phases[data-entering='true'] .phase:nth-child(6):not([data-state='idle']) .phase__dot {
+  animation-delay: calc(5 * var(--stagger));
+}
+.phases[data-entering='true'] .phase:nth-child(7):not([data-state='idle']) .phase__dot {
+  animation-delay: calc(6 * var(--stagger));
+}
+
 .phase--passed .phase__dot {
   border-color: var(--ok);
   background: var(--ok);
