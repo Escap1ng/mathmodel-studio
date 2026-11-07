@@ -44,6 +44,15 @@ button {
   touch-action: none;
 }
 
+/* 只在模式切换的瞬间变形；手动收合与拖拽没有这个类，永远即时 */
+.shell[data-mode-animating='true'] {
+  transition: grid-template-columns var(--t-layout) var(--ease-emphasized);
+}
+
+.shell[data-mode-animating='true'] .splitter--col {
+  pointer-events: none;
+}
+
 .splitter::after {
   content: '';
   position: absolute;
