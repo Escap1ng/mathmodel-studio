@@ -278,6 +278,51 @@ export default function ChatPane({
     () => entries.reduce((count, entry) => (entry.role === 'user' ? count + 1 : count), 0),
     [entries]
   )
+  // 距底 80px 内算「停在底部」；流式推进时只有停在底部才跟随，否则挂起浮钮提示。
+  const [atBottom, setAtBottom] = useState(true)
+  const atBottomRef = useRef(true)
+  const [hasNew, setHasNew] = useState(false)
+  const firstIdRef = useRef<string | null>(null)
+
+  const onStreamScroll = (): void => {
+    const el = streamRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    if (near !== atBottomRef.current) {
+      atBottomRef.current = near
+      setAtBottom(near)
+      if (near) setHasNew(false)
+    }
+  }
+
+  const jumpToBottom = (): void => {
+    const el = streamRef.current
+    if (!el) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollTo({ top: el.scrollHeight, behavior: reduce ? 'auto' : 'smooth' })
+    atBottomRef.current = true
+    setAtBottom(true)
+    setHasNew(false)
+  }
+
+  useEffect(() => {
+    const el = streamRef.current
+    if (!el) return
+    const firstId = entries[0]?.id ?? null
+    const switched = firstId !== firstIdRef.current
+    firstIdRef.current = firstId
+    // 刚切会话，或最后一条是自己发出的：总是到底。流式推进只跟随本来就停在底部的人。
+    if (switched || entries[entries.length - 1]?.role === 'user') {
+      atBottomRef.current = true
+      setAtBottom(true)
+      setHasNew(false)
+      el.scrollTop = el.scrollHeight
+      return
+    }
+    if (atBottomRef.current) el.scrollTop = el.scrollHeight
+    else setHasNew(true)
+  }, [entries])
+
   const ready = runtime.state === 'ready'
   const phaseDef = PHASES.find((p) => p.num === currentPhase)
   const phaseText = phaseDef
@@ -285,11 +330,6 @@ export default function ChatPane({
     : '阶段零 · 待开始'
   const blocked = mode === 'workflow' && pending
   const sendDisabled = !canSend || blocked || attaching
-
-  useEffect(() => {
-    const el = streamRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [entries])
 
   useEffect(() => {
     try {
@@ -641,39 +681,52 @@ export default function ChatPane({
         </div>
       </header>
 
-      <div className="chat__stream" ref={streamRef}>
-        <div className="chat__column">
-          {entries.length === 0 ? (
-            <DropZone
-              files={files}
-              rejected={rejected}
-              failure={attachError}
-              dragging={dragging}
-              busy={staging}
-              onPick={() => void pick()}
-              onRemove={remove}
-              onReveal={reveal}
-            />
-          ) : (
-            <div className="messages" aria-live="polite">
-              {entries.map((entry) =>
-                entry.notice ? (
-                  <div className="msg-divider" key={entry.id} role="note">
-                    <span>{entry.notice}</span>
-                  </div>
-                ) : (
-                  <EntryView
-                    key={entry.id}
-                    entry={entry}
-                    onDecision={handleDecision}
-                    onExplain={handleExplain}
-                    onRetry={entry.error && mode === 'chat' ? handleRetry : undefined}
-                  />
-                )
-              )}
-            </div>
-          )}
+      <div className="chat__streamwrap">
+        <div className="chat__stream" ref={streamRef} onScroll={onStreamScroll}>
+          <div className="chat__column">
+            {entries.length === 0 ? (
+              <DropZone
+                files={files}
+                rejected={rejected}
+                failure={attachError}
+                dragging={dragging}
+                busy={staging}
+                onPick={() => void pick()}
+                onRemove={remove}
+                onReveal={reveal}
+              />
+            ) : (
+              <div className="messages" aria-live="polite">
+                {entries.map((entry) =>
+                  entry.notice ? (
+                    <div className="msg-divider" key={entry.id} role="note">
+                      <span>{entry.notice}</span>
+                    </div>
+                  ) : (
+                    <EntryView
+                      key={entry.id}
+                      entry={entry}
+                      onDecision={handleDecision}
+                      onExplain={handleExplain}
+                      onRetry={entry.error && mode === 'chat' ? handleRetry : undefined}
+                    />
+                  )
+                )}
+              </div>
+            )}
+          </div>
         </div>
+        {!atBottom ? (
+          <button
+            type="button"
+            className="chat__jump"
+            data-action="jump-bottom"
+            data-new={hasNew ? 'true' : undefined}
+            onClick={jumpToBottom}
+          >
+            {hasNew ? '有新内容 · 回到底部' : '回到底部'}
+          </button>
+        ) : null}
       </div>
 
       {dragging && entries.length > 0 ? (
