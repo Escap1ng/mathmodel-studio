@@ -496,6 +496,36 @@ export default function App() {
     setWorkspaceCollapsed(next === 'chat')
   }
 
+  // 列宽过渡只在模式切换的瞬间存在：手动收合（toggleWorkspace）与拖拽都不设它，保持即时。
+  const [modeAnimating, setModeAnimating] = useState(false)
+  const firstModeRun = useRef(true)
+  useEffect(() => {
+    if (firstModeRun.current) {
+      firstModeRun.current = false
+      return
+    }
+    setModeAnimating(true)
+    let settled = false
+    let timer = 0
+    const finish = (): void => {
+      if (settled) return
+      settled = true
+      setModeAnimating(false)
+      window.clearTimeout(timer)
+    }
+    const el = shellRef.current
+    // transitionend 可能被中断丢失，480ms 兜底与 --t-layout:400ms 对齐。
+    timer = window.setTimeout(finish, 480)
+    const onEnd = (event: TransitionEvent): void => {
+      if (event.target === el && event.propertyName === 'grid-template-columns') finish()
+    }
+    el?.addEventListener('transitionend', onEnd)
+    return () => {
+      window.clearTimeout(timer)
+      el?.removeEventListener('transitionend', onEnd)
+    }
+  }, [mode])
+
   const newConversation = (): void => {
     if (streaming) {
       setNotice('正在生成，先停止再新建会话')
@@ -915,6 +945,7 @@ export default function App() {
       data-resizing={resizingPane ? 'col' : undefined}
       data-pane={workspaceCollapsed ? 'collapsed' : 'expanded'}
       data-mode={mode}
+      data-mode-animating={modeAnimating ? 'true' : undefined}
       style={paneWidth == null ? undefined : ({ '--pane-w': `${paneWidth}px` } as CSSProperties)}
     >
       <PhaseRail
