@@ -561,6 +561,7 @@ export default function App() {
     dropTokens()
     setEntries([])
     setPhases({})
+    changeMode('chat')
     setActiveKind(null)
     setActiveId(null)
     setTrimNote(null)
