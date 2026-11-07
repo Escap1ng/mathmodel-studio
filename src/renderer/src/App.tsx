@@ -43,7 +43,38 @@ const PANE_MIN = 380
 const PANE_MAX = 1100
 const CHAT_MIN = 480
 const PANE_STORAGE_KEY = 'mms.paneWidth'
-const WORKSPACE_COLLAPSE_KEY = 'mms.workspaceCollapsed'
+// 收合偏好按模式分开记；旧单键启动时迁移，迁移完即删。
+const LEGACY_COLLAPSE_KEY = 'mms.workspaceCollapsed'
+const COLLAPSE_KEYS: Record<'workflow' | 'chat', string> = {
+  workflow: 'mms.workspaceCollapsed.workflow',
+  chat: 'mms.workspaceCollapsed.chat'
+}
+
+type CollapseByMode = Record<'workflow' | 'chat', boolean>
+
+function readWorkspaceCollapse(): CollapseByMode {
+  const defaults: CollapseByMode = { workflow: false, chat: true }
+  try {
+    const legacy = window.localStorage.getItem(LEGACY_COLLAPSE_KEY)
+    if (legacy != null) {
+      // 旧键不分模式，两模式先各承接一份；用户手动 toggle 后自然会走各自的键。
+      const value = legacy === '1'
+      const next: CollapseByMode = { workflow: value, chat: value }
+      window.localStorage.removeItem(LEGACY_COLLAPSE_KEY)
+      for (const mode of ['workflow', 'chat'] as const) {
+        window.localStorage.setItem(COLLAPSE_KEYS[mode], next[mode] ? '1' : '0')
+      }
+      return next
+    }
+    const read = (mode: 'workflow' | 'chat'): boolean => {
+      const raw = window.localStorage.getItem(COLLAPSE_KEYS[mode])
+      return raw == null ? defaults[mode] : raw === '1'
+    }
+    return { workflow: read('workflow'), chat: read('chat') }
+  } catch {
+    return { workflow: false, chat: true }
+  }
+}
 
 function clampPaneWidth(width: number, rail = RAIL_WIDTH): number {
   const max = Math.min(PANE_MAX, Math.max(PANE_MIN, window.innerWidth - rail - CHAT_MIN))
@@ -64,14 +95,6 @@ function positionGrip(element: HTMLElement, clientY: number): void {
   const rect = element.getBoundingClientRect()
   const y = Math.min(Math.max(24, clientY - rect.top), Math.max(24, rect.height - 24))
   element.style.setProperty('--grip-y', `${Math.round(y)}px`)
-}
-
-function readWorkspaceCollapsed(): boolean {
-  try {
-    return window.localStorage.getItem(WORKSPACE_COLLAPSE_KEY) === '1'
-  } catch {
-    return false
-  }
 }
 
 function titleFromProblem(problem: string): string {
@@ -154,7 +177,8 @@ export default function App() {
   const [explain, setExplain] = useState<ModelCandidate | null>(null)
   const [paneWidth, setPaneWidth] = useState<number | null>(readPaneWidth)
   const [resizingPane, setResizingPane] = useState(false)
-  const [workspaceCollapsed, setWorkspaceCollapsed] = useState(readWorkspaceCollapsed)
+  const [collapseByMode, setCollapseByMode] = useState<CollapseByMode>(readWorkspaceCollapse)
+  const workspaceCollapsed = collapseByMode[mode]
   const [localChats, setLocalChats] = useState<ChatConversation[]>(loadChatConversations)
   // 本地会话列表的镜像：落盘需要最新列表但不适合进 effect 依赖。
   const localChatsRef = useRef<ChatConversation[]>([])
@@ -187,11 +211,12 @@ export default function App() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(WORKSPACE_COLLAPSE_KEY, workspaceCollapsed ? '1' : '0')
+      // 只写当前模式的键；另一模式的偏好原样保留。
+      window.localStorage.setItem(COLLAPSE_KEYS[mode], collapseByMode[mode] ? '1' : '0')
     } catch {
       /* 本地存储不可用时只保留本次会话内的状态 */
     }
-  }, [workspaceCollapsed])
+  }, [collapseByMode, mode])
 
   const refreshSessions = async (): Promise<void> => {
     if (runtime.state !== 'ready') return
@@ -489,11 +514,10 @@ export default function App() {
   const selectedContextLabel = contextLabel(provider?.contextLimit ?? 200_000)
   const selectedDepthLabel = depthLabel(provider?.thinkingDepth ?? 'high')
 
-  // 切模式时右栏先给模式默认形态：问答收成图标条腾出对话宽度，建模要展开工作台。
-  // S2-3 会换成按模式分偏好并迁移旧键。
+  // 切模式恢复各自已记住的右栏形态（collapseByMode 初始默认即问答收起、建模展开）；
+  // 模式内手动 toggle 只写当前模式的键。
   const changeMode = (next: 'workflow' | 'chat'): void => {
     setMode(next)
-    setWorkspaceCollapsed(next === 'chat')
   }
 
   // 列宽过渡只在模式切换的瞬间存在：手动收合（toggleWorkspace）与拖拽都不设它，保持即时。
@@ -936,7 +960,8 @@ export default function App() {
   const onGripMove = (event: ReactPointerEvent<HTMLDivElement>): void =>
     positionGrip(event.currentTarget, event.clientY)
 
-  const toggleWorkspace = (): void => setWorkspaceCollapsed((value) => !value)
+  const toggleWorkspace = (): void =>
+    setCollapseByMode((prev) => ({ ...prev, [mode]: !prev[mode] }))
 
   return (
     <div
