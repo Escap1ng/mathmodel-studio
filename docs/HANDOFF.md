@@ -149,7 +149,7 @@ CI：<https://github.com/Escap1ng/mathmodel-studio/actions>。0.1.0 尚未在 CI
 **近期新增的坑**：
 
 - `capturePage()` 在窗口被遮挡时会抛 `UnknownVizError`，G7 的截图全部走 `capture(win)` 重试封装。
-- 会话列表有两套来源：`GET /sessions` 只返回建模会话摘要，问答会话在渲染层 `localStorage`（`mms.chatConversations.v1`）。清空历史必须两边一起删。
+- 会话列表有两套来源：`GET /sessions` 只返回建模会话摘要，问答会话在渲染层 `localStorage`（索引 `mms.chatConversations.index.v2` + 每篇分片 `mms.chatConv.<id>`；旧单键 `mms.chatConversations.v1` 启动时自动迁移，迁移不完整时旧键保留）。清空历史必须两边一起删。
 - 上下文估算在 TS（`lib/context.ts`）与 Python（`server.py` 的 `estimate_tokens`）各有一份；改公式必须两边同步。
 - 左栏宽度 240px、`.tab` 7 个是 G6b 点名项；右栏分组用 `.tabs__group`/`.tabs__label`。
 - 面板标题与门禁条已并入栏头/`.panel__bar`；门禁页 `[data-gate-row]` 仍必须 4 条。

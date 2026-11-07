@@ -156,6 +156,9 @@ export default function App() {
   const [resizingPane, setResizingPane] = useState(false)
   const [workspaceCollapsed, setWorkspaceCollapsed] = useState(readWorkspaceCollapsed)
   const [localChats, setLocalChats] = useState<ChatConversation[]>(loadChatConversations)
+  // 本地会话列表的镜像：落盘需要最新列表但不适合进 effect 依赖。
+  const localChatsRef = useRef<ChatConversation[]>([])
+  localChatsRef.current = localChats
   const [remoteSessions, setRemoteSessions] = useState<SessionSummary[]>([])
   const [activeKind, setActiveKind] = useState<ConversationKind | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -219,7 +222,9 @@ export default function App() {
     if (mode !== 'chat' || streaming || activeKind !== 'chat' || !activeId || entries.length === 0) {
       return
     }
-    setLocalChats(saveChatConversation({ id: activeId, updatedAt: Date.now(), entries }))
+    setLocalChats(
+      saveChatConversation({ id: activeId, updatedAt: Date.now(), entries }, localChatsRef.current)
+    )
   }, [entries, streaming, mode, activeKind, activeId])
 
   useEffect(() => {
@@ -637,9 +642,15 @@ export default function App() {
       setActiveKind('chat')
       setActiveId(chatConvId)
       // 先把用户问题落盘：流到一半关窗时，至少还能在列表里找回这一问。
-      setLocalChats(
-        saveChatConversation({ id: chatConvId, updatedAt: Date.now(), entries: nextEntries })
-      )
+      // 写盘挪到下一拍，先让内存里的列表用这一问渲染出来，避免发送瞬间卡在同步 IO。
+      window.setTimeout(() => {
+        setLocalChats(
+          saveChatConversation(
+            { id: chatConvId, updatedAt: Date.now(), entries: nextEntries },
+            localChatsRef.current
+          )
+        )
+      }, 0)
     }
 
     const input: ChatStartInput = {
