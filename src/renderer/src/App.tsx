@@ -327,8 +327,53 @@ export default function App() {
     }
   }, [runtime.state])
 
+  // 真实模型的 token 一帧可能来几十个；攒到同一帧只重渲一次，避免每个 token 都全树重排。
+  const tokQueue = useRef<ChatEvent[]>([])
+  const tokFrame = useRef(0)
+
+  const drainTokens = (): void => {
+    tokFrame.current = 0
+    const queue = tokQueue.current
+    if (queue.length === 0) return
+    tokQueue.current = []
+    const assistantId = activeAssistant.current
+    if (!assistantId) return
+    setEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== assistantId) return entry
+        let next = entry
+        for (const event of queue) next = applyChatEvent(next, event)
+        return next
+      })
+    )
+  }
+
+  const flushTokens = (): void => {
+    if (tokFrame.current) {
+      cancelAnimationFrame(tokFrame.current)
+      tokFrame.current = 0
+    }
+    drainTokens()
+  }
+
+  const dropTokens = (): void => {
+    if (tokFrame.current) {
+      cancelAnimationFrame(tokFrame.current)
+      tokFrame.current = 0
+    }
+    tokQueue.current = []
+  }
+
   const consume = (event: ChatEvent): boolean => {
     if (event.chatId !== activeChat.current) return false
+    if (event.event === 'token' || event.event === 'reasoning') {
+      if (!activeAssistant.current) return false
+      tokQueue.current.push(event)
+      if (!tokFrame.current) tokFrame.current = requestAnimationFrame(drainTokens)
+      return true
+    }
+    // 非增量事件（阶段、卡片、结束、错误）必须先落地已收到的文字，界面顺序才不会倒置。
+    flushTokens()
     if (event.event === 'phase') {
       const phase = event.data.phase
       const status = event.data.status
@@ -397,7 +442,10 @@ export default function App() {
       }
       consume(event)
     })
-    return off
+    return () => {
+      off()
+      dropTokens()
+    }
     // consume 只读 refs 与 setState，行为稳定；此处只订阅一次。
     // eslint 在本仓库未启用，避免把 refs 写进依赖导致反复退订。
   }, [])
@@ -444,6 +492,7 @@ export default function App() {
     sessionId.current = null
     activeChat.current = null
     activeAssistant.current = null
+    dropTokens()
     setEntries([])
     setPhases({})
     setActiveKind(null)
@@ -459,6 +508,7 @@ export default function App() {
     }
     setNotice(null)
     setTrimNote(null)
+    dropTokens()
     if (item.kind === 'workflow') {
       try {
         const { session } = await window.studio.session.get(item.id)
@@ -618,6 +668,7 @@ export default function App() {
       }
     } catch (err) {
       buffered.current.clear()
+      dropTokens()
       activeAssistant.current = null
       setStreaming(false)
       setEntries((prev) =>
@@ -704,6 +755,7 @@ export default function App() {
       }
     } catch (err) {
       buffered.current.clear()
+      dropTokens()
       activeChat.current = null
       activeAssistant.current = null
       setStreaming(false)
@@ -745,6 +797,7 @@ export default function App() {
     // 主进程会在 2 秒后断掉本地流；这里再兜一层，避免界面永远停在「生成中」。
     window.setTimeout(() => {
       if (activeChat.current !== chatId || !assistantId) return
+      dropTokens()
       activeChat.current = null
       activeAssistant.current = null
       setStreaming(false)
