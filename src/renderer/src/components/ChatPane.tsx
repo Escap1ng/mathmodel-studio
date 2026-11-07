@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type {
   ClipboardEvent as ReactClipboardEvent,
   CSSProperties,
@@ -138,7 +138,7 @@ function ToolCardView({ tool }: { tool: ToolCard }) {
   )
 }
 
-function EntryView({
+function EntryViewBase({
   entry,
   onDecision,
   onExplain,
@@ -220,6 +220,9 @@ function EntryView({
   )
 }
 
+// 条目不可变且回调引用稳定（见下），memo 让流式期间只有活跃条目重渲。
+const EntryView = memo(EntryViewBase)
+
 export default function ChatPane({
   runtime,
   provider,
@@ -259,6 +262,18 @@ export default function ChatPane({
   const [staging, setStaging] = useState(false)
   const [attaching, setAttaching] = useState(false)
   const stageLock = useRef(false)
+  // 决策/解释/重试经 latest ref 转发，别名引用不随渲染变化，EntryView 的 memo 才能命中。
+  const handlers = useRef({ onDecision, onExplain, onRetry })
+  handlers.current = { onDecision, onExplain, onRetry }
+  const handleDecision = useCallback((action: DecisionAction, choice?: string): void => {
+    handlers.current.onDecision(action, choice)
+  }, [])
+  const handleExplain = useCallback((candidate: ModelCandidate): void => {
+    handlers.current.onExplain(candidate)
+  }, [])
+  const handleRetry = useCallback((): void => {
+    handlers.current.onRetry()
+  }, [])
   const ready = runtime.state === 'ready'
   const phaseDef = PHASES.find((p) => p.num === currentPhase)
   const phaseText = phaseDef
@@ -648,9 +663,9 @@ export default function ChatPane({
                   <EntryView
                     key={entry.id}
                     entry={entry}
-                    onDecision={onDecision}
-                    onExplain={onExplain}
-                    onRetry={entry.error && mode === 'chat' ? onRetry : undefined}
+                    onDecision={handleDecision}
+                    onExplain={handleExplain}
+                    onRetry={entry.error && mode === 'chat' ? handleRetry : undefined}
                   />
                 )
               )}
