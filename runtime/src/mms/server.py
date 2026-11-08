@@ -27,7 +27,7 @@ from urllib.parse import parse_qs, urlparse
 from . import __version__, harness, orchestrator
 from .invoke import list_templates
 from .store import SessionStore, data_dir, session_scope, snapshot
-from . import paper_build, workbench_figure, workbench_score
+from . import paper_build, project_export, workbench_figure, workbench_score
 from .provider import (
     CancelledError,
     ProviderError,
@@ -724,6 +724,10 @@ class Handler(BaseHTTPRequestHandler):
             "gate": gate,
         }
 
+    def _workspace_for(self, session_id: str) -> str:
+        record = self.server.store.get(session_id) if session_id else None
+        return str((record or {}).get("workspace") or "")
+
     def _render_figure(self) -> None:
         body = self._body()
         if body is None:
@@ -738,6 +742,8 @@ class Handler(BaseHTTPRequestHandler):
         if code != 0:
             self._error(400, "figure", str(result.get("error") or "渲染失败"))
             return
+        outputs = (result.get("version") or {}).get("outputs") or {}
+        project_export.copy_outputs(self._workspace_for(session_id), "图表", outputs)
         self._json(200, {"ok": True, "version": result.get("version"), "state": self._workbench(session_id)})
 
     def _rollback_figure(self) -> None:
@@ -762,13 +768,20 @@ class Handler(BaseHTTPRequestHandler):
         code, result = paper_build.build(
             self._scoped_dir(session_id), self.server.root
         )
+        state = self._workbench(session_id)
+        deliverables = {
+            kind: str((row or {}).get("path") or "")
+            for kind, row in (state["paper"]["artifacts"] or {}).items()
+            if kind in ("pdf", "docx")
+        }
+        project_export.copy_outputs(self._workspace_for(session_id), "论文", deliverables)
         self._json(
             200,
             {
                 "ok": bool(result.get("ok")),
                 "code": code,
                 "paper": result,
-                "state": self._workbench(session_id),
+                "state": state,
             },
         )
 

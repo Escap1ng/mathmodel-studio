@@ -13,7 +13,7 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 
-from . import baseline, workbench_figure
+from . import baseline, project_export, workbench_figure
 from .store import SessionStore, session_scope
 
 PHASE_INTRO = "已收到题目。先按小节把题面拆开；确认题面后再进入算法选择。"
@@ -724,6 +724,8 @@ def _phase4(store: SessionStore, record: dict, picked: dict, workspace: str) -> 
         stderr=run.get("stderr") or "",
         label="基线",
     )
+    # 用户文件夹里的「图表」放最新的可读副本；写不进去只记日志，不影响阶段推进。
+    project_export.copy_outputs(workspace, "图表", version["outputs"])
     yield _tool(
         "p4-collect",
         "登记产物",

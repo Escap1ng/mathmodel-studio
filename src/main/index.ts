@@ -324,7 +324,7 @@ ipcMain.handle('files:context', (_event, raw: unknown) => attachmentContext(raw)
 
 ipcMain.handle('files:reveal', () => revealStaged())
 
-ipcMain.handle('workspace:get', () => listWorkspace())
+ipcMain.handle('workspace:get', (_event, raw: unknown) => listWorkspace(projectInfoFor(raw)?.path))
 
 ipcMain.handle('workspace:choose', (event) =>
   chooseWorkspace(BrowserWindow.fromWebContents(event.sender))

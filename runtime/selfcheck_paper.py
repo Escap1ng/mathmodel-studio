@@ -22,7 +22,7 @@ for _stream in (sys.stdout, sys.stderr):
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "runtime" / "src"))
 
-from mms import paper_build  # noqa: E402
+from mms import paper_build, project_export  # noqa: E402
 from mms.store import session_scope  # noqa: E402
 
 results: list[tuple[str, bool, str]] = []
@@ -86,6 +86,16 @@ def main() -> int:
             "P5 构建状态落盘并可复读",
             saved["ok"] and saved["builtAt"] and Path(saved["artifacts"]["pdf"]["path"]).is_file(),
             f"builtAt={saved['builtAt']} artifacts={sorted(saved['artifacts'])}",
+        )
+
+        deliverables = {"pdf": str(pdf), "docx": str(docx)}
+        for name in ("ws-a", "ws-b"):
+            project_export.copy_outputs(str(workdir / name), "论文", deliverables)
+        copied = {name: sorted(item.name for item in (workdir / name / "论文").iterdir()) for name in ("ws-a", "ws-b")}
+        check(
+            "P11 论文 PDF/DOCX 复制到各自赛题文件夹",
+            all(names == ["paper.docx", "paper.pdf"] for names in copied.values()),
+            str(copied),
         )
 
         old = os.environ.get("MMS_PANDOC")

@@ -45,12 +45,15 @@ export default function FilesPanel({ projectId }: { projectId: string | null }) 
   const [armed, setArmed] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
   const flashTimer = useRef<number | null>(null)
+  // 建模会话默认只看当前赛题：项目目录大起来后整棵工作区容易撞 400 项截断。
+  const [onlyProject, setOnlyProject] = useState(true)
+  const scoped = Boolean(projectId) && onlyProject
 
   const load = async (): Promise<void> => {
     setBusy(true)
     setError(null)
     try {
-      setListing(await window.studio.workspace.get())
+      setListing(await window.studio.workspace.get(scoped ? (projectId ?? undefined) : undefined))
     } catch (err) {
       setError(errorText(err))
     } finally {
@@ -65,11 +68,15 @@ export default function FilesPanel({ projectId }: { projectId: string | null }) 
       void load()
     }
     window.addEventListener('mms:workspace-changed', onChanged)
-    return () => {
-      window.removeEventListener('mms:workspace-changed', onChanged)
+    return () => window.removeEventListener('mms:workspace-changed', onChanged)
+  }, [projectId, onlyProject])
+
+  useEffect(
+    () => () => {
       if (flashTimer.current != null) window.clearTimeout(flashTimer.current)
-    }
-  }, [])
+    },
+    []
+  )
 
   useEffect(() => {
     let alive = true
@@ -195,6 +202,19 @@ export default function FilesPanel({ projectId }: { projectId: string | null }) 
         <span className="panel__meta">
           {listing ? `${files} 个文件${dirs > 0 ? ` · ${dirs} 个文件夹` : ''} · ${formatSize(listing.totalSize)}` : ''}
         </span>
+        {project ? (
+          <button
+            type="button"
+            className="files__scope"
+            data-action="files-scope"
+            data-on={scoped ? 'true' : 'false'}
+            aria-pressed={scoped}
+            title={scoped ? '切换到整个工作区' : '只看当前赛题文件夹'}
+            onClick={() => setOnlyProject((value) => !value)}
+          >
+            仅看当前赛题
+          </button>
+        ) : null}
       </div>
 
       <div className="files__path">
@@ -262,12 +282,12 @@ export default function FilesPanel({ projectId }: { projectId: string | null }) 
       {listing && listing.entries.length === 0 ? (
         <div className="panel__empty">
           <p>
-            <strong>工作区还是空的</strong>
+            <strong>{scoped ? '当前赛题文件夹还是空的' : '工作区还是空的'}</strong>
           </p>
           <ol className="empty-steps">
             <li>把赛题或数据文件拖进中栏大框</li>
             <li>副本会存到工作区的「附件/日期」文件夹</li>
-            <li>也可以直接把自己的文件放进工作区</li>
+            <li>{scoped ? '建模产物与附件会陆续收进当前赛题文件夹' : '也可以直接把自己的文件放进工作区'}</li>
           </ol>
           <button type="button" className="btn btn--ghost btn--sm" onClick={reveal}>
             打开文件夹

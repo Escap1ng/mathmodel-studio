@@ -75,7 +75,8 @@ const studioApi = {
   },
 
   workspace: {
-    get: (): Promise<WorkspaceListing> => ipcRenderer.invoke('workspace:get'),
+    get: (projectId?: string): Promise<WorkspaceListing> =>
+      ipcRenderer.invoke('workspace:get', projectId ?? ''),
     choose: (): Promise<WorkspaceListing | null> => ipcRenderer.invoke('workspace:choose'),
     reset: (): Promise<WorkspaceListing> => ipcRenderer.invoke('workspace:reset'),
     reveal: (): Promise<void> => ipcRenderer.invoke('workspace:reveal'),

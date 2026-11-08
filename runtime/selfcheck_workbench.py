@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import shutil
 import sqlite3
 import sys
@@ -23,7 +25,7 @@ for _stream in (sys.stdout, sys.stderr):
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "runtime" / "src"))
 
-from mms import workbench_figure, workbench_score  # noqa: E402
+from mms import project_export, workbench_figure, workbench_score  # noqa: E402
 from mms.store import SessionStore, session_scope  # noqa: E402
 
 results: list[tuple[str, bool, str]] = []
@@ -146,6 +148,27 @@ def main() -> int:
             and new_row is not None
             and new_row["workspace"] == str(workdir),
             f"old={(old_row or {}).get('workspace')} new={(new_row or {}).get('workspace')}",
+        )
+
+        # S7c：图表副本落进用户赛题文件夹；目标不可写只记日志、不抛错。
+        user_ws = workdir / "user-workspace"
+        scoped_outputs = scoped_state["versions"][-1]["outputs"]
+        project_export.copy_outputs(str(user_ws), "图表", scoped_outputs)
+        copied = sorted(item.name for item in (user_ws / "图表").iterdir())
+        check(
+            "W9 图表三件套复制到赛题文件夹",
+            set(copied) == {Path(path).name for path in scoped_outputs.values()},
+            f"copied={copied}",
+        )
+        blocked = workdir / "blocked-target"
+        blocked.write_text("x", encoding="utf-8")
+        quiet = io.StringIO()
+        with contextlib.redirect_stderr(quiet):
+            project_export.copy_outputs(str(blocked), "论文", scoped_outputs)
+        check(
+            "W9 目标不可写时静默跳过",
+            blocked.is_file() and "[export]" in quiet.getvalue(),
+            quiet.getvalue().strip()[:80],
         )
 
         score = workbench_score.state(ROOT)

@@ -152,6 +152,11 @@ export async function openProjectFolder(chatId: unknown): Promise<void> {
   if (error) throw new Error(error)
 }
 
+function insideOf(root: string, target: string): boolean {
+  const rel = relative(resolve(root), resolve(target))
+  return Boolean(rel) && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
 async function walk(dir: string, root: string, depth: number, out: WorkspaceEntry[]): Promise<void> {
   if (depth > MAX_DEPTH || out.length >= MAX_ENTRIES) return
   const items = await readdir(dir, { withFileTypes: true }).catch(() => [])
@@ -202,10 +207,13 @@ async function walk(dir: string, root: string, depth: number, out: WorkspaceEntr
   }
 }
 
-export async function listWorkspace(): Promise<WorkspaceListing> {
+export async function listWorkspace(scope?: unknown): Promise<WorkspaceListing> {
   const root = await ensureWorkspace()
+  // 文件页可只列当前赛题：入口只认工作区内的子目录，越界一律退回整棵工作区。
+  const scoped = typeof scope === 'string' ? scope : ''
+  const start = scoped && insideOf(root, scoped) ? scoped : root
   const entries: WorkspaceEntry[] = []
-  await walk(root, root, 1, entries)
+  await walk(start, root, 1, entries)
   const totalSize = entries.reduce((sum, entry) => (entry.kind === 'dir' ? sum : sum + entry.size), 0)
   return { ok: true, info: workspaceInfo(), entries, totalSize, truncated: entries.length >= MAX_ENTRIES }
 }
