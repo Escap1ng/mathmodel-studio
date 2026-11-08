@@ -12,7 +12,7 @@ import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
 import { formatTokens } from '../lib/context'
 import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
 import DecisionCard, { type ModelCandidate } from './DecisionCard'
-import DropZone from './DropZone'
+import WelcomeScreen from './WelcomeScreen'
 import FileChips from './FileChips'
 import MarkdownView from './MarkdownView'
 
@@ -687,7 +687,8 @@ export default function ChatPane({
         <div className="chat__stream" ref={streamRef} onScroll={onStreamScroll}>
           <div className="chat__column">
             {entries.length === 0 ? (
-              <DropZone
+              <WelcomeScreen
+                mode={mode}
                 files={files}
                 rejected={rejected}
                 failure={attachError}
@@ -696,6 +697,8 @@ export default function ChatPane({
                 onPick={() => void pick()}
                 onRemove={remove}
                 onReveal={reveal}
+                onSend={(text) => onSend(text)}
+                onEnterWorkflow={() => onModeChange('workflow')}
               />
             ) : (
               <div className="messages" aria-live="polite">
