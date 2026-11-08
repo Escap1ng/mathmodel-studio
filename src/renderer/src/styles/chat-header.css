@@ -1,0 +1,75 @@
+/* —— 中栏会话头 —— */
+.chat {
+  container-type: inline-size;
+  container-name: chatpane;
+}
+
+.chat__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 24px;
+  background: transparent;
+}
+
+.chat__head-main {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.chat__head-kind {
+  color: var(--text-3);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.chat__head-title {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-family: var(--font-cjk);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.chat__head-side {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.chat__head-meter {
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat__stream {
+  padding-top: 18px;
+}
+
+.chat__banner--soft {
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pill--params {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+@container chatpane (max-width: 640px) {
+  .chat__head-meter,
+  .pill--params {
+    display: none;
+  }
+}
+

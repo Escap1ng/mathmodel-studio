@@ -3,37 +3,13 @@ import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { StagedFile, StageRejection, StageResult } from '../shared/api'
+import { KIND_BY_EXT } from '../shared/file-kinds'
 import { attachmentsRoot, workspacePath } from './workspace'
 
 // 从工作区外拖进来的文件复制到 <工作区>/附件/日期/ 下：原文件可能被移动或删除，要留一份自己的副本。
 // 已经在工作区里的文件直接引用原路径，不复制——它们本来就是工作区的一部分。
 const MAX_FILE_BYTES = 100 * 1024 * 1024
 const MAX_BATCH = 20
-
-const KIND_BY_EXT: Record<string, StagedFile['kind']> = {
-  pdf: 'pdf',
-  doc: 'doc',
-  docx: 'doc',
-  pages: 'doc',
-  rtf: 'doc',
-  xls: 'sheet',
-  xlsx: 'sheet',
-  csv: 'sheet',
-  tsv: 'sheet',
-  txt: 'text',
-  md: 'text',
-  json: 'text',
-  log: 'text',
-  tex: 'text',
-  py: 'text',
-  png: 'image',
-  jpg: 'image',
-  jpeg: 'image',
-  webp: 'image',
-  gif: 'image',
-  bmp: 'image',
-  svg: 'image'
-}
 
 function rootDir(): string {
   return attachmentsRoot()

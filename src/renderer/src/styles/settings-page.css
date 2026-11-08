@@ -1,0 +1,180 @@
+/* —— 设置页：左侧服务商，右侧表单 —— */
+.settings {
+  width: min(820px, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings__shell {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+
+.settings__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 18px 10px;
+  background: var(--surface);
+  overflow: auto;
+}
+
+.settings__nav-title {
+  padding: 0 8px 8px;
+  color: var(--text-3);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.settings__nav-note {
+  margin: auto 8px 0;
+  padding-top: 12px;
+  color: var(--text-3);
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.provider-chip--row {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 7px 9px;
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+}
+
+.provider-chip--row:hover {
+  border-color: transparent;
+  background: var(--bg);
+}
+
+.provider-chip--row[aria-pressed='true'] {
+  border-color: var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--shadow-1);
+}
+
+.provider-chip__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-chip__state {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.settings__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.settings__main .settings__head {
+  flex: none;
+}
+
+.settings__main .settings__body {
+  flex: 1;
+  overflow: auto;
+  padding-bottom: 18px;
+}
+
+.settings__main .settings__foot {
+  flex: none;
+  margin-top: 0;
+  background: var(--bg);
+}
+
+.model-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.model-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color var(--t), color var(--t), background var(--t);
+}
+
+.model-chip:hover {
+  border-color: var(--text-3);
+  color: var(--text);
+}
+
+.model-chip[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.seg {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.seg__btn {
+  min-width: 58px;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--t), color var(--t), box-shadow var(--t);
+}
+
+.seg__btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.seg__btn[aria-pressed='true'] {
+  background: var(--bg);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.field--check {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+}
+
+.field--check input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.field--check > span {
+  display: grid;
+  gap: 4px;
+}
+

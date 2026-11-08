@@ -1,4 +1,5 @@
 import type { AttachmentBlock, StagedFile } from '../../../shared/api'
+import { KIND_BY_EXT } from '../../../shared/file-kinds'
 import { formatBytes } from './format'
 
 export interface AttachmentRef {
@@ -22,31 +23,6 @@ export const ATTACH_END = '--- 附件结束 ---'
 
 /** 文件页把工作区条目拖到中栏时用的私有类型，避免和系统文件拖拽混在一起。 */
 export const WORKSPACE_DRAG = 'application/x-mms-workspace-files'
-
-const KIND_BY_EXT: Record<string, StagedFile['kind']> = {
-  pdf: 'pdf',
-  doc: 'doc',
-  docx: 'doc',
-  pages: 'doc',
-  rtf: 'doc',
-  xls: 'sheet',
-  xlsx: 'sheet',
-  csv: 'sheet',
-  tsv: 'sheet',
-  txt: 'text',
-  md: 'text',
-  json: 'text',
-  log: 'text',
-  tex: 'text',
-  py: 'text',
-  png: 'image',
-  jpg: 'image',
-  jpeg: 'image',
-  webp: 'image',
-  gif: 'image',
-  bmp: 'image',
-  svg: 'image'
-}
 
 export function kindOfName(name: string): StagedFile['kind'] {
   const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''

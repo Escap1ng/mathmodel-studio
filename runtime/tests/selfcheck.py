@@ -21,12 +21,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 PKG_SRC = ROOT / "runtime" / "src"
 MANIFEST_PATH = ROOT / "skills" / "manifest.json"
 SCHEMA_PATH = ROOT / "schemas" / "skill-manifest.schema.json"
 
-# 同 validate_contracts.py：不假设调用方给了 UTF-8 控制台
+# 同 validate-contracts.py：不假设调用方给了 UTF-8 控制台
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         try:

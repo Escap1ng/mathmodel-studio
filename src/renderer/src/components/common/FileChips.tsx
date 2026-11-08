@@ -1,5 +1,5 @@
-import type { AttachmentRef } from '../lib/attachments'
-import { formatBytes } from '../lib/format'
+import type { AttachmentRef } from '../../lib/attachments'
+import { formatBytes } from '../../lib/format'
 
 function badge(name: string): string {
   const dot = name.lastIndexOf('.')

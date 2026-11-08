@@ -1,0 +1,123 @@
+.chat__composer {
+  position: relative;
+  padding: 12px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.composer[data-resized='true'] .composer__input {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.composer {
+  width: 100%;
+  max-width: 760px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: background var(--t), border-color var(--t), box-shadow var(--t);
+}
+
+/* 输入区是一整块浅绿卡：聚焦时整卡发光，而不是给 textarea 描边 */
+.composer:focus-within {
+  background: var(--bg);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.composer__attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-height: 88px;
+  overflow: auto;
+}
+
+.composer__input {
+  border: 0;
+  outline: 0;
+  resize: none;
+  font-family: var(--font-cjk);
+  font-size: 15px;
+  line-height: 1.6;
+  background: transparent;
+  min-height: 44px;
+  color: var(--text);
+}
+
+.composer__bar {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pill {
+  border: 1px solid transparent;
+  background: var(--bg);
+  border-radius: var(--radius-pill);
+  padding: 4px 11px;
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pill--send {
+  margin-left: auto;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  transition: background var(--t);
+}
+
+.pill--send:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.pill--button {
+  cursor: pointer;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-cjk);
+  transition: border-color var(--t), background var(--t);
+}
+
+.pill--button:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--text-3);
+}
+
+.pill--model {
+  color: var(--text);
+}
+
+.pill--stop {
+  background: var(--bg);
+  border-color: rgba(166, 50, 50, 0.35);
+  color: var(--fail);
+}
+
+.pill--stop:hover:not(:disabled) {
+  background: rgba(166, 50, 50, 0.05);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+

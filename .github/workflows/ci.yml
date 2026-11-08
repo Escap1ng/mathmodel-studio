@@ -69,34 +69,34 @@ jobs:
 
       - name: G4 通道自检（握手、鉴权、SSE、取消、续传）
         # 起真 Python 子进程和本地假 OpenAI 端点；不需要窗口、不联网、不需要 Key
-        run: python runtime/selfcheck_channel.py
+        run: python runtime/tests/selfcheck_channel.py
 
       - name: G4/G5 反向覆盖（坏事件、Key 泄漏、假 provider 关闭）
-        run: python runtime/selfcheck_channel.py --selftest
+        run: python runtime/tests/selfcheck_channel.py --selftest
 
       - name: G2 契约校验与版本同源
-        run: python scripts/validate_contracts.py
+        run: python scripts/validate-contracts.py
 
       - name: G3 CLI 退出码契约
-        run: python runtime/selfcheck.py
+        run: python runtime/tests/selfcheck.py
 
       - name: G11 编排状态机（起题、确认、换一批、选模）
-        run: python runtime/selfcheck_orchestrator.py
+        run: python runtime/tests/selfcheck_orchestrator.py
 
       - name: G11 反向覆盖（默认族写坏、关键词族清空必须变红）
-        run: python runtime/selfcheck_orchestrator.py --selftest
+        run: python runtime/tests/selfcheck_orchestrator.py --selftest
 
       - name: G12 长会话 harness（预算、压缩、摘要、锚点、50 轮）
-        run: python runtime/selfcheck_harness.py
+        run: python runtime/tests/selfcheck_harness.py
 
       - name: G12 反向覆盖（拆掉压缩、关掉工具裁剪必须变红）
-        run: python runtime/selfcheck_harness.py --selftest
+        run: python runtime/tests/selfcheck_harness.py --selftest
 
       - name: G13 附件 xlsx 读取（工作表、日期、上限与坏文件）
         run: npm run check:xlsx
 
       - name: G9 工作台（真渲两版、回滚、评分）
-        run: python runtime/selfcheck_workbench.py
+        run: python runtime/tests/selfcheck_workbench.py
 
       - name: 装排版依赖（G10 要真编 PDF，只在 ubuntu 跑）
         if: matrix.os == 'ubuntu-latest'
@@ -109,7 +109,7 @@ jobs:
         # 真启动冒烟的 job 在 ubuntu 上有 TeX，G7-9 会真编一遍。
         env:
           MMS_PAPER_SKIP: ${{ matrix.os == 'windows-latest' && '1' || '' }}
-        run: python runtime/selfcheck_paper.py
+        run: python runtime/tests/selfcheck_paper.py
 
       - name: 运行时语法检查
         run: python -m compileall -q runtime

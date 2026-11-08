@@ -62,7 +62,7 @@ curl -s https://registry.npmmirror.com/electron | python -c "import sys,json;pri
 
 ## 4 Python
 
-G1 与 CLI 的注册表部分**只用标准库**；M1 起 `runtime/selfcheck.py` 会真渲染一张图，需要科学计算依赖。
+G1 与 CLI 的注册表部分**只用标准库**；M1 起 `runtime/tests/selfcheck.py` 会真渲染一张图，需要科学计算依赖。
 版本下限统一写在仓库根的 `requirements.txt`（与上游技能 v2.0.1 一致），安装走镜像：
 
 ```bash

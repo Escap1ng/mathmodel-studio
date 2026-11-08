@@ -10,12 +10,12 @@ import type {
   SessionSnapshot,
   SessionSummary
 } from '../../shared/api'
-import ChatPane from './components/ChatPane'
-import { candidatesOf, type ModelCandidate } from './components/DecisionCard'
-import ExplainDrawer from './components/ExplainDrawer'
-import PhaseRail from './components/PhaseRail'
-import SettingsDialog from './components/SettingsDialog'
-import WorkspacePane from './components/WorkspacePane'
+import ChatPane from './components/chat/ChatPane'
+import { candidatesOf, type ModelCandidate } from './components/chat/DecisionCard'
+import ExplainDrawer from './components/chat/ExplainDrawer'
+import PhaseRail from './components/rail/PhaseRail'
+import SettingsDialog from './components/settings/SettingsDialog'
+import WorkspacePane from './components/workspace/WorkspacePane'
 import { splitContextContent, type SendExtras } from './lib/attachments'
 import { applyChatEvent, assistantText, type ChatEntry } from './lib/chat'
 import { contextLabel, conversationTokens, depthLabel, fitHistory } from './lib/context'

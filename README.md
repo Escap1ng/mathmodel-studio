@@ -67,7 +67,7 @@ MathModel Studio 面向正在推进建模工作、准备交付的参赛者与研
 
 打包已配置完成：electron-builder 把便携 Python 和 pandoc 一起装进安装包；0.1.0 的 NSIS x64 安装包尚未构建，干净机安装仍是未证项。
 
-里程碑见 [PLAN.md](PLAN.md) §7；已验证结论与未证事项见 [docs/HANDOFF.md](docs/HANDOFF.md)。
+里程碑见 [PLAN.md](PLAN.md) §7；已验证结论与未证事项见 [docs/handoff.md](docs/handoff.md)。
 
 ## 快速开始
 
@@ -150,14 +150,14 @@ npm run gate
 | G8 技能规范 | 每个技能的 `SKILL.md` 为合法 Agent Skills 入口：frontmatter 可解析、名称与目录一致、描述非空且在 1024 字内、无仓库私有字段 | 6 种基于真实文件的破坏必须变红（`npm run check:skills:negative`） |
 | G2 契约校验 | 注册表按 JSON Schema Draft 2020-12 校验；`jsonschema` 缺席时降级并说明 | 两份非法注册表必须被拒 |
 | G2b 版本同源 | `VERSION`、`package.json`、`pyproject.toml`、`mms/__init__.py` 四处一致 | 任一缺项或取值不同即失败 |
-| G3 CLI 契约 | 退出码 0/1/2 均可达；实际调用渲染器并核验 PNG/PDF/SVG 三件产物 | 词表外取值、非法 JSON、空 `MMS_HOME`、未知子命令/模板与渲染器假成功均被拦截（`runtime/selfcheck.py`） |
-| G4 事件流 | 握手、Bearer token、回环 Host/Origin 白名单、九类 SSE 事件、续传与取消；覆盖 K2/K3 暂停恢复与进程重启后恢复、思维深度与上下文裁剪（55 条） | 10 种坏事件必须被拒；无 token、错误 Host、无待决恢复均被拒（`python runtime/selfcheck_channel.py --selftest`） |
+| G3 CLI 契约 | 退出码 0/1/2 均可达；实际调用渲染器并核验 PNG/PDF/SVG 三件产物 | 词表外取值、非法 JSON、空 `MMS_HOME`、未知子命令/模板与渲染器假成功均被拦截（`runtime/tests/selfcheck.py`） |
+| G4 事件流 | 握手、Bearer token、回环 Host/Origin 白名单、九类 SSE 事件、续传与取消；覆盖 K2/K3 暂停恢复与进程重启后恢复、思维深度与上下文裁剪（55 条） | 10 种坏事件必须被拒；无 token、错误 Host、无待决恢复均被拒（`python runtime/tests/selfcheck_channel.py --selftest`） |
 | G5 provider 离线契约 | 本地假端点覆盖 429 退避、`reasoning_content` 分离、分片 `tool_calls` 拼装、历史消息剥离和 Key 传递边界 | Key 哨兵不得进入事件流与 stderr；未开启离线模式时假 provider 被拒 |
 | G6 桌面骨架 | 类型检查、构建，并校验产物包含本项目中文文案与设计令牌 | 断言失败即退出 1（`scripts/smoke-dist.mjs`） |
-| G9 工作台 | 真实渲染两版图、版本历史与回滚，未知模板、主题或版本不会写入历史；三轮评分、扣分定位、章节样例和一票否决（13 条） | 未知模板/主题/版本均为反向控制（`runtime/selfcheck_workbench.py`） |
+| G9 工作台 | 真实渲染两版图、版本历史与回滚，未知模板、主题或版本不会写入历史；三轮评分、扣分定位、章节样例和一票否决（13 条） | 未知模板/主题/版本均为反向控制（`runtime/tests/selfcheck_workbench.py`） |
 | G10 论文排版 | xelatex 两遍 → pandoc → Word 后处理：PDF/DOCX 文件头与体积、六个步骤、三道门禁、状态写入磁盘（10 条） | 缺件、坏稿、坏 TeX、缺稿件四条反向；`MMS_PAPER_SKIP=1` 才允许跳过并打印未验证 |
-| G11 编排状态机 | 起题、K2 确认、K3 换一批与选模，选模后阶段四真跑：定位工作区 CSV、生成并执行基线脚本、PNG/PDF/SVG 登记成图表版本；工作区无数据时回落到内置示例并说明（13 条） | 默认方法族写成单元素元组、关键词族被清空两种破坏必须变红（`python runtime/selfcheck_orchestrator.py --selftest`） |
-| G12 长会话 harness | 预算核算、工具结果先裁剪再结构化摘要、摘要本身有长度上限、二次压缩并入旧摘要、锚点每轮替换、溢出识别、单条超预算时从最早处丢；50 轮压到预算内且最近 6 条原文保留（14 条） | 拆掉压缩、关掉工具裁剪两种破坏必须变红（`python runtime/selfcheck_harness.py --selftest`） |
+| G11 编排状态机 | 起题、K2 确认、K3 换一批与选模，选模后阶段四真跑：定位工作区 CSV、生成并执行基线脚本、PNG/PDF/SVG 登记成图表版本；工作区无数据时回落到内置示例并说明（13 条） | 默认方法族写成单元素元组、关键词族被清空两种破坏必须变红（`python runtime/tests/selfcheck_orchestrator.py --selftest`） |
+| G12 长会话 harness | 预算核算、工具结果先裁剪再结构化摘要、摘要本身有长度上限、二次压缩并入旧摘要、锚点每轮替换、溢出识别、单条超预算时从最早处丢；50 轮压到预算内且最近 6 条原文保留（14 条） | 拆掉压缩、关掉工具裁剪两种破坏必须变红（`python runtime/tests/selfcheck_harness.py --selftest`） |
 | G13 附件 xlsx | 解压工作簿读出全部工作表：共享字符串与富文本、稀疏列、布尔/错误值、公式缓存值、日期与时间格式（含 1904 日期系统）；单表最多 300 行 × 60 列（10 条） | 非 ZIP 与缺工作簿两种坏文件必须报错；301 行的表必须截到 300 行（`npm run check:xlsx`） |
 | G7 真启动冒烟 | 以生产入口起窗，验证构建产物、1440×900、非白像素、IPC、中文真字形与 Key 不回显；覆盖 K2→K3→解释→选择、阶段四真跑与自动出图、图表重渲与回滚、评分、论文构建与预览、附件与 xlsx、工作区文件拖入与右键、多会话、五家预设、上下文与思维深度、右栏收起、内核切换与对话优先（106 条） | 空白截图、自建窗口、缺字（方框字形）和删除关键断言都会被拦截（`tests/window-smoke.cjs`） |
 | G6b 结果核验 | 读取冒烟 JSON 并复算读数：内容尺寸、非白像素、断言下限、关键断言与自述计数 | `--selftest` 用 12 份合成结果证明假通过会被拒（`scripts/check-window-smoke.mjs`） |
@@ -168,7 +168,7 @@ npm run gate
 
 0.1.0 的 NSIS x64 安装包尚未构建；打包配置已把便携 Python 与 pandoc 接入，真实 packaged resources 的 DSH 缺失负向验证 17/17 通过。
 
-未覆盖范围：五家服务商的真实联网对话（本仓库不包含 Key）、CI 的 Windows 真起窗、CSP 违规场景的主动探测、安装包在干净机器上的安装与运行。发布记录见 [CHANGELOG.md](CHANGELOG.md)，发布格式见 [docs/RELEASE.md](docs/RELEASE.md)。
+未覆盖范围：五家服务商的真实联网对话（本仓库不包含 Key）、CI 的 Windows 真起窗、CSP 违规场景的主动探测、安装包在干净机器上的安装与运行。发布记录见 [CHANGELOG.md](CHANGELOG.md)，发布格式见 [docs/release.md](docs/release.md)。
 
 ## 依赖
 

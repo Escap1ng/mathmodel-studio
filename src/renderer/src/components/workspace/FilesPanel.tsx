@@ -5,9 +5,9 @@ import type {
   WorkspaceEntry,
   WorkspaceListing,
   WorkspaceProject
-} from '../../../shared/api'
-import { WORKSPACE_DRAG } from '../lib/attachments'
-import ContextMenu, { type ContextMenuItem } from './ContextMenu'
+} from '../../../../shared/api'
+import { WORKSPACE_DRAG } from '../../lib/attachments'
+import ContextMenu, { type ContextMenuItem } from '../common/ContextMenu'
 
 const KIND_LABEL: Record<FileKind, string> = {
   dir: 'DIR',

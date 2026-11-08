@@ -1,0 +1,147 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.shell {
+  --pane-w: clamp(460px, 38vw, 1100px);
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--pane-w);
+  grid-template-rows: minmax(0, 1fr) 30px;
+  height: 100%;
+  /* 左栏与状态栏露出这层薄荷底，内容面板是白 / 浅绿大色块，不再靠细线切分 */
+  background: var(--chrome);
+}
+
+/* —— 分隔条：拖拽改宽度/高度，键盘方向键也能调 —— */
+.splitter {
+  position: absolute;
+  z-index: 6;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  touch-action: none;
+}
+
+/* 只在模式切换的瞬间变形；手动收合与拖拽没有这个类，永远即时 */
+.shell[data-mode-animating='true'] {
+  transition: grid-template-columns var(--t-layout) var(--ease-emphasized);
+}
+
+/* 左栏的内容换手（会话列表 ⇄ 阶段轨道）跟着同一拍变形 */
+.shell[data-mode-animating='true'] .rail {
+  transition: grid-template-rows var(--t-layout) var(--ease-emphasized);
+}
+
+.shell[data-mode-animating='true'] .splitter--col {
+  pointer-events: none;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  opacity: 0;
+  /* 位置跟着指针即时走；只有透明度做淡入淡出，离开时原地消失、不回中间 */
+  transition: opacity 140ms ease-out;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after,
+.splitter[data-dragging='true']::after {
+  opacity: 1;
+}
+
+.splitter--col {
+  top: 0;
+  bottom: 30px;
+  right: calc(var(--pane-w) - 4px);
+  width: 8px;
+  cursor: col-resize;
+}
+
+/* 竖条：贯穿分隔线，指针处最实、向两端渐隐，横向也羽化，像一道融进背景的光带 */
+.splitter--col::after {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 8px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 20%, transparent) 38%,
+    var(--accent) 50%,
+    color-mix(in srgb, var(--accent) 20%, transparent) 62%,
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 60% 200px at 50% var(--grip-y, 50%),
+    #000 0%,
+    rgba(0, 0, 0, 0.4) 55%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 60% 200px at 50% var(--grip-y, 50%),
+    #000 0%,
+    rgba(0, 0, 0, 0.4) 55%,
+    transparent 100%
+  );
+}
+
+/* 骑在 .composer 顶边框上：容器有 1px 上边框 + 12px 内边距，8px 高的条居中于 12px 处 */
+.splitter--row {
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 8px;
+  cursor: row-resize;
+}
+
+/* 输入框上沿：常显一条居中的空心长条（描边胶囊），拖拽时描边变成强调色 */
+.splitter--row::after {
+  left: 50%;
+  top: 0;
+  width: 84px;
+  height: 8px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  /* 用页面底色盖住下面的输入框边框线，长条内部保持空心、不被线穿过 */
+  background: var(--bg);
+  opacity: 1;
+  transition: border-color 140ms ease-out, opacity 140ms ease-out;
+}
+
+.splitter--row:hover::after,
+.splitter--row:focus-visible::after,
+.splitter--row[data-dragging='true']::after {
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.shell[data-resizing='col'] {
+  cursor: col-resize;
+  user-select: none;
+}
+

@@ -1,7 +1,7 @@
 """`mms` 命令行入口。
 
 退出码沿用上游技能集的 CLI 契约：0 成功 / 1 校验失败 / 2 用法或环境错误。
-三码各自可达由 runtime/selfcheck.py 反向验证。
+三码各自可达由 runtime/tests/selfcheck.py 反向验证。
 """
 
 from __future__ import annotations

@@ -3,36 +3,13 @@ import { mkdir, readdir, stat } from 'node:fs/promises'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { WorkspaceEntry, WorkspaceInfo, WorkspaceListing } from '../shared/api'
+import { KIND_BY_EXT } from '../shared/file-kinds'
 import { saveWorkspace, savedWorkspace } from './settings'
 
 // 工作区是用户看得见、放得进自己文件的地方：默认在桌面建「赛题」，可在文件页改到别处。
 // 附件副本统一落在 <工作区>/附件/日期/，不再藏进 userData。
 const MAX_ENTRIES = 400
 const MAX_DEPTH = 3
-const KIND_BY_EXT: Record<string, Exclude<WorkspaceEntry['kind'], 'dir'>> = {
-  pdf: 'pdf',
-  doc: 'doc',
-  docx: 'doc',
-  pages: 'doc',
-  rtf: 'doc',
-  xls: 'sheet',
-  xlsx: 'sheet',
-  csv: 'sheet',
-  tsv: 'sheet',
-  txt: 'text',
-  md: 'text',
-  json: 'text',
-  log: 'text',
-  tex: 'text',
-  py: 'text',
-  png: 'image',
-  jpg: 'image',
-  jpeg: 'image',
-  webp: 'image',
-  gif: 'image',
-  bmp: 'image',
-  svg: 'image'
-}
 
 export function defaultWorkspace(): string {
   return join(app.getPath('desktop'), '赛题')

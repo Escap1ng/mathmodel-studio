@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ConversationItem } from '../lib/conversations'
-import { formatAgo } from '../lib/format'
-import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
+import type { ConversationItem } from '../../lib/conversations'
+import { formatAgo } from '../../lib/format'
+import { PHASES, STATE_TEXT, type PhaseState } from '../../lib/phases'
 
 interface Props {
   mode: 'workflow' | 'chat'

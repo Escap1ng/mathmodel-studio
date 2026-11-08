@@ -1,0 +1,53 @@
+@media (max-width: 760px) {
+  .settings__shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings__nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 10px;
+  }
+
+  .settings__nav-title,
+  .settings__nav-note {
+    display: none;
+  }
+
+  .provider-chip--row {
+    width: auto;
+  }
+}
+
+.msg-divider {
+  display: flex;
+  justify-content: center;
+  margin: 14px 2px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+
+.msg-divider::before,
+.msg-divider::after {
+  content: none;
+}
+
+.msg__error .msg__retry {
+  margin-left: 10px;
+  color: var(--accent, #2b4c7e);
+}
+
+/* 减少动态效果：过渡与循环动画统一归零，功能不受影响 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

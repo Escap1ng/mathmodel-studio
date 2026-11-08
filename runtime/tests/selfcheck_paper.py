@@ -19,7 +19,7 @@ for _stream in (sys.stdout, sys.stderr):
         except (OSError, ValueError):
             pass
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "runtime" / "src"))
 
 from mms import paper_build, project_export  # noqa: E402

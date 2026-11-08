@@ -31,7 +31,7 @@ for _stream in (sys.stdout, sys.stderr):
         except (OSError, ValueError):
             pass
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schemas" / "chat-events.schema.json"
 SENTINEL = "sk-test-SENTINEL-DO-NOT-LEAK"
 EVENT_TYPES = {"token", "reasoning", "tool_call", "compaction", "artifact", "interrupt", "gate", "phase", "error", "done"}

@@ -1,0 +1,100 @@
+/* —— M3：解释抽屉：常挂载，开关用滑入滑出过渡，焦点由组件自理 —— */
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 30px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, 88vw);
+  background: var(--bg);
+  box-shadow: -18px 0 40px rgba(20, 24, 30, 0.1);
+  transform: translateX(24px);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform var(--t) var(--ease-emphasized, ease), opacity var(--t), visibility 0s var(--t);
+}
+
+.drawer[data-open='true'] {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: transform var(--t) var(--ease-emphasized, ease), opacity var(--t), visibility 0s;
+}
+
+.drawer__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  padding: 20px 22px 16px;
+}
+
+.drawer__kicker {
+  grid-column: 1;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.drawer__title {
+  grid-column: 1;
+  margin: 4px 0 0;
+  font-family: var(--font-cjk);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.drawer__head .btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
+.drawer__body {
+  flex: 1;
+  overflow: auto;
+  padding: 18px 22px 10px;
+}
+
+.drawer__section {
+  margin-bottom: 20px;
+}
+
+.drawer__section h3 {
+  margin: 0 0 6px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.drawer__section p {
+  margin: 0;
+  font-family: var(--font-cjk);
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-2);
+}
+
+.drawer__math {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  overflow-wrap: anywhere;
+}
+
+.drawer__note {
+  margin: 0;
+  padding: 14px 22px 18px;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+

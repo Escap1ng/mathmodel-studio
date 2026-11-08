@@ -4,8 +4,8 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import { chunkAt, chunkBoundaries } from '../lib/md-chunks'
-import '../styles/markdown.css'
+import { chunkAt, chunkBoundaries } from '../../lib/md-chunks'
+import '../../styles/markdown.css'
 
 const remarkPlugins = [remarkGfm, remarkMath]
 // rehype-katex 内部已按 throwOnError:false 渲染：坏公式红字原样显示，不炸整条消息

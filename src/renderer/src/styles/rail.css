@@ -1,0 +1,114 @@
+/* —— 左栏：会话 + 阶段轨道 —— */
+.rail {
+  grid-row: 1;
+  grid-column: 1;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 0;
+  background: transparent;
+}
+
+/* 左栏变阵：内容都不卸载，只是两种内容轮流 0fr/1fr。
+   chat 露会话列表、阶段轨道收起；workflow 反过来；
+   workflow 里再点「会话列表」可临时展开为整栏。 */
+.rail[data-mode='chat'],
+.rail[data-mode='workflow'][data-convs-open='true'] {
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 0fr);
+}
+
+.rail[data-mode='workflow'][data-convs-open='false'] {
+  grid-template-rows: auto auto minmax(0, 0fr) minmax(0, 1fr);
+}
+
+.rail__convs,
+.rail__phases {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rail__convs-inner,
+.rail__phases-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rail__convs-toggle {
+  margin-left: auto;
+}
+
+/* ——— 会话列表折叠容器 ——— */
+
+.rail__head {
+  padding: 14px 16px 10px;
+  border-bottom: 0;
+}
+
+.rail__title {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-weight: 600;
+}
+
+.rail__empty {
+  margin-top: 6px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.phases {
+  padding: 10px 8px 16px;
+  overflow: auto;
+}
+
+.phase {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 9px 6px;
+  border-radius: var(--radius-sm);
+  transition: background var(--t);
+}
+
+.phase:hover {
+  background: var(--surface);
+}
+
+.phase__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.phase--active .phase__dot {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.phase__name {
+  font-family: var(--font-cjk);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.phase__num {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  margin-right: 5px;
+}
+
+.phase__state {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+

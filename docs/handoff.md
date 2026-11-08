@@ -28,13 +28,13 @@ node scripts/check-registry.negative.mjs        # 9/9 条破坏被门禁抓到�
 node scripts/check-skills.mjs                   # 6/6 项通过，技能 7 个            → exit 0
 node scripts/check-skills.mjs --self            # 7/7 条自检通过（含基线自证）     → exit 0
 node scripts/check-window-smoke.mjs --selftest  # 12/12 条核验自测                  → exit 0
-python scripts/validate_contracts.py            # 9/9 项通过（jsonschema）         → exit 0
-python runtime/selfcheck.py                     # 13/13 条 CLI 断言，含真渲一张图  → exit 0
-python runtime/selfcheck_channel.py             # 55/55 条通道断言（含 C15 选模卡）→ exit 0
-python runtime/selfcheck_channel.py --selftest  # 10/10 条坏事件被拒                → exit 0
-python runtime/selfcheck_channel.py --core dsh  # 31/31 条 DSH 断言                 → exit 0
-python runtime/selfcheck_workbench.py           # 19/19 条工作台断言（真渲两版）  → exit 0
-python runtime/selfcheck_paper.py               # 12/12 条论文断言（真编 PDF/DOCX）→ exit 0
+python scripts/validate-contracts.py            # 9/9 项通过（jsonschema）         → exit 0
+python runtime/tests/selfcheck.py                     # 13/13 条 CLI 断言，含真渲一张图  → exit 0
+python runtime/tests/selfcheck_channel.py             # 55/55 条通道断言（含 C15 选模卡）→ exit 0
+python runtime/tests/selfcheck_channel.py --selftest  # 10/10 条坏事件被拒                → exit 0
+python runtime/tests/selfcheck_channel.py --core dsh  # 31/31 条 DSH 断言                 → exit 0
+python runtime/tests/selfcheck_workbench.py           # 19/19 条工作台断言（真渲两版）  → exit 0
+python runtime/tests/selfcheck_paper.py               # 12/12 条论文断言（真编 PDF/DOCX）→ exit 0
 ```
 
 `--core dsh` 会自动转发到 `vendor/python`（SDK 与 `dsh.exe` 都装在那里）；系统解释器缺 SDK 时不再误报 `dshVersion`。`selfcheck.py`、`selfcheck_workbench.py` 与 `selfcheck_paper.py` 会真调 matplotlib / xelatex / pandoc（各十几秒）。
@@ -107,7 +107,7 @@ CI：<https://github.com/Escap1ng/mathmodel-studio/actions>。0.1.0 尚未在 CI
 4. 设置页内核切换、`settings.json` 持久化、`providerViews` 的 `unavailable` 约束。
 5. 打包布线：SDK 版本记录、`MMS_DSH_*` 环境、resources 路径探测。
 6. 门禁：G4 55、G7 112、DSH 31、G9 19、G10 12、G11 13、G12 14、G13 10。
-7. 发布规范 `docs/RELEASE.md`；版本重置为 0.1.0，旧 Release/tag 已删。
+7. 发布规范 `docs/release.md`；版本重置为 0.1.0，旧 Release/tag 已删。
 
 仍欠：
 
@@ -173,30 +173,32 @@ runtime/src/mms/
   cli.py                    serve / templates / invoke
 runtime/mcp/mms_server.py   DSH 侧 stdio MCP（当前只有 list_templates）
 runtime/cli.py              开发期入口（npm run mms）
-runtime/selfcheck_channel.py G4/G5 自检、DSH 自检与反向覆盖
-runtime/selfcheck_workbench.py G9 工作台自检（真渲两版）
-runtime/selfcheck_paper.py  G10 论文自检（真编 PDF/DOCX + 四条反向）
+runtime/cli.py              开发期入口（npm run mms）
+runtime/tests/              自检：CLI、通道、编排、harness、工作台、论文（G3–G13，含反向覆盖）
 src/main/
   index.ts                  窗口、IPC、provider 合并视图、SSE 转发、resume、PDF data URL
   channel.ts                Python 子进程生命周期、HTTP/SSE 客户端、内核选择
   settings.ts               safeStorage 密文、工作区、对话内核与 provider 设置
 src/preload/index.ts        window.studio 窄接口
 src/shared/api.ts           主进程与渲染层共享的纯类型
+src/shared/file-kinds.ts    扩展名 → 文件类别（主进程与渲染层共用）
 src/renderer/src/
   App.tsx                   运行时状态、provider、对话事件归并、快照恢复、卡片决策分流
-  components/ChatPane.tsx   流式消息、工具卡、输入区、全流程按钮
-  components/DecisionCard.tsx  K2 确认卡与 K3 选模卡
-  components/SettingsDialog.tsx  服务商/模型/Key 与对话内核设置
+  components/chat/          对话流、欢迎屏、决策卡、解释抽屉、Markdown 与消息操作
+  components/rail/          PhaseRail：会话列表与七阶段轨道
+  components/workspace/     WorkspacePane 与图表/论文/评分/门禁/代码/日志/文件面板
+  components/settings/      SettingsDialog：服务商/模型/Key 与对话内核设置
+  components/common/        ContextMenu、SelectMenu、FileChips
   lib/chat.ts               事件折叠的纯函数
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
 tests/window-smoke.cjs      真启动断言（112 条）+ 截图与 JSON 结论
-docs/RELEASE.md             发布格式规范
+docs/release.md             发布格式规范
 .github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu）
 ```
 
 会话库位置：Electron `userData/sessions.db`；命令行直接起 runtime 时是 `<MMS_HOME>/.mms/sessions.db`，可用 `MMS_DATA_DIR` 覆盖。库内只有阶段、待决卡与消息，没有 Key。
 DSH 状态：`MMS_DSH_HOME`（默认 `userData/dsh`），profile 名 `mms`。
-图表版本位置：`userData/workbench/figure/versions/<v>`，`state.json` 记当前版与上一版。
-论文工作区：`userData/workbench/paper/`，含 `paper.tex`、`paper.pdf`、`paper.docx`、`figures/final/`、`logs/` 与 `build.json`。
+图表版本位置：`userData/sessions/<sid>/workbench/figure/versions/<v>`，`state.json` 记当前版与上一版；无合法 sid 时回落 `userData/workbench/`。
+论文工作区：`userData/sessions/<sid>/workbench/paper/`，含 `paper.tex`、`paper.pdf`、`paper.docx`、`figures/final/`、`logs/` 与 `build.json`；受同样回落规则约束。
 
 一处刻意的设计：`runtime` 只用 subprocess 调技能脚本、按退出码与产物双重判定，不 import 技能内部函数——这样 `skills/` 仍可被 Claude Code 等宿主单独装载。改这条要先想清楚代价。

@@ -1,5 +1,5 @@
 import DropZone from './DropZone'
-import type { StagedFile } from '../../../shared/api'
+import type { StagedFile } from '../../../../shared/api'
 
 const CHAT_PROMPTS = [
   '什么问题适合灰色预测 GM(1,1)？举两个例子',

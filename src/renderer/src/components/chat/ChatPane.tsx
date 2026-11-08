@@ -6,15 +6,15 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent
 } from 'react'
-import type { DecisionAction, ProviderView, RuntimeStatus, StagedFile } from '../../../shared/api'
-import { buildContextText, WORKSPACE_DRAG, type SendExtras } from '../lib/attachments'
-import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
-import { formatTokens } from '../lib/context'
-import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
+import type { DecisionAction, ProviderView, RuntimeStatus, StagedFile } from '../../../../shared/api'
+import { buildContextText, WORKSPACE_DRAG, type SendExtras } from '../../lib/attachments'
+import { isRecordData, type ChatEntry, type ToolCard } from '../../lib/chat'
+import { formatTokens } from '../../lib/context'
+import { PHASES, STATE_TEXT, type PhaseState } from '../../lib/phases'
 import DecisionCard, { type ModelCandidate } from './DecisionCard'
 import MessageActions from './MessageActions'
 import WelcomeScreen from './WelcomeScreen'
-import FileChips from './FileChips'
+import FileChips from '../common/FileChips'
 import MarkdownView from './MarkdownView'
 
 const COMPOSER_MIN = 132

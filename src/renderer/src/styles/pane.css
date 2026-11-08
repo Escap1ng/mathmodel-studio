@@ -1,0 +1,81 @@
+/* —— 右栏：工作台 —— */
+.workspace {
+  grid-row: 1;
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 4px;
+  background: transparent;
+  overflow-x: auto;
+  /* 窄栏里宁可横向滑动，也不要出现一条压住标签的滚动条 */
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  padding: 4px 12px;
+  color: var(--text-2);
+  font-family: var(--font-cjk);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--t), color var(--t), border-color var(--t);
+}
+
+.tab:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 选中态与轮次、版本、服务商等胶囊选择器保持同一套：淡底 + 主色字。
+   不改字重，切换标签时文字宽度不变，标签不会左右跳。 */
+.tab[aria-selected='true'] {
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.workspace__body {
+  flex: 1;
+  overflow: auto;
+  padding: 18px;
+  color: var(--text-2);
+  font-size: 13px;
+  /* 右栏宽度可拖拽，版式按容器宽度而不是视口宽度切 */
+  container-type: inline-size;
+  container-name: pane;
+}
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+  padding: 14px;
+}
+
+.card + .card {
+  margin-top: 10px;
+}
+

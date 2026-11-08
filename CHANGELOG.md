@@ -16,7 +16,7 @@
 
 ### 变更
 
-- 版本重新定为 `0.1.0`；此前的版本记录、Release 与 tag 已清理，后续按 [docs/RELEASE.md](docs/RELEASE.md) 记录。
+- 版本重新定为 `0.1.0`；此前的版本记录、Release 与 tag 已清理，后续按 [docs/release.md](docs/release.md) 记录。
 - 会话恢复时会切回建模模式，避免待决卡在对话模式下点确认走错分支。
 - 随包依赖新增 `deepseek-harness-sdk==0.2.1rc2`；NSIS 安装包体积约 311 MB（较无 DSH 构建净增约 46–59 MB）。
 

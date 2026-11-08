@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ProviderList, ThinkingDepth } from '../../../shared/api'
+import type { ProviderList, ThinkingDepth } from '../../../../shared/api'
 import {
   CONTEXT_OPTIONS,
   DEPTH_OPTIONS,
   contextLabel,
   depthLabel,
   formatTokens
-} from '../lib/context'
+} from '../../lib/context'
 
 interface Props {
   list: ProviderList

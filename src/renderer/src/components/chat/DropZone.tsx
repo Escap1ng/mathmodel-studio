@@ -1,5 +1,5 @@
-import type { StagedFile } from '../../../shared/api'
-import FileChips from './FileChips'
+import type { StagedFile } from '../../../../shared/api'
+import FileChips from '../common/FileChips'
 
 interface Props {
   files: StagedFile[]

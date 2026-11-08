@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { assistantText, type ChatEntry } from '../lib/chat'
-import { copyText } from '../lib/clipboard'
+import { assistantText, type ChatEntry } from '../../lib/chat'
+import { copyText } from '../../lib/clipboard'
 
 interface Props {
   entry: ChatEntry

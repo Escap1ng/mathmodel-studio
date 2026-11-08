@@ -1,0 +1,19 @@
+/* 样式入口：令牌 → 外壳与左栏 → 对话 → 输入 → 右栏 → 状态栏 → 设置与抽屉 →
+   响应式 → 工作台。@import 顺序就是原 app.css 的级联顺序，不要重排。 */
+@import './tokens.css';
+@import './base.css';
+@import './rail.css';
+@import './chat.css';
+@import './composer.css';
+@import './pane.css';
+@import './statusbar.css';
+@import './settings.css';
+@import './phases.css';
+@import './decision.css';
+@import './drawer.css';
+@import './conversations.css';
+@import './chat-header.css';
+@import './pane-extra.css';
+@import './settings-page.css';
+@import './responsive.css';
+@import './workbench.css';

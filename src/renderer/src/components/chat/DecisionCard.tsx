@@ -1,4 +1,4 @@
-import type { DecisionAction, InterruptCard } from '../../../shared/api'
+import type { DecisionAction, InterruptCard } from '../../../../shared/api'
 
 export interface ModelCandidate {
   id: string
