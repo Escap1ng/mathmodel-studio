@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from . import baseline, workbench_figure
-from .store import SessionStore
+from .store import SessionStore, session_scope
 
 PHASE_INTRO = "已收到题目。先按小节把题面拆开；确认题面后再进入算法选择。"
 
@@ -592,7 +592,8 @@ def _phase4(store: SessionStore, record: dict, picked: dict, workspace: str) -> 
     """阶段四：目录 → 数据 → 脚本 → 真跑 → 登记。每一步一张工具卡。"""
     delay = _workflow_delay()
     name = str(picked.get("name") or "方案")
-    data_root = store.path.parent
+    # 产物按会话隔离：<data>/sessions/<sid>，sid 非十六进制时回落全局目录。
+    data_root = session_scope(store.path.parent, record.get("id"))
     code_dir = data_root / "workbench" / "code"
     out_dir = code_dir / "outputs"
 

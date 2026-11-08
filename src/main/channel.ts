@@ -292,28 +292,33 @@ export class Channel {
     return Number(data['removed'] ?? 0)
   }
 
-  async workbenchState(): Promise<Record<string, unknown>> {
-    return this.request('/workbench/state')
+  async workbenchState(sessionId?: string): Promise<Record<string, unknown>> {
+    const query = sessionId ? `?session=${encodeURIComponent(sessionId)}` : ''
+    return this.request(`/workbench/state${query}`)
   }
 
-  async renderFigure(template: string, theme: string): Promise<Record<string, unknown>> {
+  async renderFigure(
+    template: string,
+    theme: string,
+    sessionId?: string
+  ): Promise<Record<string, unknown>> {
     return this.request('/workbench/render', {
       method: 'POST',
-      body: { template, theme }
+      body: { template, theme, sessionId }
     })
   }
 
-  async rollbackFigure(version: string): Promise<Record<string, unknown>> {
+  async rollbackFigure(version: string, sessionId?: string): Promise<Record<string, unknown>> {
     return this.request('/workbench/rollback', {
       method: 'POST',
-      body: { version }
+      body: { version, sessionId }
     })
   }
 
-  async buildPaper(): Promise<Record<string, unknown>> {
+  async buildPaper(sessionId?: string): Promise<Record<string, unknown>> {
     return this.request('/workbench/paper/build', {
       method: 'POST',
-      body: {}
+      body: { sessionId }
     })
   }
 

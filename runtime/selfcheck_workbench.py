@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+import sqlite3
 import sys
 import tempfile
 from pathlib import Path
@@ -23,6 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "runtime" / "src"))
 
 from mms import workbench_figure, workbench_score  # noqa: E402
+from mms.store import SessionStore, session_scope  # noqa: E402
 
 results: list[tuple[str, bool, str]] = []
 
@@ -93,6 +95,57 @@ def main() -> int:
             "W5 未知版本回滚被拒",
             workbench_figure.rollback("v999", ROOT, data)[0] == 2,
             "v999",
+        )
+
+        # S7b：产物目录按会话隔离；非法 sid 一律回落全局目录。
+        scoped = session_scope(data, "a1b2c3d4")
+        check(
+            "W8 十六进制 sid 映射到 sessions/<sid>",
+            scoped == data / "sessions" / "a1b2c3d4",
+            str(scoped),
+        )
+        bad_sids = ("../evil", "a1/b2", "A1B2C3D4", "a1", "", None, "a1b2c3d4/../../x")
+        check(
+            "W8 非法 sid 回落全局目录（路径穿越被拒）",
+            all(session_scope(data, bad) == data for bad in bad_sids),
+            "，".join(str(session_scope(data, bad)) for bad in bad_sids),
+        )
+        scoped_code, _ = workbench_figure.render("line-compare", "nature", ROOT, scoped)
+        scoped_state = workbench_figure.state_payload(ROOT, scoped)
+        global_state = workbench_figure.state_payload(ROOT, data)
+        check(
+            "W8 会话产物的版本不混入全局目录",
+            scoped_code == 0
+            and len(scoped_state["versions"]) == 1
+            and len(global_state["versions"]) == before_count
+            and Path(scoped_state["active_png"]).is_file()
+            and str(scoped) in str(scoped_state["active_png"]),
+            f"scoped={len(scoped_state['versions'])} global={len(global_state['versions'])} active={scoped_state['active_png']}",
+        )
+
+        old_db = workdir / "old" / "sessions.db"
+        old_db.parent.mkdir(parents=True)
+        with sqlite3.connect(old_db) as conn:
+            conn.executescript(
+                "CREATE TABLE sessions (id TEXT PRIMARY KEY, created REAL NOT NULL, updated REAL NOT NULL,"
+                " provider TEXT NOT NULL, model TEXT NOT NULL, problem TEXT NOT NULL, phases TEXT NOT NULL,"
+                " pending TEXT, messages TEXT NOT NULL, batch INTEGER NOT NULL DEFAULT 1);"
+            )
+            conn.execute(
+                "INSERT INTO sessions VALUES"
+                " ('a1b2c3d4e5f60718', 0, 0, 'fake', 'm', 'p', '[]', NULL, '[]', 1)"
+            )
+        migrated = SessionStore(old_db)
+        old_row = migrated.get("a1b2c3d4e5f60718")
+        migrated.create("0011223344556677", "fake", "m", "p", str(workdir))
+        new_row = migrated.get("0011223344556677")
+        check(
+            "W8 旧库补 workspace 列，新会话可写入归属目录",
+            old_row is not None
+            and old_row["workspace"] is None
+            and new_row is not None
+            and new_row["workspace"] == str(workdir),
+            f"old={(old_row or {}).get('workspace')} new={(new_row or {}).get('workspace')}",
         )
 
         score = workbench_score.state(ROOT)

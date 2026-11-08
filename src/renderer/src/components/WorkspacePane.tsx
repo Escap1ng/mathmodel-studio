@@ -37,6 +37,8 @@ interface Props {
   onToggle: () => void
   /** 当前建模会话 id：文件页据此显示赛题项目文件夹 */
   projectId: string | null
+  /** 工作台产物的会话作用域；空值让 runtime 回落到最近会话 */
+  sessionId: string | null
 }
 
 function errorText(err: unknown): string {
@@ -664,7 +666,14 @@ function PaperPanel({
   )
 }
 
-export default function WorkspacePane({ runtimeReady, collapsed, onToggle, projectId }: Props) {
+export default function WorkspacePane({
+  runtimeReady,
+  collapsed,
+  onToggle,
+  projectId,
+  sessionId
+}: Props) {
+  const scope = sessionId ?? undefined
   const [active, setActive] = useState<TabId>('figure')
   const [state, setState] = useState<WorkbenchState | null>(null)
   const [loading, setLoading] = useState(false)
@@ -688,7 +697,7 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle, proje
     setRendering(true)
     setError(null)
     try {
-      const result = await window.studio.workbench.render(nextTemplate, nextTheme)
+      const result = await window.studio.workbench.render(nextTemplate, nextTheme, scope)
       setState(result.state)
     } catch (err) {
       setError(errorText(err))
@@ -701,7 +710,7 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle, proje
     setBuilding(true)
     setError(null)
     try {
-      const result = await window.studio.paper.build()
+      const result = await window.studio.paper.build(scope)
       setState(result.state)
     } catch (err) {
       setError(errorText(err))
@@ -714,8 +723,9 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle, proje
     if (!runtimeReady) return
     let alive = true
     setLoading(true)
+    setState(null)
     window.studio.workbench
-      .state()
+      .state(scope)
       .then((next) => {
         if (!alive) return
         setState(next)
@@ -735,21 +745,21 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle, proje
     return () => {
       alive = false
     }
-    // 只在 runtime 就绪时载入一次；渲染结果由 renderFigure 直接回填。
+    // runtime 就绪或当前会话变化时重拉；渲染结果由 renderFigure 直接回填。
     // eslint 未启用，避免把 renderFigure 写进依赖导致反复载入。
-  }, [runtimeReady])
+  }, [runtimeReady, scope])
 
   // 阶段四把图登记成新版本后，主进程之外的改动不会走 renderFigure，靠事件回拉一次状态。
   useEffect(() => {
     const reload = (): void => {
       window.studio.workbench
-        .state()
+        .state(scope)
         .then((next) => setState(next))
         .catch(() => undefined)
     }
     window.addEventListener('mms:workbench-changed', reload)
     return () => window.removeEventListener('mms:workbench-changed', reload)
-  }, [])
+  }, [scope])
 
   return (
     <aside
@@ -870,7 +880,7 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle, proje
             onRender={() => void renderFigure(template, theme)}
             onRollback={(version) => {
               void window.studio.workbench
-                .rollback(version)
+                .rollback(version, scope)
                 .then((result) => {
                   setState(result.state)
                   const picked = result.state.figure.versions.find((v) => v.id === result.state.figure.active)

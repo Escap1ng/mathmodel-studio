@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "runtime" / "src"))
 
 from mms import paper_build  # noqa: E402
+from mms.store import session_scope  # noqa: E402
 
 results: list[tuple[str, bool, str]] = []
 
@@ -149,6 +150,15 @@ def main() -> int:
             "P9 稿件不存在按用法错误退出 2",
             missing_code == 2 and not missing_state["ok"],
             f"exit={missing_code} error={missing_state.get('error')}",
+        )
+
+        sid_dir = session_scope(data, "a1b2c3d4e5f60718")
+        check(
+            "P10 论文目录按会话隔离，非法 sid 回落全局",
+            paper_build.workspace(sid_dir)
+            == data / "sessions" / "a1b2c3d4e5f60718" / "workbench" / "paper"
+            and paper_build.workspace(session_scope(data, "../x")) == paper_build.workspace(data),
+            str(paper_build.workspace(sid_dir)),
         )
     finally:
         shutil.rmtree(workdir, ignore_errors=True)

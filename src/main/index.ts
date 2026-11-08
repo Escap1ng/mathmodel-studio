@@ -384,7 +384,13 @@ function withImages(raw: Record<string, unknown>): WorkbenchState {
   }
 }
 
-ipcMain.handle('workbench:state', async () => withImages(await channel.workbenchState()))
+function sessionScope(raw: unknown): string | undefined {
+  return typeof raw === 'string' && raw ? raw : undefined
+}
+
+ipcMain.handle('workbench:state', async (_event, raw: unknown) =>
+  withImages(await channel.workbenchState(sessionScope(raw)))
+)
 
 ipcMain.handle('workbench:render', async (_event, raw: unknown): Promise<WorkbenchResult> => {
   if (!raw || typeof raw !== 'object') throw new Error('渲染请求格式不对')
@@ -392,7 +398,7 @@ ipcMain.handle('workbench:render', async (_event, raw: unknown): Promise<Workben
   const template = typeof obj.template === 'string' ? obj.template : ''
   const theme = typeof obj.theme === 'string' ? obj.theme : ''
   if (!template || !theme) throw new Error('缺少模板或主题')
-  const data = await channel.renderFigure(template, theme)
+  const data = await channel.renderFigure(template, theme, sessionScope(obj.sessionId))
   return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
 })
 
@@ -400,12 +406,12 @@ ipcMain.handle('workbench:rollback', async (_event, raw: unknown): Promise<Workb
   if (!raw || typeof raw !== 'object') throw new Error('回滚请求格式不对')
   const version = (raw as Record<string, unknown>).version
   if (typeof version !== 'string' || !version) throw new Error('缺少版本 id')
-  const data = await channel.rollbackFigure(version)
+  const data = await channel.rollbackFigure(version, sessionScope((raw as Record<string, unknown>).sessionId))
   return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
 })
 
-ipcMain.handle('paper:build', async (): Promise<WorkbenchResult> => {
-  const data = await channel.buildPaper()
+ipcMain.handle('paper:build', async (_event, raw: unknown): Promise<WorkbenchResult> => {
+  const data = await channel.buildPaper(sessionScope(raw))
   return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
 })
 

@@ -26,7 +26,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import __version__, harness, orchestrator
 from .invoke import list_templates
-from .store import SessionStore, data_dir, snapshot
+from .store import SessionStore, data_dir, session_scope, snapshot
 from . import paper_build, workbench_figure, workbench_score
 from .provider import (
     CancelledError,
@@ -577,7 +577,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, "sessions": self.server.store.list_summaries()})
             return
         if parsed.path == "/workbench/state":
-            self._json(200, self._workbench())
+            raw_session = parse_qs(parsed.query).get("session", [""])[0]
+            self._json(200, self._workbench(self._scope_session(raw_session)))
             return
         if parsed.path.startswith("/sessions/") and parsed.path.count("/") == 2:
             session_id = parsed.path[len("/sessions/") :]
@@ -642,11 +643,23 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._error(404, "not_found", "没有这个端点")
 
-    def _workbench(self) -> dict:
-        figure = workbench_figure.state_payload(
-            self.server.root, self.server.store.path.parent
-        )
+    def _scope_session(self, raw: object) -> str:
+        """工作台请求定位会话产物目录：显式 sid 优先，缺省最近会话，非法 sid 回落全局。"""
+        sid = str(raw or "").strip()
+        if sid:
+            return sid
+        record = self.server.store.latest()
+        return str(record["id"]) if record else ""
+
+    def _scoped_dir(self, session_id: str) -> Path:
+        base = self.server.store.path.parent
+        return session_scope(base, session_id) if session_id else base
+
+    def _workbench(self, session_id: str = "") -> dict:
+        data_root = self._scoped_dir(session_id)
+        figure = workbench_figure.state_payload(self.server.root, data_root)
         try:
+            # 评分与章节门禁用的是内置 demo 文稿，不随会话隔离。
             score = workbench_score.state(self.server.root)
             chapter = score.get("chapter", {})
             round_row = next(
@@ -692,7 +705,7 @@ class Handler(BaseHTTPRequestHandler):
                 ),
             },
         ]
-        paper = paper_build.state(self.server.store.path.parent, self.server.root)
+        paper = paper_build.state(data_root, self.server.root)
         artifacts = paper.get("artifacts") or {}
         paper_ok = bool(paper.get("ok")) and {"pdf", "docx"} <= set(artifacts)
         if paper_ok:
@@ -717,33 +730,37 @@ class Handler(BaseHTTPRequestHandler):
             return
         template = str(body.get("template") or "")
         theme = str(body.get("theme") or "")
+        session_id = self._scope_session(body.get("sessionId"))
+        data_root = self._scoped_dir(session_id)
         code, result = workbench_figure.render(
-            template, theme, self.server.root, self.server.store.path.parent
+            template, theme, self.server.root, data_root
         )
         if code != 0:
             self._error(400, "figure", str(result.get("error") or "渲染失败"))
             return
-        self._json(200, {"ok": True, "version": result.get("version"), "state": self._workbench()})
+        self._json(200, {"ok": True, "version": result.get("version"), "state": self._workbench(session_id)})
 
     def _rollback_figure(self) -> None:
         body = self._body()
         if body is None:
             return
         version = str(body.get("version") or "")
+        session_id = self._scope_session(body.get("sessionId"))
         code, result = workbench_figure.rollback(
-            version, self.server.root, self.server.store.path.parent
+            version, self.server.root, self._scoped_dir(session_id)
         )
         if code != 0:
             self._error(404, "figure", str(result.get("error") or "没有这个版本"))
             return
-        self._json(200, {"ok": True, "state": self._workbench()})
+        self._json(200, {"ok": True, "state": self._workbench(session_id)})
 
     def _build_paper(self) -> None:
         body = self._body()
         if body is None:
             return
+        session_id = self._scope_session(body.get("sessionId"))
         code, result = paper_build.build(
-            self.server.store.path.parent, self.server.root
+            self._scoped_dir(session_id), self.server.root
         )
         self._json(
             200,
@@ -751,7 +768,7 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": bool(result.get("ok")),
                 "code": code,
                 "paper": result,
-                "state": self._workbench(),
+                "state": self._workbench(session_id),
             },
         )
 
@@ -831,7 +848,7 @@ class Handler(BaseHTTPRequestHandler):
         goal = " ".join(str(raw_goal).split())[:80]
         if mode == "workflow":
             problem = next(m["content"] for m in reversed(messages) if m["role"] == "user")
-            record = self.server.store.create(chat_id, provider_id, model, problem)
+            record = self.server.store.create(chat_id, provider_id, model, problem, workspace)
             session: ChatSession = WorkflowSession(
                 chat_id, self.server.store, record, "start", "", workspace=workspace
             )

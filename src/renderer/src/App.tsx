@@ -1062,6 +1062,7 @@ export default function App() {
         collapsed={workspaceCollapsed}
         onToggle={toggleWorkspace}
         projectId={activeKind === 'workflow' ? activeId : null}
+        sessionId={activeKind === 'workflow' ? activeId : null}
       />
       <div
         className="splitter splitter--col"

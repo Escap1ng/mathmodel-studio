@@ -90,15 +90,17 @@ const studioApi = {
   },
 
   workbench: {
-    state: (): Promise<WorkbenchState> => ipcRenderer.invoke('workbench:state'),
-    render: (template: string, theme: string): Promise<WorkbenchResult> =>
-      ipcRenderer.invoke('workbench:render', { template, theme }),
-    rollback: (version: string): Promise<WorkbenchResult> =>
-      ipcRenderer.invoke('workbench:rollback', { version })
+    state: (sessionId?: string): Promise<WorkbenchState> =>
+      ipcRenderer.invoke('workbench:state', sessionId ?? ''),
+    render: (template: string, theme: string, sessionId?: string): Promise<WorkbenchResult> =>
+      ipcRenderer.invoke('workbench:render', { template, theme, sessionId }),
+    rollback: (version: string, sessionId?: string): Promise<WorkbenchResult> =>
+      ipcRenderer.invoke('workbench:rollback', { version, sessionId })
   },
 
   paper: {
-    build: (): Promise<WorkbenchResult> => ipcRenderer.invoke('paper:build')
+    build: (sessionId?: string): Promise<WorkbenchResult> =>
+      ipcRenderer.invoke('paper:build', sessionId ?? '')
   }
 }
 

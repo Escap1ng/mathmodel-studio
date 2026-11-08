@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   phases TEXT NOT NULL,
   pending TEXT,
   messages TEXT NOT NULL,
-  batch INTEGER NOT NULL DEFAULT 1
+  batch INTEGER NOT NULL DEFAULT 1,
+  workspace TEXT
 );
 CREATE INDEX IF NOT EXISTS sessions_updated ON sessions(updated DESC);
 """
@@ -45,6 +46,18 @@ CREATE INDEX IF NOT EXISTS sessions_updated ON sessions(updated DESC);
 def data_dir(root: Path) -> Path:
     override = os.environ.get("MMS_DATA_DIR")
     return Path(override) if override else root / ".mms"
+
+
+def session_scope(base: Path, session_id: object) -> Path:
+    """会话产物的隔离目录：<base>/sessions/<sid>。
+
+    sid 只接受十六进制：任何带 ../ 或分隔符的输入一律回落到旧全局目录，
+    宁可与旧数据共用，也不让路径穿出 base。
+    """
+    sid = str(session_id or "").strip()
+    if sid and all(ch in "0123456789abcdef" for ch in sid) and 8 <= len(sid) <= 64:
+        return base / "sessions" / sid
+    return base
 
 
 def initial_phases() -> list[dict]:
@@ -62,6 +75,10 @@ class SessionStore:
         self.lock = threading.Lock()
         with self._connect() as conn:
             conn.executescript(SCHEMA)
+            # 旧库没有 workspace 列：补一列，历史会话保持空值（回落全局工作区）。
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}
+            if "workspace" not in columns:
+                conn.execute("ALTER TABLE sessions ADD COLUMN workspace TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path, timeout=10)
@@ -73,6 +90,7 @@ class SessionStore:
     def _row(row: sqlite3.Row | None) -> dict | None:
         if row is None:
             return None
+        keys = row.keys()
         return {
             "id": row["id"],
             "created": row["created"],
@@ -84,9 +102,12 @@ class SessionStore:
             "pending": json.loads(row["pending"]) if row["pending"] else None,
             "messages": json.loads(row["messages"]),
             "batch": row["batch"],
+            "workspace": row["workspace"] if "workspace" in keys else None,
         }
 
-    def create(self, session_id: str, provider: str, model: str, problem: str) -> dict:
+    def create(
+        self, session_id: str, provider: str, model: str, problem: str, workspace: str = ""
+    ) -> dict:
         now = time.time()
         record = {
             "id": session_id,
@@ -99,11 +120,12 @@ class SessionStore:
             "pending": None,
             "messages": [],
             "batch": 1,
+            "workspace": workspace,
         }
         with self.lock, self._connect() as conn:
             conn.execute(
-                "INSERT INTO sessions (id, created, updated, provider, model, problem, phases, pending, messages, batch)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO sessions (id, created, updated, provider, model, problem, phases, pending, messages, batch, workspace)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     session_id,
                     now,
@@ -115,6 +137,7 @@ class SessionStore:
                     None,
                     "[]",
                     1,
+                    workspace,
                 ),
             )
         return record
