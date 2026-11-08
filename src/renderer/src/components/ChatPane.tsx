@@ -14,6 +14,7 @@ import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
 import DecisionCard, { type ModelCandidate } from './DecisionCard'
 import DropZone from './DropZone'
 import FileChips from './FileChips'
+import MarkdownView from './MarkdownView'
 
 const COMPOSER_MIN = 132
 const COMPOSER_STORAGE_KEY = 'mms.composerHeight'
@@ -178,12 +179,11 @@ function EntryViewBase({
       {!hasBody && entry.streaming ? <div className="msg__pending">正在生成…</div> : null}
       {entry.parts.map((part, index) =>
         part.kind === 'text' ? (
-          <div className="msg__text" key={`t-${index}`}>
-            {part.text}
-            {entry.streaming && index === entry.parts.length - 1 ? (
-              <span className="cursor" aria-hidden="true" />
-            ) : null}
-          </div>
+          <MarkdownView
+            key={`t-${index}`}
+            text={part.text}
+            streaming={entry.streaming && index === entry.parts.length - 1}
+          />
         ) : (
           <ToolCardView key={`k-${part.tool.id}-${index}`} tool={part.tool} />
         )

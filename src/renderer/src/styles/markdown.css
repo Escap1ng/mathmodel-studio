@@ -1,0 +1,137 @@
+/* 助手正文 Markdown 排版。容器上已有的 msg__text 负责字体与全局字号，
+   这里负责块级结构；用户消息不走这个类，仍按纯文本 pre-wrap 显示。 */
+
+.msg__text.markdown > :first-child {
+  margin-top: 0;
+}
+
+.msg__text.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.msg__text.markdown p {
+  margin: 0.7em 0;
+  white-space: normal;
+}
+
+.msg__text.markdown ul,
+.msg__text.markdown ol {
+  margin: 0.6em 0;
+  padding-left: 1.5em;
+}
+
+.msg__text.markdown li {
+  margin: 0.25em 0;
+}
+
+.msg__text.markdown h1,
+.msg__text.markdown h2,
+.msg__text.markdown h3,
+.msg__text.markdown h4,
+.msg__text.markdown h5,
+.msg__text.markdown h6 {
+  margin: 1.1em 0 0.45em;
+  font-family: var(--font-cjk);
+  font-weight: 650;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.msg__text.markdown h1 {
+  font-size: 1.22em;
+}
+
+.msg__text.markdown h2 {
+  font-size: 1.14em;
+}
+
+.msg__text.markdown h3 {
+  font-size: 1.05em;
+}
+
+.msg__text.markdown blockquote {
+  margin: 0.8em 0;
+  padding: 0.1em 0.9em;
+  border-left: 3px solid var(--line-strong);
+  color: var(--text-2);
+}
+
+.msg__text.markdown table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  width: 100%;
+  font-size: 0.93em;
+}
+
+.msg__text.markdown th,
+.msg__text.markdown td {
+  border: 1px solid var(--line-strong);
+  padding: 5px 9px;
+  text-align: left;
+}
+
+.msg__text.markdown th {
+  background: var(--surface);
+  font-weight: 600;
+}
+
+/* 行内代码与代码块都上浅灰底，等宽走 --font-mono */
+.msg__text.markdown :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0.12em 0.4em;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.msg__text.markdown pre {
+  position: relative;
+  margin: 0.8em 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: auto;
+}
+
+.msg__text.markdown pre code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.md-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--t), color var(--t);
+}
+
+.msg__text.markdown pre:hover .md-copy,
+.md-copy:focus-visible {
+  opacity: 1;
+}
+
+.md-copy:hover {
+  color: var(--accent);
+}
+
+/* 流式光标：挂在最后一个块的行尾，不额外插 DOM 节点 */
+.msg__text.markdown.is-streaming > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.16em;
+  background: var(--accent);
+  animation: caret-blink 1.1s steps(1) infinite;
+}
