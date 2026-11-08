@@ -11,6 +11,8 @@ export interface AttachmentRef {
 export interface SendExtras {
   context?: string
   attachments?: AttachmentRef[]
+  /** 本轮暂存附件的绝对路径：主进程在建项目文件夹时把副本收编进去 */
+  attachmentPaths?: string[]
 }
 
 // 送进模型的消息里，附件正文用一对固定标记包起来：

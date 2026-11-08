@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
-import type { FileKind, WorkspaceEntry, WorkspaceListing } from '../../../shared/api'
+import type {
+  FileKind,
+  WorkspaceEntry,
+  WorkspaceListing,
+  WorkspaceProject
+} from '../../../shared/api'
 import { WORKSPACE_DRAG } from '../lib/attachments'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 
@@ -30,8 +35,9 @@ function formatTime(ms: number): string {
   return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-export default function FilesPanel() {
+export default function FilesPanel({ projectId }: { projectId: string | null }) {
   const [listing, setListing] = useState<WorkspaceListing | null>(null)
+  const [project, setProject] = useState<WorkspaceProject | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; entry: WorkspaceEntry } | null>(null)
@@ -64,6 +70,23 @@ export default function FilesPanel() {
       if (flashTimer.current != null) window.clearTimeout(flashTimer.current)
     }
   }, [])
+
+  useEffect(() => {
+    let alive = true
+    if (!projectId) {
+      setProject(null)
+      return
+    }
+    window.studio.workspace.project(projectId).then(
+      (info) => {
+        if (alive) setProject(info)
+      },
+      () => undefined
+    )
+    return () => {
+      alive = false
+    }
+  }, [projectId])
 
   const notify = (text: string): void => {
     setFlash(text)
@@ -184,6 +207,27 @@ export default function FilesPanel() {
           </button>
         )}
       </div>
+
+      {project ? (
+        <div className="files__project" data-role="files-project">
+          <span className="files__tag">当前赛题</span>
+          <code title={project.path}>{project.name}</code>
+          <button
+            type="button"
+            className="files__link"
+            data-action="open-project"
+            onClick={() => {
+              if (projectId) {
+                void window.studio.workspace
+                  .openProject(projectId)
+                  .catch((err: unknown) => setError(errorText(err)))
+              }
+            }}
+          >
+            打开项目文件夹
+          </button>
+        </div>
+      ) : null}
 
       <p className="files__hint">
         拖进中栏的文件会复制到 <code>附件/日期/</code> 下；这里也会列出你直接放进工作区的文件。拖动条目到中栏可直接发给模型，右键还有更多操作。

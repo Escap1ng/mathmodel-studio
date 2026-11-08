@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 105
+const MIN_ASSERTIONS = 107
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -95,7 +95,9 @@ const REQUIRED_ASSERTIONS = [
   'G7-12 进入建模自动展开大工作台',
   'G7-12 建模态阶段轨道整块展开',
   'G7-12 退出建模恢复问答收起偏好',
-  'G7-12 阶段区隐藏但仍在 DOM'
+  'G7-12 阶段区隐藏但仍在 DOM',
+  'G7-14 建模会话建出赛题文件夹',
+  'G7-14 暂存附件收进项目附件目录'
 ]
 
 const problems = []

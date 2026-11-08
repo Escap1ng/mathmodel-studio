@@ -1,6 +1,6 @@
 import { dialog, shell, type BrowserWindow, type OpenDialogOptions } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { copyFile, mkdir, stat, unlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { StagedFile, StageRejection, StageResult } from '../shared/api'
 import { attachmentsRoot, workspacePath } from './workspace'
@@ -214,4 +214,31 @@ export async function revealStaged(): Promise<void> {
   await mkdir(folder, { recursive: true })
   const error = await shell.openPath(folder)
   if (error) throw new Error(error)
+}
+
+/**
+ * 发起建模时把暂存副本收进项目文件夹的「附件」目录：
+ * 优先 rename（同盘瞬间完成），失败退回 copy+删除；单个文件失败不阻断发送。
+ */
+export async function adoptAttachments(paths: unknown, projectPath: string): Promise<void> {
+  if (!Array.isArray(paths) || paths.length === 0) return
+  const root = resolve(rootDir())
+  const target = join(projectPath, '附件')
+  await mkdir(target, { recursive: true })
+  for (const raw of paths) {
+    if (typeof raw !== 'string' || !raw) continue
+    const source = resolve(raw)
+    if (!insideOf(root, source)) continue
+    try {
+      const destination = await uniqueTarget(target, basename(source))
+      try {
+        await rename(source, destination)
+      } catch {
+        await copyFile(source, destination)
+        await unlink(source).catch(() => undefined)
+      }
+    } catch {
+      /* 单个附件收编失败就留在暂存区，不影响本轮对话 */
+    }
+  }
 }

@@ -1,16 +1,30 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from 'electron'
 import { APP_ROOT, runtimePython } from './runtime-env'
 import { readFileSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
 import { attachmentContext } from './extract'
-import { attachWorkspace, discardStaged, pickFiles, revealStaged, stageBlob, stageFiles } from './files'
+import {
+  adoptAttachments,
+  attachWorkspace,
+  discardStaged,
+  pickFiles,
+  revealStaged,
+  stageBlob,
+  stageFiles
+} from './files'
 import {
   chooseWorkspace,
   copyWorkspacePath,
+  createProjectFolder,
   ensureWorkspace,
   listWorkspace,
+  openProjectFolder,
   openWorkspaceEntry,
+  projectFolderFor,
+  projectInfoFor,
+  rememberProject,
   resetWorkspace,
   revealWorkspace,
   revealWorkspaceEntry,
@@ -33,6 +47,7 @@ import {
   activeProviderId,
   apiKeyFor,
   clearProviderKey,
+  projectFoldersEnabled,
   publicProviders,
   saveProvider,
   type SaveProviderInput
@@ -142,6 +157,9 @@ function parseChatInput(raw: unknown): ChatInput {
     typeof obj.contextTokens === 'number' && Number.isFinite(obj.contextTokens)
       ? obj.contextTokens
       : undefined
+  const attachmentPaths = Array.isArray(obj.attachmentPaths)
+    ? obj.attachmentPaths.filter((item): item is string => typeof item === 'string' && Boolean(item)).slice(0, 20)
+    : undefined
   return {
     providerId,
     model,
@@ -149,7 +167,8 @@ function parseChatInput(raw: unknown): ChatInput {
     messages,
     thinking,
     contextTokens,
-    sendThinking: typeof obj.sendThinking === 'boolean' ? obj.sendThinking : undefined
+    sendThinking: typeof obj.sendThinking === 'boolean' ? obj.sendThinking : undefined,
+    attachmentPaths
   }
 }
 
@@ -222,6 +241,20 @@ ipcMain.handle('chat:start', async (event, raw: unknown) => {
   const apiKey = view.id === 'fake' ? '' : apiKeyFor(view.id)
   if (view.requiresKey && !apiKey) throw new Error('还没配置 API Key')
 
+  // 建模会话按赛题分文件夹；建目录失败就退回旧行为，发送不能被目录问题卡住。
+  let workspace = workspacePath()
+  let project: { name: string; path: string } | null = null
+  if (input.mode === 'workflow' && projectFoldersEnabled()) {
+    const firstText = input.messages.find((message) => message.role === 'user')?.content ?? ''
+    try {
+      project = await createProjectFolder(firstText, randomBytes(2).toString('hex'))
+      await adoptAttachments(input.attachmentPaths, project.path)
+      workspace = project.path
+    } catch {
+      project = null
+    }
+  }
+
   const chatId = await channel.startChat({
     providerId: view.id,
     model: input.model || view.model,
@@ -233,15 +266,18 @@ ipcMain.handle('chat:start', async (event, raw: unknown) => {
     contextTokens: input.contextTokens ?? view.contextLimit,
     sendThinking: view.sendThinking,
     // 阶段四要在工作区里找数据文件；路径由主进程给，渲染层不碰文件系统。
-    workspace: workspacePath()
+    workspace
   })
+  if (project) rememberProject(chatId, project)
   attachStream(chatId, event.sender)
   return { ok: true, chatId }
 })
 
 ipcMain.handle('chat:resume', async (event, raw: unknown) => {
   const input = parseResumeInput(raw)
-  await channel.resumeSession(input.sessionId, input.action, input.choice ?? '', workspacePath())
+  // 续聊沿用会话自己的项目目录；老会话没登记过时退回全局工作区。
+  const workspace = projectFolderFor(input.sessionId) ?? workspacePath()
+  await channel.resumeSession(input.sessionId, input.action, input.choice ?? '', workspace)
   attachStream(input.sessionId, event.sender)
   return { ok: true, chatId: input.sessionId }
 })
@@ -305,6 +341,8 @@ ipcMain.handle('workspace:reveal-entry', (_event, raw: unknown) => revealWorkspa
 ipcMain.handle('workspace:copy-path', (_event, raw: unknown) => copyWorkspacePath(raw))
 
 ipcMain.handle('workspace:trash', (_event, raw: unknown) => trashWorkspaceEntry(raw))
+ipcMain.handle('workspace:project', (_event, raw: unknown) => projectInfoFor(raw))
+ipcMain.handle('workspace:open-project', (_event, raw: unknown) => openProjectFolder(raw))
 
 function imageDataUrl(path: unknown): string | null {
   if (typeof path !== 'string' || !path) return null

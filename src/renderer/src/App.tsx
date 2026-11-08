@@ -731,7 +731,8 @@ export default function App() {
       messages: [...history, { role: 'user', content }],
       thinking: provider.thinkingDepth,
       contextTokens: provider.contextLimit,
-      sendThinking: provider.sendThinking
+      sendThinking: provider.sendThinking,
+      attachmentPaths: extras?.attachmentPaths
     }
 
     try {
@@ -1060,6 +1061,7 @@ export default function App() {
         runtimeReady={runtime.state === 'ready'}
         collapsed={workspaceCollapsed}
         onToggle={toggleWorkspace}
+        projectId={activeKind === 'workflow' ? activeId : null}
       />
       <div
         className="splitter splitter--col"

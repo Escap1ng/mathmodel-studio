@@ -953,6 +953,44 @@ async function main() {
     `!!document.querySelector('.decision[data-card="problem-confirm"]')`,
     15000
   )
+
+  // —— G7-14 按赛题分项目文件夹：建目录 + 暂存附件收编 ——
+  const wsRoot = join(userDataDir, 'workspace')
+  const projectDirs = (() => {
+    try {
+      return readdirSync(wsRoot, { withFileTypes: true })
+        .filter(
+          (item) =>
+            item.isDirectory() &&
+            !['附件', '图表', '论文', '代码'].includes(item.name) &&
+            !item.name.startsWith('.')
+        )
+        .map((item) => item.name)
+    } catch {
+      return []
+    }
+  })()
+  const projectName = projectDirs.find(
+    (name) => /-[0-9a-f]{4}$/.test(name) && name.includes('问题1')
+  )
+  const projectPath = projectName ? join(wsRoot, projectName) : ''
+  const projectShape =
+    Boolean(projectPath) &&
+    ['附件', '图表', '论文', '代码'].every((sub) => existsSync(join(projectPath, sub)))
+  record(
+    'G7-14 建模会话建出赛题文件夹',
+    projectShape,
+    `dirs=${JSON.stringify(projectDirs)}`
+  )
+  const adopted = projectPath
+    ? readdirSync(join(projectPath, '附件')).some((name) => name.includes('k2-problem'))
+    : false
+  record(
+    'G7-14 暂存附件收进项目附件目录',
+    adopted,
+    `附件=${projectPath ? JSON.stringify(readdirSync(join(projectPath, '附件'))) : '无项目目录'}`
+  )
+
   const k2 = await win.webContents.executeJavaScript(`({
     questions: document.querySelectorAll('.decision[data-card="problem-confirm"] .decision__questions li').length,
     phase1: document.querySelector('.rail .phase[data-phase="1"]')?.dataset.state ?? null,

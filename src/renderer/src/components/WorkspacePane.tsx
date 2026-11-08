@@ -35,6 +35,8 @@ interface Props {
   runtimeReady: boolean
   collapsed: boolean
   onToggle: () => void
+  /** 当前建模会话 id：文件页据此显示赛题项目文件夹 */
+  projectId: string | null
 }
 
 function errorText(err: unknown): string {
@@ -662,7 +664,7 @@ function PaperPanel({
   )
 }
 
-export default function WorkspacePane({ runtimeReady, collapsed, onToggle }: Props) {
+export default function WorkspacePane({ runtimeReady, collapsed, onToggle, projectId }: Props) {
   const [active, setActive] = useState<TabId>('figure')
   const [state, setState] = useState<WorkbenchState | null>(null)
   const [loading, setLoading] = useState(false)
@@ -851,7 +853,7 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle }: Pro
         {error && active !== 'figure' && active !== 'files' ? (
           <div className="panel__error" role="alert">{error}</div>
         ) : null}
-        {active === 'files' ? <FilesPanel /> : null}
+        {active === 'files' ? <FilesPanel projectId={projectId} /> : null}
         {state && active === 'figure' ? (
           <FigurePanel
             state={state}

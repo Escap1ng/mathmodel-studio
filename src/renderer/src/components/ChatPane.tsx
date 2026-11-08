@@ -631,7 +631,8 @@ export default function ChatPane({
         const result = await window.studio.files.context(files.map((file) => file.path))
         extras = {
           context: buildContextText(text, result.blocks, files),
-          attachments: files.map((file) => ({ name: file.name, kind: file.kind, size: file.size }))
+          attachments: files.map((file) => ({ name: file.name, kind: file.kind, size: file.size })),
+          attachmentPaths: files.map((file) => file.path)
         }
       } catch (err) {
         setAttachError(`附件读取失败：${errorText(err)}`)

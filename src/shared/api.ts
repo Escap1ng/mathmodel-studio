@@ -79,6 +79,8 @@ export interface ChatStartInput {
   thinking?: ThinkingDepth
   contextTokens?: number
   sendThinking?: boolean
+  /** 本轮随消息暂存的附件绝对路径；workflow 建档时收进项目「附件」目录 */
+  attachmentPaths?: string[]
 }
 
 export interface ChatStartResult {
@@ -353,6 +355,12 @@ export interface WorkspaceInfo {
   path: string
   defaultPath: string
   isDefault: boolean
+}
+
+/** 按赛题分的项目文件夹：注册表里 sessionId → 目录 */
+export interface WorkspaceProject {
+  name: string
+  path: string
 }
 
 export interface WorkspaceEntry {

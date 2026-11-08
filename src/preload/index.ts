@@ -17,7 +17,8 @@ import type {
   StudioMeta,
   WorkbenchResult,
   WorkbenchState,
-  WorkspaceListing
+  WorkspaceListing,
+  WorkspaceProject
 } from '../shared/api'
 
 // 渲染层只能看到这几条窄接口：主进程的 runtime 端口、token 与 API Key 都不经过这里。
@@ -81,7 +82,11 @@ const studioApi = {
     open: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:open', rel),
     revealEntry: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:reveal-entry', rel),
     copyPath: (rel: string): Promise<string> => ipcRenderer.invoke('workspace:copy-path', rel),
-    trash: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:trash', rel)
+    trash: (rel: string): Promise<void> => ipcRenderer.invoke('workspace:trash', rel),
+    project: (chatId: string): Promise<WorkspaceProject | null> =>
+      ipcRenderer.invoke('workspace:project', chatId),
+    openProject: (chatId: string): Promise<void> =>
+      ipcRenderer.invoke('workspace:open-project', chatId)
   },
 
   workbench: {

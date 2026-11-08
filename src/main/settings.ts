@@ -18,6 +18,8 @@ interface SettingsFile {
   version: 1
   activeProvider?: string
   workspace?: string
+  /** 按赛题分项目文件夹；缺省视为开启 */
+  projectFolders?: boolean
   providers: Record<string, StoredProvider>
 }
 
@@ -46,6 +48,7 @@ export function loadSettings(): SettingsFile {
       version: 1,
       activeProvider: typeof raw.activeProvider === 'string' ? raw.activeProvider : undefined,
       workspace: typeof raw.workspace === 'string' && raw.workspace ? raw.workspace : undefined,
+      projectFolders: typeof raw.projectFolders === 'boolean' ? raw.projectFolders : undefined,
       providers
     }
   } catch {
@@ -169,4 +172,13 @@ export function saveWorkspace(path: string | undefined): void {
   if (path) next.workspace = path
   else delete next.workspace
   persist(next)
+}
+
+/** 按赛题分项目文件夹的总开关；未写过时默认开启。 */
+export function projectFoldersEnabled(): boolean {
+  return loadSettings().projectFolders !== false
+}
+
+export function setProjectFolders(enabled: boolean): void {
+  persist({ ...loadSettings(), projectFolders: enabled })
 }
