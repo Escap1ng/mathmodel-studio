@@ -266,7 +266,7 @@ async function main() {
     `发送 disabled=${dom.sendDisabled}，输入 disabled=${dom.inputDisabled}`
   )
   record('G7-4 底色为白', dom.bg === 'rgb(255, 255, 255)', `实得 ${dom.bg}`)
-  record('G7-4 默认强调色 = A 墨青', dom.accent.toLowerCase() === '#17494d', `实得 ${dom.accent}`)
+  record('G7-4 默认强调色 = A 松绿', dom.accent.toLowerCase() === '#16a36a', `实得 ${dom.accent}`)
 
   await win.webContents.executeJavaScript(`document.querySelectorAll('.swatch')[1].click()`)
   await sleep(200)
@@ -1740,7 +1740,7 @@ async function main() {
       half: Math.round(box.width / 2),
       border: after.borderTopWidth,
       background: after.backgroundColor,
-      shellBg: getComputedStyle(document.querySelector('.shell')).backgroundColor,
+      chatBg: getComputedStyle(document.querySelector('.chat')).backgroundColor,
       centerY: Math.round(box.top + parseFloat(after.top) + parseFloat(after.height) / 2),
       cardTop: Math.round(card.getBoundingClientRect().top)
     }
@@ -1750,7 +1750,7 @@ async function main() {
     parseFloat(composerGrip.width) >= 60 &&
       Math.abs(parseFloat(composerGrip.left) - composerGrip.half) <= 1 &&
       composerGrip.border === '1px' &&
-      composerGrip.background === composerGrip.shellBg &&
+      composerGrip.background === composerGrip.chatBg &&
       Math.abs(composerGrip.centerY - composerGrip.cardTop) <= 1,
     JSON.stringify(composerGrip)
   )

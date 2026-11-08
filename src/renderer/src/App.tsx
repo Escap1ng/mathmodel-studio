@@ -36,7 +36,7 @@ import { PHASES, type PhaseState } from './lib/phases'
 type StudioMeta = Awaited<ReturnType<typeof window.studio.meta>>
 
 type Accent = 'a' | 'b' | 'c'
-const ACCENTS: Record<Accent, string> = { a: '墨青', b: '靛蓝', c: '朱砂' }
+const ACCENTS: Record<Accent, string> = { a: '松绿', b: '靛蓝', c: '朱砂' }
 
 const RAIL_WIDTH = 240
 const PANE_MIN = 380

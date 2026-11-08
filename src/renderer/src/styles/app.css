@@ -31,7 +31,8 @@ button {
   grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--pane-w);
   grid-template-rows: minmax(0, 1fr) 30px;
   height: 100%;
-  background: var(--bg);
+  /* 左栏与状态栏露出这层薄荷底，内容面板是白 / 浅绿大色块，不再靠细线切分 */
+  background: var(--chrome);
 }
 
 /* —— 分隔条：拖拽改宽度/高度，键盘方向键也能调 —— */
@@ -148,11 +149,10 @@ button {
 .rail {
   grid-row: 1;
   grid-column: 1;
-  border-right: 1px solid var(--line);
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr);
   min-height: 0;
-  background: var(--bg);
+  background: transparent;
 }
 
 /* 左栏变阵：内容都不卸载，只是两种内容轮流 0fr/1fr。
@@ -192,7 +192,7 @@ button {
 
 .rail__head {
   padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
 }
 
 .rail__title {
@@ -268,6 +268,9 @@ button {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  /* 白色内容面板压在薄荷 chrome 上，左上角用圆角收口 */
+  background: var(--bg);
+  border-top-left-radius: var(--radius-lg);
 }
 
 .chat__streamwrap {
@@ -295,19 +298,19 @@ button {
   align-items: center;
   gap: 7px;
   padding: 6px 12px;
-  border: 1px solid var(--line-strong);
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--bg);
   color: var(--text-2);
   font-size: 12px;
   cursor: pointer;
-  box-shadow: var(--shadow-1);
-  transition: background var(--t), color var(--t), border-color var(--t);
+  box-shadow: var(--shadow-2);
+  transition: background var(--t), color var(--t);
 }
 
 .chat__jump:hover {
-  color: var(--text);
-  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
 }
 
 .chat__jump::before {
@@ -388,9 +391,9 @@ button {
 
 .welcome__chip {
   padding: 6px 12px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid transparent;
   border-radius: var(--radius-pill);
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text-2);
   font-size: 12.5px;
   cursor: pointer;
@@ -399,7 +402,7 @@ button {
 
 .welcome__chip:hover {
   color: var(--accent);
-  border-color: var(--accent);
+  border-color: transparent;
   background: var(--accent-soft);
 }
 
@@ -555,11 +558,12 @@ button {
   gap: 8px;
   max-width: 100%;
   padding: 5px 6px 5px 5px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--bg);
   font-size: 12px;
   color: var(--text);
+  box-shadow: var(--shadow-1);
 }
 
 .file-chip__kind {
@@ -698,7 +702,7 @@ button {
 
 .msg--user .msg__text {
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   padding: 9px 13px;
 }
@@ -783,8 +787,9 @@ button {
 /* —— 思考过程与工具卡 —— */
 .think {
   margin: 8px 0 10px;
-  padding: 2px 0 2px 12px;
-  border-left: 2px solid var(--line-strong);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   color: var(--text-2);
 }
 
@@ -825,7 +830,7 @@ button {
 .tool-card {
   margin: 10px 0;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
@@ -916,7 +921,7 @@ button {
   max-width: 760px;
   margin: 0 auto 8px;
   padding: 8px 12px;
-  border: 1px solid var(--line-strong);
+  border: 0;
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-2);
@@ -941,7 +946,6 @@ button {
 
 .chat__composer {
   position: relative;
-  border-top: 1px solid var(--line);
   padding: 12px 24px 18px;
   display: flex;
   flex-direction: column;
@@ -958,14 +962,21 @@ button {
 .composer {
   width: 100%;
   max-width: 760px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: var(--bg);
-  box-shadow: var(--shadow-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: background var(--t), border-color var(--t), box-shadow var(--t);
+}
+
+/* 输入区是一整块浅绿卡：聚焦时整卡发光，而不是给 textarea 描边 */
+.composer:focus-within {
+  background: var(--bg);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .composer__attach {
@@ -999,7 +1010,7 @@ button {
 }
 
 .pill {
-  border: 1px solid var(--line-strong);
+  border: 1px solid transparent;
   background: var(--bg);
   border-radius: var(--radius-pill);
   padding: 4px 11px;
@@ -1060,19 +1071,18 @@ button:disabled {
 .workspace {
   grid-row: 1;
   grid-column: 3;
-  border-left: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--surface);
+  border-top-right-radius: var(--radius-lg);
 }
 
 .tabs {
   display: flex;
   gap: 4px;
-  padding: 8px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
+  padding: 8px 8px 4px;
+  background: transparent;
   overflow-x: auto;
   /* 窄栏里宁可横向滑动，也不要出现一条压住标签的滚动条 */
   scrollbar-width: none;
@@ -1142,14 +1152,13 @@ button:disabled {
 .statusbar {
   grid-row: 2;
   grid-column: 1 / 4;
-  border-top: 1px solid var(--line);
-  background: var(--bg);
+  background: var(--chrome);
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 14px;
   font-size: 11.5px;
-  color: var(--text-3);
+  color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1179,7 +1188,7 @@ button:disabled {
 }
 
 .swatch--a {
-  background: #17494d;
+  background: #16a36a;
 }
 
 .swatch--b {
@@ -1376,7 +1385,7 @@ button:disabled {
   gap: 8px;
   margin-top: 16px;
   padding: 14px 22px 18px;
-  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 16px rgba(16, 24, 40, 0.04);
 }
 
 .settings__error {
@@ -1525,9 +1534,9 @@ button:disabled {
 .mode-switch {
   display: inline-flex;
   padding: 2px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-pill);
-  background: var(--surface);
+  background: var(--chrome-2);
 }
 
 .mode-switch__btn {
@@ -1552,8 +1561,8 @@ button:disabled {
 .decision {
   margin: 16px 0 6px;
   padding: 18px 20px 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border: 0;
+  border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
@@ -1598,7 +1607,7 @@ button:disabled {
   gap: 12px;
   align-items: baseline;
   padding: 9px 12px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-sm);
   background: var(--bg);
 }
@@ -1634,8 +1643,6 @@ button:disabled {
   align-items: center;
   gap: 10px;
   margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
 }
 
 .decision__foot .btn--primary,
@@ -1675,9 +1682,10 @@ button:disabled {
   flex-direction: column;
   min-width: 0;
   padding: 14px 14px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   background: var(--bg);
+  box-shadow: var(--shadow-1);
 }
 
 .candidate--pick {
@@ -1776,7 +1784,6 @@ button:disabled {
   gap: 6px;
   margin-top: auto;
   padding-top: 10px;
-  border-top: 1px solid var(--line);
 }
 
 /* —— M3：解释抽屉：常挂载，开关用滑入滑出过渡，焦点由组件自理 —— */
@@ -1789,7 +1796,6 @@ button:disabled {
   display: flex;
   flex-direction: column;
   width: min(400px, 88vw);
-  border-left: 1px solid var(--line);
   background: var(--bg);
   box-shadow: -18px 0 40px rgba(20, 24, 30, 0.1);
   transform: translateX(24px);
@@ -1812,7 +1818,6 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 12px;
   padding: 20px 22px 16px;
-  border-bottom: 1px solid var(--line);
 }
 
 .drawer__kicker {
@@ -1877,7 +1882,6 @@ button:disabled {
 .drawer__note {
   margin: 0;
   padding: 14px 22px 18px;
-  border-top: 1px solid var(--line);
   color: var(--text-3);
   font-size: 11.5px;
 }
@@ -1900,17 +1904,17 @@ button:disabled {
   gap: 3px;
   height: 24px;
   padding: 0 9px;
-  border: 1px solid var(--line-strong);
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--bg);
   color: var(--text-2);
   font-size: 11.5px;
   cursor: pointer;
+  box-shadow: var(--shadow-1);
   transition: border-color var(--t), color var(--t), background var(--t);
 }
 
 .rail__new:hover:not(:disabled) {
-  border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -1919,6 +1923,7 @@ button:disabled {
 .rail__convs-inner {
   overflow: auto;
   padding: 8px 8px 6px;
+  gap: 4px;
 }
 
 .rail__convs-foot {
@@ -1944,7 +1949,7 @@ button:disabled {
 }
 
 .rail__divider {
-  border-top: 1px solid var(--line);
+  height: 8px;
 }
 
 .rail__head--phases {
@@ -1955,16 +1960,20 @@ button:disabled {
 .conv {
   display: flex;
   align-items: stretch;
-  border-radius: var(--radius-sm);
-  transition: background var(--t);
+  border-radius: var(--radius);
+  transition: background var(--t), box-shadow var(--t);
 }
 
-.conv:hover {
-  background: var(--surface);
+.conv:hover:not(.conv--active) {
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
 }
 
+/* 当前会话是一张白卡 + 浅绿描边，和 chrome 底拉开一层 */
 .conv--active {
-  background: var(--accent-soft);
+  background: var(--bg);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent),
+    var(--shadow-1);
 }
 
 .conv__main {
@@ -2004,9 +2013,9 @@ button:disabled {
 
 .conv__tag {
   padding: 0 5px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-pill);
-  background: var(--bg);
+  background: var(--chrome-2);
   font-size: 9.5px;
   line-height: 15px;
 }
@@ -2061,8 +2070,7 @@ button:disabled {
   align-items: center;
   gap: 14px;
   padding: 10px 24px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
+  background: transparent;
 }
 
 .chat__head-main {
@@ -2142,8 +2150,7 @@ button:disabled {
   gap: 8px;
   min-height: 45px;
   padding: 8px 10px 8px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
+  background: transparent;
 }
 
 .workspace__name {
@@ -2165,19 +2172,19 @@ button:disabled {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text-2);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
-  transition: border-color var(--t), color var(--t), background var(--t);
+  box-shadow: var(--shadow-1);
+  transition: color var(--t), background var(--t);
 }
 
 .workspace__toggle:hover {
-  border-color: var(--text-3);
-  color: var(--text);
+  color: var(--accent);
 }
 
 .workspace--collapsed .workspace__head {
@@ -2197,7 +2204,7 @@ button:disabled {
   gap: 6px;
   min-width: 0;
   padding: 3px 9px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--bg);
   color: var(--text-2);
@@ -2205,10 +2212,11 @@ button:disabled {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: pointer;
+  box-shadow: var(--shadow-1);
 }
 
 .gate-summary:hover {
-  border-color: var(--text-3);
+  color: var(--accent);
 }
 
 .gate-summary__dots,
@@ -2252,20 +2260,20 @@ button:disabled {
   width: 34px;
   height: 34px;
   padding: 0;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-2);
   font-family: var(--font-cjk);
   font-size: 12.5px;
   cursor: pointer;
-  transition: background var(--t), color var(--t), border-color var(--t);
+  transition: background var(--t), color var(--t), box-shadow var(--t);
 }
 
 .workspace-icon:hover {
-  border-color: var(--line);
   background: var(--bg);
   color: var(--text);
+  box-shadow: var(--shadow-1);
 }
 
 .tabs {
@@ -2329,7 +2337,6 @@ button:disabled {
   flex-direction: column;
   gap: 3px;
   padding: 18px 10px;
-  border-right: 1px solid var(--line);
   background: var(--surface);
   overflow: auto;
 }
@@ -2515,8 +2522,7 @@ button:disabled {
 
 .msg-divider {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  justify-content: center;
   margin: 14px 2px;
   color: var(--text-3);
   font-size: 11.5px;
@@ -2525,10 +2531,7 @@ button:disabled {
 
 .msg-divider::before,
 .msg-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--line, rgba(0, 0, 0, 0.08));
+  content: none;
 }
 
 .msg__error .msg__retry {

@@ -1,24 +1,28 @@
-/* 设计令牌：底色白、层次靠线与阴影而不是靠灰块，强调色三案由 data-accent 切换。
-   取值理由见 PLAN.md §4.4；换整套配色只改本文件，组件里不出现硬编码色值。 */
+/* 设计令牌：白色主体 + 中性灰 chrome，层次靠色块与留白而不是满屏细线；
+   强调色三案由 data-accent 切换。换整套配色只改本文件，组件里不出现硬编码色值。 */
 :root {
   --bg: #ffffff;
-  --surface: #fafafa;
-  --surface-2: #f4f6f8;
-  --line: #edeff2;
-  --line-strong: #dce0e6;
+  --surface: #f3f4f5;
+  --surface-2: #ebecee;
+  --line: #e9ebed;
+  --line-strong: #d9dde1;
+
+  /* 窗口 chrome：左栏、右栏底与状态栏共用，和白色内容面板形成大色块关系 */
+  --chrome: #f4f5f6;
+  --chrome-2: #ebedee;
 
   --text: #1a1d21;
-  --text-2: #6b7280;
-  --text-3: #9aa1ac;
+  --text-2: #5f666d;
+  --text-3: #949aa1;
 
   --ok: #2f7a55;
   --warn: #a9631c;
   --fail: #a63232;
 
-  /* A 墨青：学术、安静，带印刷感 */
-  --accent: #17494d;
-  --accent-hover: #0f3a3e;
-  --accent-soft: rgba(23, 73, 77, 0.08);
+  /* A 松绿：对话与工作台共用的主操作色 */
+  --accent: #16a36a;
+  --accent-hover: #0e8a58;
+  --accent-soft: rgba(22, 163, 106, 0.10);
   --on-accent: #ffffff;
 
   --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
