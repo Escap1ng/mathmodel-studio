@@ -33,8 +33,8 @@ python runtime/selfcheck.py                     # 13/13 条 CLI 断言，含真�
 python runtime/selfcheck_channel.py             # 55/55 条通道断言（含 C15 选模卡）→ exit 0
 python runtime/selfcheck_channel.py --selftest  # 10/10 条坏事件被拒                → exit 0
 python runtime/selfcheck_channel.py --core dsh  # 31/31 条 DSH 断言                 → exit 0
-python runtime/selfcheck_workbench.py           # 13/13 条工作台断言（真渲两版）  → exit 0
-python runtime/selfcheck_paper.py               # 10/10 条论文断言（真编 PDF/DOCX）→ exit 0
+python runtime/selfcheck_workbench.py           # 19/19 条工作台断言（真渲两版）  → exit 0
+python runtime/selfcheck_paper.py               # 12/12 条论文断言（真编 PDF/DOCX）→ exit 0
 ```
 
 `--core dsh` 会自动转发到 `vendor/python`（SDK 与 `dsh.exe` 都装在那里）；系统解释器缺 SDK 时不再误报 `dshVersion`。`selfcheck.py`、`selfcheck_workbench.py` 与 `selfcheck_paper.py` 会真调 matplotlib / xelatex / pandoc（各十几秒）。
@@ -42,7 +42,7 @@ python runtime/selfcheck_paper.py               # 10/10 条论文断言（真编
 需要显示器的部分：
 
 ```bash
-npm run smoke:window   # 真起窗口，106/106，写 screenshots/window-smoke.{png,json} 与各页截图
+npm run smoke:window   # 真起窗口，112/112，写 screenshots/window-smoke.{png,json} 与各页截图
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
 
@@ -65,8 +65,8 @@ CI：<https://github.com/Escap1ng/mathmodel-studio/actions>。0.1.0 尚未在 CI
 | DSH 内核：流式、工具、取消、续聊复用、缺少 dsh 时明确报错 | `selfcheck_channel.py --core dsh` 31/31 | 强（本机） |
 | 打包后 DSH 缺失的报错与密钥边界 | 真实 packaged resources 负向 17/17（2026-11-04，改名后已恢复） | 强（本机） |
 | 内核切换：设置落盘、运行时重启、DSH 下离线演示禁用、切回恢复 | G7-11 五条 | 强（本机） |
-| 界面端到端 106 条：K2→K3→解释→选择、阶段四真跑、图表、评分、论文、附件、多会话、右栏、内核切换 | G7 106/106 | 强（本机） |
-| 图表工作台、评分卡、论文排版与三道门禁 | G9 13/13、G10 10/10、G7 对应段落 | 强（演示数据/演示稿） |
+| 界面端到端 112 条：K2→K3→解释→选择、阶段四真跑、图表、评分、论文、附件、多会话、右栏、内核切换 | G7 112/112 | 强（本机） |
+| 图表工作台、评分卡、论文排版与三道门禁 | G9 19/19、G10 12/12、G7 对应段落 | 强（演示数据/演示稿） |
 | 门禁能抓住坏稿；缺工具 / 坏 TeX / 缺稿件 | G10 反向 P6–P9 | 强（反向） |
 | 0.1.0 的 NSIS 安装包 | 未构建 | **未证** |
 | 0.1.0 在 CI 上的门禁与真启动 | 未复跑 | **未证** |
@@ -106,7 +106,7 @@ CI：<https://github.com/Escap1ng/mathmodel-studio/actions>。0.1.0 尚未在 CI
 3. DSH 适配层：进程管理、WS follow、事件映射、取消、续聊复用、闲置回收。
 4. 设置页内核切换、`settings.json` 持久化、`providerViews` 的 `unavailable` 约束。
 5. 打包布线：SDK 版本记录、`MMS_DSH_*` 环境、resources 路径探测。
-6. 门禁：G4 55、G7 106、DSH 31、G9 13、G10 10、G11 13、G12 14、G13 10。
+6. 门禁：G4 55、G7 112、DSH 31、G9 19、G10 12、G11 13、G12 14、G13 10。
 7. 发布规范 `docs/RELEASE.md`；版本重置为 0.1.0，旧 Release/tag 已删。
 
 仍欠：
@@ -189,7 +189,7 @@ src/renderer/src/
   components/SettingsDialog.tsx  服务商/模型/Key 与对话内核设置
   lib/chat.ts               事件折叠的纯函数
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
-tests/window-smoke.cjs      真启动断言（106 条）+ 截图与 JSON 结论
+tests/window-smoke.cjs      真启动断言（112 条）+ 截图与 JSON 结论
 docs/RELEASE.md             发布格式规范
 .github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu）
 ```
