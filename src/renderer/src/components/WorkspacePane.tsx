@@ -404,46 +404,81 @@ function pdfBytes(dataUrl: string): Uint8Array {
   return bytes
 }
 
-function PdfPreview({ data, onPages }: { data: string; onPages?: (pages: number) => void }) {
+// 已解码的 PDF 按「产物路径#构建时间」缓存：切 tab 再回来免去 base64 解码与重新解析。
+// LRU 只留 3 份；被逐出或键变化时连同 loadingTask 一起 destroy。
+const PDF_CACHE_LIMIT = 3
+interface CachedPdf {
+  task: PDFDocumentLoadingTask
+  promise: Promise<PDFDocumentProxy>
+}
+const pdfDocs = new Map<string, CachedPdf>()
+
+function loadPdfDoc(key: string, makeBytes: () => Uint8Array): Promise<PDFDocumentProxy> {
+  const hit = pdfDocs.get(key)
+  if (hit) {
+    pdfDocs.delete(key)
+    pdfDocs.set(key, hit)
+    return hit.promise
+  }
+  // 传二进制而不是 data: URL：pdf.js 默认会去 fetch，CSP 的 connect-src 不放行 data:。
+  const task = getDocument({ data: makeBytes() })
+  const entry: CachedPdf = { task, promise: task.promise }
+  pdfDocs.set(key, entry)
+  entry.promise.catch(() => {
+    if (pdfDocs.get(key) === entry) pdfDocs.delete(key)
+  })
+  while (pdfDocs.size > PDF_CACHE_LIMIT) {
+    const oldestKey = pdfDocs.keys().next().value as string | undefined
+    if (oldestKey == null) break
+    const oldest = pdfDocs.get(oldestKey)
+    pdfDocs.delete(oldestKey)
+    void oldest?.task.destroy().catch(() => undefined)
+  }
+  return entry.promise
+}
+
+function PdfPreview({
+  data,
+  cacheKey,
+  page,
+  onPage,
+  onPages
+}: {
+  data: string
+  cacheKey: string
+  page: number
+  onPage: (page: number) => void
+  onPages?: (pages: number) => void
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const docRef = useRef<PDFDocumentProxy | null>(null)
-  const taskRef = useRef<PDFDocumentLoadingTask | null>(null)
-  const [page, setPage] = useState(1)
+  const dataRef = useRef(data)
+  dataRef.current = data
   const [pages, setPages] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
-    setPage(1)
     setPages(0)
     onPages?.(0)
     setError(null)
-    let task: PDFDocumentLoadingTask
-    try {
-      // 传二进制而不是 data: URL：pdf.js 默认会去 fetch，CSP 的 connect-src 不放行 data:。
-      task = getDocument({ data: pdfBytes(data) })
-    } catch (err) {
-      setError(errorText(err))
-      return
-    }
-    taskRef.current = task
-    task.promise
+    loadPdfDoc(cacheKey, () => pdfBytes(dataRef.current))
       .then((doc) => {
         if (!alive) return
         docRef.current = doc
         setPages(doc.numPages)
         onPages?.(doc.numPages)
+        if (page > doc.numPages) onPage(doc.numPages)
       })
       .catch((err: unknown) => {
         if (alive) setError(errorText(err))
       })
     return () => {
       alive = false
-      void taskRef.current?.destroy()
-      taskRef.current = null
       docRef.current = null
     }
-  }, [data, onPages])
+    // page/onPage 只用于越界回夹，不参与重载
+  }, [cacheKey])
 
   useEffect(() => {
     const doc = docRef.current
@@ -475,13 +510,13 @@ function PdfPreview({ data, onPages }: { data: string; onPages?: (pages: number)
       <canvas ref={canvasRef} aria-label={`论文第 ${page} 页`} />
       {pages > 1 ? (
         <div className="paper-pager">
-          <button type="button" className="linkbtn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          <button type="button" className="linkbtn" disabled={page <= 1} onClick={() => onPage(page - 1)}>
             上一页
           </button>
           <span>
             {page} / {pages}
           </span>
-          <button type="button" className="linkbtn" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>
+          <button type="button" className="linkbtn" disabled={page >= pages} onClick={() => onPage(page + 1)}>
             下一页
           </button>
         </div>
@@ -494,11 +529,15 @@ function PaperPanel({
   state,
   building,
   error,
+  page,
+  onPage,
   onBuild
 }: {
   state: WorkbenchState
   building: boolean
   error: string | null
+  page: number
+  onPage: (page: number) => void
   onBuild: () => void
 }) {
   const paper: PaperState = state.paper
@@ -543,7 +582,13 @@ function PaperPanel({
       <div className="paper-layout">
         <div className="paper-layout__preview">
           {paper.pdfData ? (
-            <PdfPreview data={paper.pdfData} onPages={setPdfPages} />
+            <PdfPreview
+              data={paper.pdfData}
+              cacheKey={`${paper.artifacts.pdf?.path ?? 'paper'}#${paper.builtAt ?? paper.artifacts.pdf?.size ?? 0}`}
+              page={page}
+              onPage={onPage}
+              onPages={setPdfPages}
+            />
           ) : built ? (
             <div className="panel__empty">
               <p>上次构建的 PDF 不在了，重新构建一次。</p>
@@ -629,6 +674,13 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle }: Pro
   const [roundNo, setRoundNo] = useState(2)
   const [vetoMode, setVetoMode] = useState(false)
   const [deduction, setDeduction] = useState<ScoreDeduction | null>(null)
+  // 论文预览页码按产物路径记：切去图表再回来、重开论文页都能停在原页。
+  const [pdfPages, setPdfPages] = useState<Record<string, number>>({})
+  const pdfPath = state?.paper.artifacts.pdf?.path ?? 'paper'
+  const paperPage = pdfPages[pdfPath] ?? 1
+  const setPaperPage = (page: number): void => {
+    setPdfPages((prev) => ({ ...prev, [pdfPath]: page }))
+  }
 
   const renderFigure = async (nextTemplate: string, nextTheme: string): Promise<void> => {
     setRendering(true)
@@ -851,7 +903,14 @@ export default function WorkspacePane({ runtimeReady, collapsed, onToggle }: Pro
         {state && active === 'code' ? <CodePanel state={state} onGoto={setActive} /> : null}
         {state && active === 'log' ? <LogPanel state={state} onGoto={setActive} /> : null}
         {state && active === 'paper' ? (
-          <PaperPanel state={state} building={building} error={error} onBuild={() => void buildPaper()} />
+          <PaperPanel
+            state={state}
+            building={building}
+            error={error}
+            page={paperPage}
+            onPage={setPaperPage}
+            onBuild={() => void buildPaper()}
+          />
         ) : null}
           </div>
         </>
