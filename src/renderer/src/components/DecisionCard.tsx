@@ -62,11 +62,18 @@ export function candidatesOf(payload: Record<string, unknown>): ModelCandidate[]
 interface Props {
   card: InterruptCard
   busy: boolean
+  resolving?: boolean
   onDecision: (action: DecisionAction, choice?: string) => void
   onExplain: (candidate: ModelCandidate) => void
 }
 
-function ProblemConfirm({ card, busy, onDecision }: Props) {
+/** 点击后的等待反馈：resolving 且已 resolved 时给一次呼吸点，已 resolved 仍 disabled */
+function ResolvingMark({ show }: { show: boolean }) {
+  if (!show) return null
+  return <i className="decision__spinner" aria-hidden="true" />
+}
+
+function ProblemConfirm({ card, busy, resolving, onDecision }: Props) {
   const payload = card.payload
   const questions = records(payload.questions)
   const attachments = records(payload.attachments)
@@ -93,6 +100,7 @@ function ProblemConfirm({ card, busy, onDecision }: Props) {
       </div>
       <div className="decision__foot">
         {resolved ? <span className="decision__resolved">{resolved}</span> : null}
+        <ResolvingMark show={resolving === true} />
         <button
           type="button"
           className="btn btn--primary"
@@ -107,7 +115,7 @@ function ProblemConfirm({ card, busy, onDecision }: Props) {
   )
 }
 
-function ModelChoice({ card, busy, onDecision, onExplain }: Props) {
+function ModelChoice({ card, busy, resolving, onDecision, onExplain }: Props) {
   const payload = card.payload
   const candidates = candidatesOf(payload)
   const resolved = card.resolved
@@ -181,6 +189,7 @@ function ModelChoice({ card, busy, onDecision, onExplain }: Props) {
       </div>
       <div className="decision__foot">
         {resolved ? <span className="decision__resolved">{resolved}</span> : null}
+        <ResolvingMark show={resolving === true} />
         <span className="decision__batch">第 {text(payload.batch, '1')} 组</span>
         <button
           type="button"

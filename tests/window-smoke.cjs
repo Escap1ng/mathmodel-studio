@@ -1080,7 +1080,15 @@ async function main() {
     `非白像素 ${(drawerInk.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
   )
   await win.webContents.executeJavaScript(`document.querySelector('[data-action="close-drawer"]')?.click()`)
-  const drawerClosed = await waitFor(win, `!document.querySelector('.drawer')`, 5000)
+  // 抽屉常挂载：关闭 = 元素还在但 data-open=false 且视觉隐藏
+  const drawerClosed = await waitFor(
+    win,
+    `(() => {
+      const d = document.querySelector('.drawer')
+      return !!d && d.dataset.open === 'false' && getComputedStyle(d).visibility === 'hidden'
+    })()`,
+    5000
+  )
   record('G7-7 解释抽屉可以关闭', drawerClosed, `关闭后仍存在=${!drawerClosed}`)
 
   // 杀掉 runtime 再拉起：待选卡必须从 SQLite 快照回到界面，而不是靠内存。

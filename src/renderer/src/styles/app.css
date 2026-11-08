@@ -766,6 +766,20 @@ button {
   margin: 8px 0 0;
 }
 
+/* 助手消息底部操作行：hover 或键盘聚焦时显形 */
+.msg__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  opacity: 0;
+  transition: opacity var(--t);
+}
+
+.msg--assistant:hover .msg__actions,
+.msg__actions:focus-within {
+  opacity: 1;
+}
+
 /* —— 思考过程与工具卡 —— */
 .think {
   margin: 8px 0 10px;
@@ -1635,6 +1649,15 @@ button:disabled {
   font-weight: 600;
 }
 
+/* 点了卡之后的等待反馈：一枚呼吸点，动画在 reduced-motion 下归零 */
+.decision__spinner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: msg-pending-breathe 1.2s ease-in-out infinite;
+}
+
 .decision__batch {
   margin-left: auto;
   color: var(--text-3);
@@ -1756,7 +1779,7 @@ button:disabled {
   border-top: 1px solid var(--line);
 }
 
-/* —— M3：解释抽屉 —— */
+/* —— M3：解释抽屉：常挂载，开关用滑入滑出过渡，焦点由组件自理 —— */
 .drawer {
   position: fixed;
   top: 0;
@@ -1769,6 +1792,19 @@ button:disabled {
   border-left: 1px solid var(--line);
   background: var(--bg);
   box-shadow: -18px 0 40px rgba(20, 24, 30, 0.1);
+  transform: translateX(24px);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform var(--t) var(--ease-emphasized, ease), opacity var(--t), visibility 0s var(--t);
+}
+
+.drawer[data-open='true'] {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: transform var(--t) var(--ease-emphasized, ease), opacity var(--t), visibility 0s;
 }
 
 .drawer__head {

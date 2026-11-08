@@ -172,9 +172,14 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null)
   const [entries, setEntries] = useState<ChatEntry[]>([])
   const [streaming, setStreaming] = useState(false)
+  // 卡片点击后的等待反馈；下一轮流结束或出错时清除
+  const [resolving, setResolving] = useState(false)
   const [phases, setPhases] = useState<Record<number, PhaseState>>({})
   const [mode, setMode] = useState<'workflow' | 'chat'>('chat')
   const [explain, setExplain] = useState<ModelCandidate | null>(null)
+  // 抽屉常挂载做滑入滑出过渡；关闭瞬间还要有内容可画，留最近一次候选
+  const lastExplainRef = useRef<ModelCandidate | null>(null)
+  if (explain) lastExplainRef.current = explain
   const [paneWidth, setPaneWidth] = useState<number | null>(readPaneWidth)
   const [resizingPane, setResizingPane] = useState(false)
   const [collapseByMode, setCollapseByMode] = useState<CollapseByMode>(readWorkspaceCollapse)
@@ -195,6 +200,8 @@ export default function App() {
   const buffered = useRef(new Map<string, ChatEvent[]>())
   const sessionId = useRef<string | null>(null)
   const entriesRef = useRef<ChatEntry[]>([])
+  // 数模卡片的最近一次决策操作：错误重试时重放同一次 resume
+  const lastResume = useRef<{ action: DecisionAction; choice?: string } | null>(null)
 
   useEffect(() => {
     entriesRef.current = entries
@@ -458,7 +465,9 @@ export default function App() {
       activeChat.current = null
       activeAssistant.current = null
       setStreaming(false)
+      setResolving(false)
     }
+    if (event.event === 'error') setResolving(false)
     return true
   }
 
@@ -780,12 +789,15 @@ export default function App() {
         : action === 'reroll'
           ? '换一批候选模型（batch 加 1）。'
           : '确认。'
+    setResolving(true)
     await send(text)
   }
 
   const resume = async (action: DecisionAction, choice?: string): Promise<void> => {
     const sid = sessionId.current
     if (!sid || streaming) return
+    // 数模错误重试要重放的卡操作；retry 失败回滚时不动它。
+    lastResume.current = { action, choice }
     const pendingEntry = [...entries]
       .reverse()
       .find((entry) => entry.interrupt && !entry.interrupt.resolved)
@@ -812,6 +824,7 @@ export default function App() {
       { id: assistantId, role: 'assistant', reasoning: '', parts: [], streaming: true }
     ])
     setStreaming(true)
+    setResolving(true)
     setNotice(null)
     setTrimNote(null)
     setActiveKind('workflow')
@@ -832,6 +845,7 @@ export default function App() {
       activeChat.current = null
       activeAssistant.current = null
       setStreaming(false)
+      setResolving(false)
       setEntries((prev) =>
         prev.map((entry) => {
           if (entry.id === assistantId) {
@@ -848,8 +862,33 @@ export default function App() {
     }
   }
 
+  // 从某一条 assistant 消息重发：定位它前面最近的 user，把该问之后的内容截断重发。
+  // 仅正常模式；数模的错误走 retry 的 resume 重放。
+  const retryFromEntry = (entryId: string): void => {
+    if (streaming) return
+    const index = entries.findIndex((entry) => entry.id === entryId)
+    if (index < 0) return
+    let userIdx = -1
+    for (let scan = index - 1; scan >= 0; scan--) {
+      if (entries[scan].role === 'user') {
+        userIdx = scan
+        break
+      }
+    }
+    if (userIdx < 0) return
+    const user = entries[userIdx]
+    void send(userText(user), { attachments: user.attachments, context: user.context }, userIdx)
+  }
+
+  // 消息里的「重试」按钮：数模在会话里时重放最近一次卡决策；正常模式重发最后一问。
   const retry = (): void => {
     if (streaming) return
+    if (mode === 'workflow') {
+      if (sessionId.current && lastResume.current) {
+        void resume(lastResume.current.action, lastResume.current.choice)
+      }
+      return
+    }
     const lastUser = [...entries].reverse().find((entry) => entry.role === 'user')
     if (!lastUser) return
     const index = entries.findIndex((entry) => entry.id === lastUser.id)
@@ -874,6 +913,7 @@ export default function App() {
       activeChat.current = null
       activeAssistant.current = null
       setStreaming(false)
+      setResolving(false)
       setEntries((prev) =>
         prev.map((entry) =>
           entry.id === assistantId && entry.streaming
@@ -1002,9 +1042,11 @@ export default function App() {
         depthLabel={selectedDepthLabel}
         usedTokens={usedTokens}
         trimNote={trimNote}
+        resolving={resolving}
         onModeChange={changeMode}
         onSend={(text, extras) => void send(text, extras)}
         onRetry={retry}
+        onRegenerate={retryFromEntry}
         onStop={stop}
         onDecision={(action, choice) =>
           mode === 'workflow' ? void resume(action, choice) : void decideInChat(action, choice)
@@ -1034,7 +1076,13 @@ export default function App() {
         onDoubleClick={() => setPaneWidth(null)}
         onKeyDown={onPaneKey}
       />
-      {explain ? <ExplainDrawer candidate={explain} onClose={() => setExplain(null)} /> : null}
+      {lastExplainRef.current ? (
+        <ExplainDrawer
+          candidate={lastExplainRef.current}
+          open={explain != null}
+          onClose={() => setExplain(null)}
+        />
+      ) : null}
       <footer className="statusbar">
         <span>{meta ? `v${meta.version}` : '主进程未响应'}</span>
         <span className={`status-dot status-dot--${runtime.state}`} aria-hidden="true" />

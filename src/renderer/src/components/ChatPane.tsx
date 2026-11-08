@@ -12,6 +12,7 @@ import { isRecordData, type ChatEntry, type ToolCard } from '../lib/chat'
 import { formatTokens } from '../lib/context'
 import { PHASES, STATE_TEXT, type PhaseState } from '../lib/phases'
 import DecisionCard, { type ModelCandidate } from './DecisionCard'
+import MessageActions from './MessageActions'
 import WelcomeScreen from './WelcomeScreen'
 import FileChips from './FileChips'
 import MarkdownView from './MarkdownView'
@@ -69,9 +70,11 @@ interface Props {
   depthLabel: string
   usedTokens: number
   trimNote: string | null
+  resolving: boolean
   onModeChange: (mode: 'workflow' | 'chat') => void
   onSend: (text: string, extras?: SendExtras) => void
   onRetry: () => void
+  onRegenerate: (entryId: string) => void
   onStop: () => void
   onDecision: (action: DecisionAction, choice?: string) => void
   onExplain: (candidate: ModelCandidate) => void
@@ -143,12 +146,16 @@ function EntryViewBase({
   entry,
   onDecision,
   onExplain,
-  onRetry
+  onRetry,
+  onRegenerate,
+  resolving
 }: {
   entry: ChatEntry
   onDecision: (action: DecisionAction, choice?: string) => void
   onExplain: (candidate: ModelCandidate) => void
   onRetry?: () => void
+  onRegenerate?: (entryId: string) => void
+  resolving?: boolean
 }) {
   if (entry.role === 'user') {
     const text = entry.parts.map((p) => (p.kind === 'text' ? p.text : '')).join('')
@@ -195,6 +202,7 @@ function EntryViewBase({
         <DecisionCard
           card={entry.interrupt}
           busy={entry.streaming}
+          resolving={resolving}
           onDecision={onDecision}
           onExplain={onExplain}
         />
@@ -215,6 +223,9 @@ function EntryViewBase({
       ) : null}
       {entry.doneReason === 'max_tool_rounds' ? (
         <div className="msg__note">工具调用轮数已用尽，这一轮先停在这里。</div>
+      ) : null}
+      {!entry.streaming ? (
+        <MessageActions entry={entry} onRegenerate={onRegenerate} />
       ) : null}
     </article>
   )
@@ -239,9 +250,11 @@ export default function ChatPane({
   depthLabel,
   usedTokens,
   trimNote,
+  resolving,
   onModeChange,
   onSend,
   onRetry,
+  onRegenerate,
   onStop,
   onDecision,
   onExplain,
@@ -262,9 +275,9 @@ export default function ChatPane({
   const [staging, setStaging] = useState(false)
   const [attaching, setAttaching] = useState(false)
   const stageLock = useRef(false)
-  // 决策/解释/重试经 latest ref 转发，别名引用不随渲染变化，EntryView 的 memo 才能命中。
-  const handlers = useRef({ onDecision, onExplain, onRetry })
-  handlers.current = { onDecision, onExplain, onRetry }
+  // 决策/解释/重试/重新生成经 latest ref 转发，别名引用不随渲染变化，EntryView 的 memo 才能命中。
+  const handlers = useRef({ onDecision, onExplain, onRetry, onRegenerate })
+  handlers.current = { onDecision, onExplain, onRetry, onRegenerate }
   const handleDecision = useCallback((action: DecisionAction, choice?: string): void => {
     handlers.current.onDecision(action, choice)
   }, [])
@@ -273,6 +286,9 @@ export default function ChatPane({
   }, [])
   const handleRetry = useCallback((): void => {
     handlers.current.onRetry()
+  }, [])
+  const handleRegenerate = useCallback((entryId: string): void => {
+    handlers.current.onRegenerate(entryId)
   }, [])
   const rounds = useMemo(
     () => entries.reduce((count, entry) => (entry.role === 'user' ? count + 1 : count), 0),
@@ -713,7 +729,9 @@ export default function ChatPane({
                       entry={entry}
                       onDecision={handleDecision}
                       onExplain={handleExplain}
-                      onRetry={entry.error && mode === 'chat' ? handleRetry : undefined}
+                      onRetry={entry.error ? handleRetry : undefined}
+                      onRegenerate={mode === 'chat' ? handleRegenerate : undefined}
+                      resolving={resolving}
                     />
                   )
                 )}
