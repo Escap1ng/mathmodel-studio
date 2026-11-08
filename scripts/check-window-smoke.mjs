@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 100
+const MIN_ASSERTIONS = 105
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -29,6 +29,8 @@ const REQUIRED_ASSERTIONS = [
   'G7-3 runtime 通过握手就绪',
   'G7-4 空状态大框与加号居中',
   'G7-4 拖入文件时大框高亮',
+  'G7-4 问答默认收起为 7 图标',
+  'G7-4 图标展开后 7 个标签',
   'G7-4 附件正文抽取（PDF/CSV）',
   'G7-4 只读取工作区里的文件',
   'G7-4 附件暂存到工作区',
@@ -87,7 +89,13 @@ const REQUIRED_ASSERTIONS = [
   'G7-10 按钮行在输入框卡片外且同宽',
   'G7-10 按钮行不随输入框拉伸移动',
   'G7-10 右栏可收起为图标条',
-  'G7-10 点图标展开并切到对应页'
+  'G7-10 点图标展开并切到对应页',
+  'G7-12 问答手动收起写 chat 偏好',
+  'G7-12 切建模有列宽过渡',
+  'G7-12 进入建模自动展开大工作台',
+  'G7-12 建模态阶段轨道整块展开',
+  'G7-12 退出建模恢复问答收起偏好',
+  'G7-12 阶段区隐藏但仍在 DOM'
 ]
 
 const problems = []

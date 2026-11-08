@@ -211,6 +211,8 @@ async function main() {
   const dom = await win.webContents.executeJavaScript(`({
     statusbar: document.querySelector('.statusbar')?.textContent ?? '',
     phases: document.querySelectorAll('.phase').length,
+    icons: document.querySelectorAll('.workspace-icon').length,
+    pane: Math.round(document.querySelector('.workspace')?.getBoundingClientRect().width ?? 0),
     tabs: document.querySelectorAll('.tab').length,
     accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
     sendDisabled: document.querySelector('.pill--send')?.disabled ?? null,
@@ -246,14 +248,18 @@ async function main() {
     `模型条: ${JSON.stringify(dom.modelPill)}`
   )
 
-  record('G7-4 阶段轨道 7 节', dom.phases === 7, `实得 ${dom.phases}`)
+  record('G7-4 阶段轨道 7 节不因变阵卸载', dom.phases === 7, `实得 ${dom.phases}`)
   const appMenu = Menu.getApplicationMenu()
   record(
     'G7-4 Windows/Linux 不挂英文系统菜单',
     process.platform === 'darwin' || appMenu === null,
     `platform=${process.platform}，应用菜单=${appMenu === null ? 'null' : 'still set'}`
   )
-  record('G7-4 工作台 7 个标签', dom.tabs === 7, `实得 ${dom.tabs}`)
+  record(
+    'G7-4 问答默认收起为 7 图标',
+    dom.icons === 7 && dom.tabs === 0 && dom.pane <= 60,
+    `icons=${dom.icons}，tabs=${dom.tabs}，pane=${dom.pane}`
+  )
   record(
     'G7-4 输入区在 runtime 就绪后可用',
     ready && dom.sendDisabled === false && dom.inputDisabled === false,
@@ -349,6 +355,21 @@ async function main() {
     const shot = await capture(win)
     writeFileSync(join(OUT_DIR, 'dropzone.png'), shot.toPNG())
 
+    // 文件页：答辩模式默认收起，先用文件图标展开成标签态，后续 tab 用例在展开态继续。
+    await win.webContents.executeJavaScript(
+      `document.querySelector('.workspace-icon[data-tab="files"]')?.click()`
+    )
+    await sleep(260)
+    const expandedTabs = await win.webContents.executeJavaScript(`({
+      pane: Math.round(document.querySelector('.workspace')?.getBoundingClientRect().width ?? 0),
+      tabs: document.querySelectorAll('.tab').length,
+      stored: localStorage.getItem('mms.workspaceCollapsed.chat')
+    })`)
+    record(
+      'G7-4 图标展开后 7 个标签',
+      expandedTabs.pane > 100 && expandedTabs.tabs === 7 && expandedTabs.stored === '0',
+      JSON.stringify(expandedTabs)
+    )
     // 文件页：切过去应当看到工作区路径，并在列表里看到刚拖进来的文件；
     // 移除并刷新后，条目要跟着消失（列表读的是磁盘，不是缓存）。
     await win.webContents.executeJavaScript(
@@ -1471,6 +1492,15 @@ async function main() {
   record('G7-7 删除历史会话', armed && removedChat, `二次确认=${armed}，删除=${removedChat}`)
 
   // —— 布局：宽屏比例与两处分隔条 ——
+  // 量的是展开态宽度：当前 prefs 可能停在收起，先显式展开。
+  await win.webContents.executeJavaScript(`(() => {
+    const width = Math.round(document.querySelector('.workspace')?.getBoundingClientRect().width ?? 0)
+    if (width > 60) return 'already'
+    const icon = document.querySelector('.workspace-icon[data-tab="files"]') ?? document.querySelector('.workspace-icon')
+    icon?.click()
+    return 'reopened'
+  })()`)
+  await sleep(260)
   win.setContentSize(2400, 1200)
   await waitFor(
     win,
@@ -1711,7 +1741,7 @@ async function main() {
     tabs: document.querySelectorAll('.tab').length,
     splitter: getComputedStyle(document.querySelector('[data-splitter="pane"]')).display,
     gateDots: document.querySelectorAll('.workspace__gate-dots i').length,
-    stored: localStorage.getItem('mms.workspaceCollapsed')
+    stored: localStorage.getItem('mms.workspaceCollapsed.chat')
   })`)
   record(
     'G7-10 右栏可收起为图标条',
@@ -1743,6 +1773,65 @@ async function main() {
     JSON.stringify(reopenedPane)
   )
 
+  // —— G7-12 模式变阵：手动偏好、切换过渡、自动展开、阶段轨道换手与恢复 ——
+  await win.webContents.executeJavaScript(`document.querySelector('.workspace__toggle')?.click()`)
+  await sleep(200)
+  const g712Collapsed = await win.webContents.executeJavaScript(`({
+    pane: Math.round(document.querySelector('.workspace')?.getBoundingClientRect().width ?? 0),
+    pref: localStorage.getItem('mms.workspaceCollapsed.chat')
+  })`)
+  record(
+    'G7-12 问答手动收起写 chat 偏好',
+    g712Collapsed.pane <= 60 && g712Collapsed.pref === '1',
+    JSON.stringify(g712Collapsed)
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn')?.click()`)
+  const g712Animating = await win.webContents.executeJavaScript(
+    `document.querySelector('.shell')?.dataset.modeAnimating ?? null`
+  )
+  record(
+    'G7-12 切建模有列宽过渡',
+    g712Animating === 'true',
+    `data-mode-animating=${g712Animating}`
+  )
+  await sleep(650)
+  const g712Workflow = await win.webContents.executeJavaScript(`({
+    mode: document.querySelector('.shell')?.dataset.mode,
+    pane: Math.round(document.querySelector('.workspace')?.getBoundingClientRect().width ?? 0),
+    track: Math.round(document.querySelector('.rail__phases')?.getBoundingClientRect().height ?? 0)
+  })`)
+  record(
+    'G7-12 进入建模自动展开大工作台',
+    g712Workflow.mode === 'workflow' && g712Workflow.pane > 800,
+    JSON.stringify(g712Workflow)
+  )
+  record(
+    'G7-12 建模态阶段轨道整块展开',
+    g712Workflow.track > 120,
+    `track=${g712Workflow.track}`
+  )
+
+  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn')?.click()`)
+  await sleep(650)
+  const g712Back = await win.webContents.executeJavaScript(`({
+    mode: document.querySelector('.shell')?.dataset.mode,
+    pane: Math.round(document.querySelector('.workspace')?.getBoundingClientRect().width ?? 0),
+    track: Math.round(document.querySelector('.rail__phases')?.getBoundingClientRect().height ?? -1),
+    phases: document.querySelectorAll('.phase').length,
+    splitter: getComputedStyle(document.querySelector('[data-splitter="pane"]')).display
+  })`)
+  record(
+    'G7-12 退出建模恢复问答收起偏好',
+    g712Back.mode === 'chat' && g712Back.pane <= 60 && g712Back.splitter === 'none',
+    JSON.stringify(g712Back)
+  )
+  record(
+    'G7-12 阶段区隐藏但仍在 DOM',
+    g712Back.phases === 7 && g712Back.track === 0,
+    `phases=${g712Back.phases}，track=${g712Back.track}`
+  )
+
   // —— 清空历史：二次确认后列表与阶段一起复位 ——
   await win.webContents.executeJavaScript(`document.querySelector('.rail__clear')?.click()`)
   await sleep(180)
@@ -1761,6 +1850,14 @@ async function main() {
     `二次确认=${clearArmed}，清空=${historyCleared}`
   )
 
+  // G7-12 走完停在问答收起态：先展开，分隔条的双击复位才摸得到
+  await win.webContents.executeJavaScript(`(() => {
+    const width = Math.round(document.querySelector('.workspace')?.getBoundingClientRect().width ?? 0)
+    if (width > 60) return 'already'
+    ;(document.querySelector('.workspace-icon[data-tab="files"]') ?? document.querySelector('.workspace-icon'))?.click()
+    return 'reopened'
+  })()`)
+  await sleep(260)
   // 双击恢复默认，再把窗口还原，避免影响后续人工看图
   await win.webContents.executeJavaScript(
     `document.querySelector('[data-splitter="pane"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`
