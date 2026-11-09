@@ -3,7 +3,7 @@ import type { AttachmentRef } from './attachments'
 
 // 一条助手回复由若干段组成：文字与工具卡按发生顺序排列，
 // 这样「先说一句 → 调工具 → 再总结」在界面上不会被打乱成两段。
-export type ChatPart =
+type ChatPart =
   | { kind: 'text'; text: string }
   | { kind: 'tool'; tool: ToolCard }
 
@@ -43,7 +43,7 @@ export function assistantText(entry: ChatEntry): string {
     .join('\n\n')
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -109,8 +109,4 @@ export function applyChatEvent(entry: ChatEntry, event: ChatEvent): ChatEntry {
       // gate / artifact 留给后面的里程碑；未知事件不能打断当前流。
       return entry
   }
-}
-
-export function isRecordData(value: unknown): value is Record<string, unknown> {
-  return isRecord(value)
 }

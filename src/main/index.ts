@@ -3,7 +3,8 @@ import { APP_ROOT, runtimePython } from './runtime-env'
 import { readFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
-import { Channel, type ChatEventPayload, type ProviderRow, type RuntimeStatus } from './channel'
+import { Channel, type ChatEventPayload, type ProviderRow } from './channel'
+import type { RuntimeStatus } from '../shared/api'
 import { attachmentContext } from './extract'
 import {
   adoptAttachments,

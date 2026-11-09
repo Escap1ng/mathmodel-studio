@@ -8,7 +8,7 @@ import type {
 } from 'react'
 import type { DecisionAction, ProviderView, RuntimeStatus, StagedFile } from '../../../../shared/api'
 import { buildContextText, WORKSPACE_DRAG, type SendExtras } from '../../lib/attachments'
-import { isRecordData, type ChatEntry, type ToolCard } from '../../lib/chat'
+import { isRecord, type ChatEntry, type ToolCard } from '../../lib/chat'
 import { formatTokens } from '../../lib/context'
 import { errorText } from '../../lib/format'
 import { PHASES, STATE_TEXT, type PhaseState } from '../../lib/phases'
@@ -97,9 +97,9 @@ function formatArgs(args: unknown): string {
 function describeTool(tool: ToolCard): string | null {
   if (tool.status === 'running' || tool.status === 'error') return null
   const result = tool.result
-  if (isRecordData(result)) {
+  if (isRecord(result)) {
     if (result.ok === false && typeof result.error === 'string') return result.error
-    if (typeof result.total === 'number' && isRecordData(result.by_skill)) {
+    if (typeof result.total === 'number' && isRecord(result.by_skill)) {
       return `载入 ${result.total} 个模板，覆盖 ${Object.keys(result.by_skill).length} 个技能`
     }
   }

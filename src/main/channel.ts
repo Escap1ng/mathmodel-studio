@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ReasoningSpec } from '../shared/api'
+import type { ReasoningSpec, RuntimeStatus } from '../shared/api'
 
 // 与 runtime/src/mms/server.py 的握手契约。渲染层永远拿不到 port 与 token。
 export interface ChannelHandshake {
@@ -10,15 +10,6 @@ export interface ChannelHandshake {
   pid: number
   fake: boolean
   version: string
-}
-
-export type RuntimeState = 'starting' | 'ready' | 'error'
-
-export interface RuntimeStatus {
-  state: RuntimeState
-  message?: string
-  version?: string
-  fake?: boolean
 }
 
 export interface ProviderRow {
