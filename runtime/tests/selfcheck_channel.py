@@ -23,26 +23,12 @@ import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-# 同 selfcheck.py：CI 的 Windows 控制台是 cp1252，不重配会在打印中文时崩
-for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        try:
-            _stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
+from checklib import ROOT, check, report
 
-ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schemas" / "chat-events.schema.json"
 SENTINEL = "sk-test-SENTINEL-DO-NOT-LEAK"
 EVENT_TYPES = {"token", "reasoning", "tool_call", "compaction", "artifact", "interrupt", "gate", "phase", "error", "done"}
-sys.path.insert(0, str(ROOT / "runtime" / "src"))
 from mms.provider import apply_reasoning, find_provider  # noqa: E402
-
-results: list[dict] = []
-
-
-def check(name: str, ok: bool, detail: str = "") -> None:
-    results.append({"name": name, "ok": bool(ok), "detail": detail})
 
 
 def lint_event(ev) -> list[str]:
@@ -367,11 +353,7 @@ def run_fake_chat(channel: Channel, api_key: str = "") -> tuple[list[dict], str,
 
 
 def finish() -> None:
-    failed = [r for r in results if not r["ok"]]
-    for row in results:
-        print(f"{'PASS' if row['ok'] else 'FAIL'} {row['name']}\n       {row['detail']}")
-    print(f"\n{len(results) - len(failed)}/{len(results)} 条通道契约断言通过")
-    raise SystemExit(0 if not failed else 1)
+    raise SystemExit(report("通道契约断言通过"))
 
 
 def tests() -> None:

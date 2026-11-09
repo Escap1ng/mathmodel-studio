@@ -41,24 +41,8 @@ def load_manifest(root: Path | None = None) -> dict:
         return json.load(fh)
 
 
-def repo_version(root: Path | None = None) -> str:
-    path = (root or repo_root()) / "VERSION"
-    try:
-        return path.read_text(encoding="utf-8").strip()
-    except FileNotFoundError as exc:
-        raise EnvError(f"VERSION 文件不存在: {path}") from exc
-
-
 def skills(manifest: dict) -> list[dict]:
     return list(manifest.get("skills") or [])
-
-
-def for_phase(manifest: dict, phase: int) -> list[dict]:
-    return [s for s in skills(manifest) if phase in (s.get("ui") or {}).get("phases", [])]
-
-
-def for_hitl(manifest: dict, card: str) -> list[dict]:
-    return [s for s in skills(manifest) if card in (s.get("ui") or {}).get("hitl", [])]
 
 
 def minimal_validate(manifest: dict) -> list[str]:

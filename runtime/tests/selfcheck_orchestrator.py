@@ -14,15 +14,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        try:
-            _stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
-
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "runtime" / "src"))
+from checklib import ROOT, check, report
 
 from mms import orchestrator, workbench_figure  # noqa: E402
 from mms.store import SessionStore  # noqa: E402
@@ -38,13 +30,6 @@ ENGLISH_PROBLEM = (
 KEYWORD_PROBLEM = "预测某城市未来五年的用电需求，并给出区间估计。"
 PLAIN_PROBLEM = "一道没有任何关键词的题，只有场景描述。"
 PREDICTION_FAMILY = {"梯度提升回归", "SARIMAX 时间序列", "高斯过程回归"}
-
-results: list[tuple[str, bool, str]] = []
-
-
-def check(name: str, ok: bool, detail: str = "") -> None:
-    results.append((name, bool(ok), detail))
-
 
 def interrupt_card(events: list[dict]) -> dict:
     for event in events:
@@ -280,11 +265,7 @@ def main(argv: list[str]) -> int:
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
-    failed = [row for row in results if not row[1]]
-    for name, ok, detail in results:
-        print(f"{'PASS' if ok else 'FAIL'} {name}\n       {detail}")
-    print(f"\n{len(results) - len(failed)}/{len(results)} 条编排断言通过")
-    return 0 if not failed else 1
+    return report("编排断言通过")
 
 
 if __name__ == "__main__":

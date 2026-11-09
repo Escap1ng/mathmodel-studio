@@ -9,23 +9,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        try:
-            _stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
-
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "runtime" / "src"))
+from checklib import ROOT, check, report
 
 from mms import harness  # noqa: E402
-
-results: list[tuple[str, bool, str]] = []
-
-
-def check(name: str, ok: bool, detail: str = "") -> None:
-    results.append((name, bool(ok), detail))
 
 
 def session_messages(turns: int, size: int = 400) -> list[dict]:
@@ -221,11 +207,7 @@ def main(argv: list[str]) -> int:
     if "--selftest" in argv:
         return run_self_test()
     run_checks()
-    failed = [row for row in results if not row[1]]
-    for name, ok, detail in results:
-        print(f"{'PASS' if ok else 'FAIL'} {name}\n       {detail}")
-    print(f"\n{len(results) - len(failed)}/{len(results)} 条 harness 断言通过")
-    return 0 if not failed else 1
+    return report("harness 断言通过")
 
 
 if __name__ == "__main__":

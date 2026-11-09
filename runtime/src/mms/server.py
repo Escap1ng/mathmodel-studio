@@ -90,10 +90,6 @@ TOOLS = [
 ]
 
 
-class FakeProviderDisabled(RuntimeError):
-    pass
-
-
 def fake_enabled() -> bool:
     return os.environ.get("MMS_FAKE_PROVIDER") == "1"
 

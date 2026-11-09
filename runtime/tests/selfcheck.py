@@ -21,20 +21,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from checklib import ROOT, check, report
+
 PKG_SRC = ROOT / "runtime" / "src"
 MANIFEST_PATH = ROOT / "skills" / "manifest.json"
 SCHEMA_PATH = ROOT / "schemas" / "skill-manifest.schema.json"
-
-# 同 validate-contracts.py：不假设调用方给了 UTF-8 控制台
-for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        try:
-            _stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
-
-rows: list[tuple[str, bool, str]] = []
 
 
 def run(
@@ -59,10 +50,6 @@ def run(
         )
 
 
-def record(name: str, ok: bool, detail: str) -> None:
-    rows.append((name, ok, detail))
-
-
 def fixture_home(mutate) -> str:
     """复制一份真实注册表到临时仓库根，按 mutate 改坏，返回该根目录。"""
     home = tempfile.mkdtemp(prefix="mms-selfcheck-")
@@ -79,12 +66,12 @@ skill_count = len(declared["skills"])
 
 # S1 版本
 r = run(["--version"])
-record("S1 --version 退出 0", r.returncode == 0 and r.stdout.startswith("mms "), f"exit {r.returncode} · {r.stdout.strip()!r}")
+check("S1 --version 退出 0", r.returncode == 0 and r.stdout.startswith("mms "), f"exit {r.returncode} · {r.stdout.strip()!r}")
 
 # S2 人读列举
 r = run(["skills"])
 listed = [ln for ln in r.stdout.splitlines() if ln.strip()]
-record(
+check(
     "S2 skills 列举数与注册表一致",
     r.returncode == 0 and len(listed) - 1 == skill_count,
     f"exit {r.returncode} · 列出 {len(listed) - 1} 行 / 注册表 {skill_count} 个",
@@ -98,12 +85,12 @@ try:
     detail3 = f"exit {r.returncode} · JSON skills {len(parsed['skills'])} 个"
 except json.JSONDecodeError as exc:
     ok3, detail3 = False, f"exit {r.returncode} · JSON 解析失败 {exc}"
-record("S3 skills --json 可被程序读取", ok3, detail3)
+check("S3 skills --json 可被程序读取", ok3, detail3)
 
 # S4 真注册表应当通过
 r = run(["skills", "--check"])
 how = "jsonschema" if "jsonschema" in r.stdout else ("minimal" if "minimal" in r.stdout else "?")
-record("S4 skills --check 对真注册表退出 0", r.returncode == 0, f"exit {r.returncode} · 判据来源 {how} · {r.stdout.strip()}")
+check("S4 skills --check 对真注册表退出 0", r.returncode == 0, f"exit {r.returncode} · 判据来源 {how} · {r.stdout.strip()}")
 
 # S5 契约外取值必须 1
 def break_enum(home: Path) -> None:
@@ -115,7 +102,7 @@ def break_enum(home: Path) -> None:
 home5 = fixture_home(break_enum)
 try:
     r = run(["skills", "--check"], {"MMS_HOME": home5})
-    record("S5 词表外取值退出 1", r.returncode == 1, f"exit {r.returncode} · {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.stdout.strip()}")
+    check("S5 词表外取值退出 1", r.returncode == 1, f"exit {r.returncode} · {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.stdout.strip()}")
 finally:
     shutil.rmtree(home5, ignore_errors=True)
 
@@ -127,7 +114,7 @@ def break_json(home: Path) -> None:
 home6 = fixture_home(break_json)
 try:
     r = run(["skills", "--check"], {"MMS_HOME": home6})
-    record("S6 非法 JSON 退出 1 且不抛栈", r.returncode == 1 and "Traceback" not in r.stderr, f"exit {r.returncode}")
+    check("S6 非法 JSON 退出 1 且不抛栈", r.returncode == 1 and "Traceback" not in r.stderr, f"exit {r.returncode}")
 finally:
     shutil.rmtree(home6, ignore_errors=True)
 
@@ -135,13 +122,13 @@ finally:
 empty = tempfile.mkdtemp(prefix="mms-selfcheck-empty-")
 try:
     r = run(["skills"], {"MMS_HOME": empty})
-    record("S7 MMS_HOME 无注册表退出 2", r.returncode == 2, f"exit {r.returncode}")
+    check("S7 MMS_HOME 无注册表退出 2", r.returncode == 2, f"exit {r.returncode}")
 finally:
     shutil.rmtree(empty, ignore_errors=True)
 
 # S8 未知子命令必须 2
 r = run(["nope"])
-record("S8 未知子命令退出 2", r.returncode == 2, f"exit {r.returncode}")
+check("S8 未知子命令退出 2", r.returncode == 2, f"exit {r.returncode}")
 
 # S9 模板清单：20 张图 + 5 张示意图。上游增删模板时这条要跟着改（re-sync 记录里留痕）。
 r = run(["templates", "--json"])
@@ -162,7 +149,7 @@ try:
     )
 except (json.JSONDecodeError, KeyError) as exc:
     ok9, detail9 = False, f"exit {r.returncode} · JSON 解析失败 {exc}"
-record("S9 templates --json 列出 20 图 + 5 示意图", ok9, detail9)
+check("S9 templates --json 列出 20 图 + 5 示意图", ok9, detail9)
 
 # S10 真渲染一张：退出 0 且 PNG/PDF/SVG 三件产物都非空
 render_out = tempfile.mkdtemp(prefix="mms-render-")
@@ -186,11 +173,11 @@ try:
         ok10, detail10 = False, f"exit {r.returncode} · 结果解析失败 {exc} · {r.stderr.strip()[:200]}"
 finally:
     shutil.rmtree(render_out, ignore_errors=True)
-record("S10 invoke figure 真出 PNG/PDF/SVG", ok10, detail10)
+check("S10 invoke figure 真出 PNG/PDF/SVG", ok10, detail10)
 
 # S11 未接通的技能必须 2（用法错误，不是渲染失败）
 r = run(["invoke", "paper", "x"])
-record("S11 invoke 未接通技能退出 2", r.returncode == 2, f"exit {r.returncode} · {r.stderr.strip()[:120]}")
+check("S11 invoke 未接通技能退出 2", r.returncode == 2, f"exit {r.returncode} · {r.stderr.strip()[:120]}")
 
 # S12 不存在的模板由上游渲染器报用法错误 2，我们原样透传
 bad_out = tempfile.mkdtemp(prefix="mms-render-bad-")
@@ -198,7 +185,7 @@ try:
     r = run(["invoke", "figure", "no-such-template", "--out", bad_out], timeout=120)
 finally:
     shutil.rmtree(bad_out, ignore_errors=True)
-record("S12 未知模板退出 2", r.returncode == 2, f"exit {r.returncode}")
+check("S12 未知模板退出 2", r.returncode == 2, f"exit {r.returncode}")
 
 # S13 反向覆盖：渲染器退出 0 但没写产物，必须判 1（不信退出码）
 def fake_renderer(home: Path) -> None:
@@ -219,12 +206,6 @@ try:
 finally:
     shutil.rmtree(home13, ignore_errors=True)
     shutil.rmtree(empty_out, ignore_errors=True)
-record("S13 渲染器假成功（退出 0 无产物）被判 1", ok13, detail13)
+check("S13 渲染器假成功（退出 0 无产物）被判 1", ok13, detail13)
 
-for name, ok, detail in rows:
-    print(f"{'PASS' if ok else 'FAIL'} {name}")
-    print(f"       {detail}")
-
-failed = [n for n, ok, _ in rows if not ok]
-print(f"\n{len(rows) - len(failed)}/{len(rows)} 条 CLI 契约断言通过（0/1/2 三码各自可达）")
-sys.exit(1 if failed else 0)
+sys.exit(report("CLI 契约断言通过（0/1/2 三码各自可达）"))

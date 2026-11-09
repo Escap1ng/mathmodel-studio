@@ -11,28 +11,13 @@ import hashlib
 import io
 import shutil
 import sqlite3
-import sys
 import tempfile
 from pathlib import Path
 
-for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        try:
-            _stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
-
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "runtime" / "src"))
+from checklib import ROOT, check, report
 
 from mms import project_export, workbench_figure, workbench_score  # noqa: E402
 from mms.store import SessionStore, session_scope  # noqa: E402
-
-results: list[tuple[str, bool, str]] = []
-
-
-def check(name: str, ok: bool, detail: str = "") -> None:
-    results.append((name, bool(ok), detail))
 
 
 def digest(path: str | None) -> str:
@@ -211,11 +196,7 @@ def main() -> int:
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
-    failed = [row for row in results if not row[1]]
-    for name, ok, detail in results:
-        print(f"{'PASS' if ok else 'FAIL'} {name}\n       {detail}")
-    print(f"\n{len(results) - len(failed)}/{len(results)} 条工作台断言通过")
-    return 0 if not failed else 1
+    return report("工作台断言通过")
 
 
 if __name__ == "__main__":
