@@ -121,7 +121,8 @@ def main() -> int:
             and len(scoped_state["versions"]) == 1
             and len(global_state["versions"]) == before_count
             and Path(scoped_state["active_png"]).is_file()
-            and str(scoped) in str(scoped_state["active_png"]),
+            # Windows runner 的临时目录带 8.3 短名（RUNNER~1），产物路径却是长名，先 resolve 再比。
+            and Path(scoped_state["active_png"]).resolve().is_relative_to(scoped.resolve()),
             f"scoped={len(scoped_state['versions'])} global={len(global_state['versions'])} active={scoped_state['active_png']}",
         )
 

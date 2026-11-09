@@ -161,7 +161,14 @@ jobs:
         # 所以先把二进制显式取回来，再把目录列出来——下次再挂就知道挂在哪儿，而不是猜。
         # 注意这一步不运行 electron：沙箱助手还没改权限，跑一次就会 FATAL 退出（上一轮就是这么挂的）。
         run: |
-          node node_modules/electron/install.js
+          # GitHub release 直链偶发 504（2026-11-08 连续多轮挂在同一 URL），重试三次再放弃。
+          ok=0
+          for attempt in 1 2 3; do
+            if node node_modules/electron/install.js; then ok=1; break; fi
+            echo "第 $attempt 次取回 Electron 失败，10 秒后重试"
+            sleep 10
+          done
+          [ "$ok" = 1 ] || exit 1
           ls -l node_modules/electron/ | head -10
           ls -l node_modules/electron/dist/ | head -12
 
