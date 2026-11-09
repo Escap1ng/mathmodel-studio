@@ -44,6 +44,9 @@ const PANE_MIN = 380
 const PANE_MAX = 1100
 const CHAT_MIN = 480
 const PANE_STORAGE_KEY = 'mms.paneWidth'
+const ACCENT_KEY = 'mms.accent'
+// 强调色旧键是 S8 之前的讲法，读到就迁进 mms.* 家族并删掉。
+const LEGACY_ACCENT_KEY = 'studio.accent'
 // 收合偏好按模式分开记；旧单键启动时迁移，迁移完即删。
 const LEGACY_COLLAPSE_KEY = 'mms.workspaceCollapsed'
 const COLLAPSE_KEYS: Record<'workflow' | 'chat', string> = {
@@ -114,7 +117,7 @@ function nextId(prefix: string): string {
 function initialAccent(): Accent {
   const fromUrl = new URLSearchParams(window.location.search).get('accent')
   if (fromUrl === 'a' || fromUrl === 'b' || fromUrl === 'c') return fromUrl
-  const saved = localStorage.getItem('studio.accent')
+  const saved = localStorage.getItem(ACCENT_KEY) ?? localStorage.getItem(LEGACY_ACCENT_KEY)
   return saved === 'b' || saved === 'c' ? saved : 'a'
 }
 
@@ -286,7 +289,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.accent = accent
-    localStorage.setItem('studio.accent', accent)
+    localStorage.setItem(ACCENT_KEY, accent)
+    localStorage.removeItem(LEGACY_ACCENT_KEY)
   }, [accent])
 
   useEffect(() => {
