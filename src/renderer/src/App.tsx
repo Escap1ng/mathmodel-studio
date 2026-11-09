@@ -131,6 +131,20 @@ function phaseMap(snapshot: SessionSnapshot): Record<number, PhaseState> {
   return out
 }
 
+function resolvedLabel(action: DecisionAction, name: string): string {
+  if (action === 'choose') return `已选：${name}`
+  if (action === 'reroll') return '已换一批'
+  return '已确认'
+}
+
+function markResolved(entries: ChatEntry[], label: string): ChatEntry[] {
+  return entries.map((entry) =>
+    entry.interrupt && !entry.interrupt.resolved
+      ? { ...entry, interrupt: { ...entry.interrupt, resolved: label } }
+      : entry
+  )
+}
+
 function entriesFromSnapshot(snapshot: SessionSnapshot): ChatEntry[] {
   return snapshot.messages.map((message, index) => {
     // 用户消息里存的是「手打文字 + 附件正文」；显示时只取文字，并还原附件胶囊。
@@ -772,19 +786,8 @@ export default function App() {
     const picked = choice
       ? candidatesOf(pendingEntry?.interrupt?.payload ?? {}).find((c) => c.id === choice)
       : undefined
-    const label =
-      action === 'choose'
-        ? `已选：${picked?.name ?? choice ?? ''}`
-        : action === 'reroll'
-          ? '已换一批'
-          : '已确认'
-    setEntries((prev) =>
-      prev.map((entry) =>
-        entry.interrupt && !entry.interrupt.resolved
-          ? { ...entry, interrupt: { ...entry.interrupt, resolved: label } }
-          : entry
-      )
-    )
+    const label = resolvedLabel(action, picked?.name ?? choice ?? '')
+    setEntries((prev) => markResolved(prev, label))
     const text =
       action === 'choose'
         ? `我选「${picked?.name ?? choice ?? ''}」。请按这个模型继续。`
@@ -807,19 +810,8 @@ export default function App() {
     const picked = choice
       ? candidatesOf(pendingEntry?.interrupt?.payload ?? {}).find((c) => c.id === choice)
       : undefined
-    const label =
-      action === 'confirm'
-        ? '已确认'
-        : action === 'reroll'
-          ? '已换一批'
-          : `已选：${picked?.name ?? choice ?? ''}`
-    setEntries((prev) =>
-      prev.map((entry) =>
-        entry.interrupt && !entry.interrupt.resolved
-          ? { ...entry, interrupt: { ...entry.interrupt, resolved: label } }
-          : entry
-      )
-    )
+    const label = resolvedLabel(action, picked?.name ?? choice ?? '')
+    setEntries((prev) => markResolved(prev, label))
     const assistantId = nextId('a')
     setEntries((prev) => [
       ...prev,
