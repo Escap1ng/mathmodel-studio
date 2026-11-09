@@ -1,9 +1,5 @@
 import type { FigureVersion, ScoreRound, WorkbenchState } from '../../../../shared/api'
 
-export function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 export function formatSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   return `${Math.max(1, Math.round(bytes / 1024))} KB`

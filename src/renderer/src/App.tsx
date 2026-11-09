@@ -29,6 +29,7 @@ import {
   type ConversationItem,
   type ConversationKind
 } from './lib/conversations'
+import { errorText } from './lib/format'
 import { PHASES, type PhaseState } from './lib/phases'
 
 // 类型由 src/preload/index.d.ts 声明的全局 window.studio 反推，
@@ -108,10 +109,6 @@ let sequence = 0
 function nextId(prefix: string): string {
   sequence += 1
   return `${prefix}-${Date.now().toString(36)}-${sequence}`
-}
-
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 function initialAccent(): Accent {

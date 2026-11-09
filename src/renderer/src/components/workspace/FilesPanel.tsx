@@ -7,6 +7,7 @@ import type {
   WorkspaceProject
 } from '../../../../shared/api'
 import { WORKSPACE_DRAG } from '../../lib/attachments'
+import { errorText } from '../../lib/format'
 import ContextMenu, { type ContextMenuItem } from '../common/ContextMenu'
 
 const KIND_LABEL: Record<FileKind, string> = {
@@ -17,10 +18,6 @@ const KIND_LABEL: Record<FileKind, string> = {
   image: 'IMG',
   text: 'TXT',
   other: 'FILE'
-}
-
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 function formatSize(bytes: number): string {

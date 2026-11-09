@@ -7,7 +7,7 @@ import ScorePanel from './ScorePanel'
 import GatePanel from './GatePanel'
 import CodePanel from './CodePanel'
 import LogPanel from './LogPanel'
-import { errorText } from './helpers'
+import { errorText } from '../../lib/format'
 import { TABS, TAB_GROUPS, type TabId } from './tabs'
 
 interface Props {

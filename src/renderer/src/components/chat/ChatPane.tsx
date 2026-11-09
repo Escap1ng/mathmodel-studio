@@ -10,6 +10,7 @@ import type { DecisionAction, ProviderView, RuntimeStatus, StagedFile } from '..
 import { buildContextText, WORKSPACE_DRAG, type SendExtras } from '../../lib/attachments'
 import { isRecordData, type ChatEntry, type ToolCard } from '../../lib/chat'
 import { formatTokens } from '../../lib/context'
+import { errorText } from '../../lib/format'
 import { PHASES, STATE_TEXT, type PhaseState } from '../../lib/phases'
 import DecisionCard, { type ModelCandidate } from './DecisionCard'
 import MessageActions from './MessageActions'
@@ -36,10 +37,6 @@ function readComposerHeight(): number | null {
   } catch {
     return null
   }
-}
-
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 function hasFiles(event: DragEvent<HTMLElement>): boolean {
