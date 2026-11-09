@@ -67,7 +67,7 @@ The paper tab runs the full typesetting chain: xelatex twice → pandoc to DOCX 
 
 Packaging is wired up: electron-builder bundles a portable Python and pandoc; the 0.1.0 NSIS x64 installer has not been built yet, and clean-machine installation remains unverified.
 
-Milestones are listed in [PLAN.md](PLAN.md) §7; verified claims and open items are recorded in [docs/handoff.md](docs/handoff.md).
+Milestones are listed in [PLAN.md](docs/PLAN.md) §7; verified claims and open items are recorded in [docs/handoff.md](docs/handoff.md).
 
 ## Quick start
 

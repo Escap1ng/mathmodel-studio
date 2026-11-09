@@ -67,7 +67,7 @@ MathModel Studio 面向正在推进建模工作、准备交付的参赛者与研
 
 打包已配置完成：electron-builder 把便携 Python 和 pandoc 一起装进安装包；0.1.0 的 NSIS x64 安装包尚未构建，干净机安装仍是未证项。
 
-里程碑见 [PLAN.md](PLAN.md) §7；已验证结论与未证事项见 [docs/handoff.md](docs/handoff.md)。
+里程碑见 [PLAN.md](docs/PLAN.md) §7；已验证结论与未证事项见 [docs/handoff.md](docs/handoff.md)。
 
 ## 快速开始
 
