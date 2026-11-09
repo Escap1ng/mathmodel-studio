@@ -34,6 +34,7 @@ from pathlib import Path
 
 from .server import ChatSession
 from .store import data_dir
+from .registry import repo_root
 from . import dsh_provider
 
 READY_TIMEOUT = 40.0
@@ -48,10 +49,6 @@ URL_RE = re.compile(r"(http://127\.0\.0\.1:(\d+)/\?token=([\w\-]+))")
 
 class DshError(RuntimeError):
     """DSH 子进程、认证或 RPC 失败。错误文本不包含 API Key。"""
-
-
-def repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
 
 
 def find_dsh(explicit: str = "") -> Path:

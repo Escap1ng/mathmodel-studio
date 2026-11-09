@@ -12,19 +12,13 @@ import threading
 import time
 from pathlib import Path
 
+from .common import read_json
 from .invoke import invoke, list_templates
 from .registry import repo_root
 
 LOCK = threading.Lock()
 MAX_VERSIONS = 8
 CUSTOM_THEMES = Path(__file__).resolve().parent / "themes"
-
-
-def _read_json(path: Path, fallback):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return fallback
 
 
 def themes(root: Path | None = None) -> list[dict]:
@@ -34,7 +28,7 @@ def themes(root: Path | None = None) -> list[dict]:
     for path, builtin in [(bundled, True)] + [
         (p, False) for p in sorted(CUSTOM_THEMES.glob("*.theme.json"))
     ]:
-        data = _read_json(path, {})
+        data = read_json(path, {})
         name = data.get("name") or path.name.removesuffix(".theme.json")
         rows.append(
             {
@@ -56,7 +50,7 @@ def _state_path(data_dir: Path) -> Path:
 
 
 def _load_state(data_dir: Path) -> dict:
-    state = _read_json(_state_path(data_dir), {})
+    state = read_json(_state_path(data_dir), {})
     if not isinstance(state, dict):
         state = {}
     state.setdefault("counter", 0)

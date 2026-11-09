@@ -14,6 +14,8 @@ import threading
 import time
 from pathlib import Path
 
+from .common import dump_json
+
 PHASE_COUNT = 7
 PHASE_NAMES = [
     "环境预检",
@@ -62,10 +64,6 @@ def session_scope(base: Path, session_id: object) -> Path:
 
 def initial_phases() -> list[dict]:
     return [{"phase": i, "status": "idle", "name": PHASE_NAMES[i]} for i in range(PHASE_COUNT)]
-
-
-def _dumps(value) -> str:
-    return json.dumps(value, ensure_ascii=False)
 
 
 class SessionStore:
@@ -133,7 +131,7 @@ class SessionStore:
                     provider,
                     model,
                     problem,
-                    _dumps(record["phases"]),
+                    dump_json(record["phases"]),
                     None,
                     "[]",
                     1,
@@ -193,9 +191,9 @@ class SessionStore:
                 "UPDATE sessions SET updated = ?, phases = ?, pending = ?, messages = ?, batch = ? WHERE id = ?",
                 (
                     record["updated"],
-                    _dumps(record["phases"]),
-                    _dumps(record["pending"]) if record["pending"] is not None else None,
-                    _dumps(record["messages"]),
+                    dump_json(record["phases"]),
+                    dump_json(record["pending"]) if record["pending"] is not None else None,
+                    dump_json(record["messages"]),
                     record["batch"],
                     record["id"],
                 ),

@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .common import utf8_console
 from .invoke import FIGURE_SKILL, invoke, list_templates
 from .registry import (
     EXIT_OK,
@@ -23,16 +24,6 @@ from .registry import (
     repo_root,
     skills,
 )
-
-
-def _force_utf8_stdout() -> None:
-    # Windows 控制台默认 GBK，打印中文技能名会直接抛 UnicodeEncodeError。
-    if hasattr(sys.stdout, "reconfigure"):
-        try:
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
 
 
 def _schema_problems(manifest: dict) -> tuple[list[str], str]:
@@ -158,7 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    _force_utf8_stdout()
+    utf8_console()
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

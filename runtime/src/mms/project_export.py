@@ -17,7 +17,7 @@ def copy_outputs(workspace: str, folder: str, sources: dict[str, str]) -> None:
     try:
         target.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        print(f"[export] 创建 {target} 失败：{exc}", file=sys.stderr)
+        print(f"[mms] 创建 {target} 失败：{exc}", file=sys.stderr)
         return
     for source in sources.values():
         path = Path(source)
@@ -26,4 +26,4 @@ def copy_outputs(workspace: str, folder: str, sources: dict[str, str]) -> None:
         try:
             shutil.copy2(path, target / path.name)
         except OSError as exc:
-            print(f"[export] 复制 {path.name} 失败：{exc}", file=sys.stderr)
+            print(f"[mms] 复制 {path.name} 失败：{exc}", file=sys.stderr)

@@ -153,7 +153,7 @@ def main() -> int:
             project_export.copy_outputs(str(blocked), "论文", scoped_outputs)
         check(
             "W9 目标不可写时静默跳过",
-            blocked.is_file() and "[export]" in quiet.getvalue(),
+            blocked.is_file() and "[mms]" in quiet.getvalue(),
             quiet.getvalue().strip()[:80],
         )
 
