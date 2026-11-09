@@ -1,5 +1,5 @@
 import type { AttachmentRef } from '../../lib/attachments'
-import { formatBytes } from '../../lib/format'
+import { formatSize } from '../../lib/format'
 
 function badge(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -25,7 +25,7 @@ export default function FileChips({
             {item.name}
           </span>
           {typeof item.size === 'number' ? (
-            <span className="file-chip__size">{formatBytes(item.size)}</span>
+            <span className="file-chip__size">{formatSize(item.size)}</span>
           ) : null}
           {onRemove ? (
             <button

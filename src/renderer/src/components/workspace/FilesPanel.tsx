@@ -7,7 +7,7 @@ import type {
   WorkspaceProject
 } from '../../../../shared/api'
 import { WORKSPACE_DRAG } from '../../lib/attachments'
-import { errorText } from '../../lib/format'
+import { errorText, formatSize } from '../../lib/format'
 import ContextMenu, { type ContextMenuItem } from '../common/ContextMenu'
 
 const KIND_LABEL: Record<FileKind, string> = {
@@ -18,12 +18,6 @@ const KIND_LABEL: Record<FileKind, string> = {
   image: 'IMG',
   text: 'TXT',
   other: 'FILE'
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 function formatTime(ms: number): string {

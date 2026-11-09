@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { GlobalWorkerOptions, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import type { PaperState, WorkbenchState } from '../../../../shared/api'
-import { errorText } from '../../lib/format'
-import { formatSize } from './helpers'
+import { errorText, formatSize } from '../../lib/format'
 
 GlobalWorkerOptions.workerSrc = pdfWorker
 

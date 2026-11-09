@@ -1,6 +1,6 @@
 import type { AttachmentBlock, StagedFile } from '../../../shared/api'
 import { KIND_BY_EXT } from '../../../shared/file-kinds'
-import { formatBytes } from './format'
+import { formatSize } from './format'
 
 export interface AttachmentRef {
   name: string
@@ -35,7 +35,7 @@ export function buildContextText(text: string, blocks: AttachmentBlock[], files:
   const body = blocks
     .map((block, index) => {
       const file = files[index]
-      const size = file ? ` · ${formatBytes(file.size)}` : ''
+      const size = file ? ` · ${formatSize(file.size)}` : ''
       const note = block.note ? `（${block.note}）` : ''
       return `### ${block.name}${size}${note}\n${block.text || '（无正文）'}`
     })

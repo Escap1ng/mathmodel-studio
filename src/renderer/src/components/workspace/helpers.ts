@@ -1,10 +1,5 @@
 import type { FigureVersion, ScoreRound, WorkbenchState } from '../../../../shared/api'
 
-export function formatSize(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`
-}
-
 export function findVersion(state: WorkbenchState | null, id: string | null): FigureVersion | undefined {
   return state?.figure.versions.find((version) => version.id === id)
 }
