@@ -829,20 +829,27 @@ export default function ChatPane({
           />
         </div>
         <div className="composer__bar">
-          <div className="mode-switch" role="group" aria-label="输入模式">
+          <div className="mode-switch" role="group" aria-label="对话模式" data-active={mode}>
+            <span className="mode-switch__thumb" aria-hidden="true" />
             <button
               type="button"
               className="mode-switch__btn"
-              data-mode={mode === 'workflow' ? 'chat' : 'workflow'}
-              aria-pressed={mode === 'workflow'}
-              title={
-                mode === 'workflow'
-                  ? '回到自由对话，不再按七阶段推进'
-                  : '进入固定流程：题面确认 → 选模 → 基线 → 论文'
-              }
-              onClick={() => onModeChange(mode === 'workflow' ? 'chat' : 'workflow')}
+              data-mode="chat"
+              aria-pressed={mode === 'chat'}
+              title="自由对话：问答、分析、写作，不按七阶段推进"
+              onClick={() => onModeChange('chat')}
             >
-              {mode === 'workflow' ? '退出全流程' : '全流程建模'}
+              通用
+            </button>
+            <button
+              type="button"
+              className="mode-switch__btn"
+              data-mode="workflow"
+              aria-pressed={mode === 'workflow'}
+              title="固定流程：题面确认 → 选模 → 基线 → 论文"
+              onClick={() => onModeChange('workflow')}
+            >
+              数模
             </button>
           </div>
           <button

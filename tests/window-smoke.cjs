@@ -891,25 +891,25 @@ async function main() {
   await sleep(200)
 
   // —— M3：从赛题到选模卡，再到持久化恢复 ——
-  // 现在默认是自由对话；用「全流程建模」按钮显式进入建模模式。
+  // 现在默认是通用模式；用「数模」分段显式进入建模模式。
   const defaultMode = await win.webContents.executeJavaScript(`({
-    label: document.querySelector('.mode-switch__btn')?.textContent.trim(),
-    pressed: document.querySelector('.mode-switch__btn')?.getAttribute('aria-pressed')
+    chat: document.querySelector('.mode-switch__btn[data-mode="chat"]')?.getAttribute('aria-pressed'),
+    workflow: document.querySelector('.mode-switch__btn[data-mode="workflow"]')?.getAttribute('aria-pressed')
   })`)
   record(
     'G7-7 默认进入自由对话',
-    defaultMode.label === '全流程建模' && defaultMode.pressed === 'false',
+    defaultMode.chat === 'true' && defaultMode.workflow === 'false',
     JSON.stringify(defaultMode)
   )
   await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="workflow"]')?.click()`)
   await sleep(200)
   const workflowMode = await win.webContents.executeJavaScript(`({
-    label: document.querySelector('.mode-switch__btn')?.textContent.trim(),
-    pressed: document.querySelector('.mode-switch__btn')?.getAttribute('aria-pressed')
+    chat: document.querySelector('.mode-switch__btn[data-mode="chat"]')?.getAttribute('aria-pressed'),
+    workflow: document.querySelector('.mode-switch__btn[data-mode="workflow"]')?.getAttribute('aria-pressed')
   })`)
   record(
     'G7-7 全流程建模按钮激活建模模式',
-    workflowMode.label === '退出全流程' && workflowMode.pressed === 'true',
+    workflowMode.chat === 'false' && workflowMode.workflow === 'true',
     JSON.stringify(workflowMode)
   )
 
@@ -1832,7 +1832,7 @@ async function main() {
     JSON.stringify(g712Collapsed)
   )
 
-  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn')?.click()`)
+  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="workflow"]')?.click()`)
   const g712Animating = await win.webContents.executeJavaScript(
     `document.querySelector('.shell')?.dataset.modeAnimating ?? null`
   )
@@ -1858,7 +1858,7 @@ async function main() {
     `track=${g712Workflow.track}`
   )
 
-  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn')?.click()`)
+  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="chat"]')?.click()`)
   await sleep(650)
   const g712Back = await win.webContents.executeJavaScript(`({
     mode: document.querySelector('.shell')?.dataset.mode,

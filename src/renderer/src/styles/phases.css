@@ -91,6 +91,7 @@
 
 /* —— M3：输入模式 —— */
 .mode-switch {
+  position: relative;
   display: inline-flex;
   padding: 2px;
   border: 0;
@@ -98,7 +99,27 @@
   background: var(--chrome-2);
 }
 
+/* 选中底的滑块：两段等宽，切换时整块滑过去 */
+.mode-switch__thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.07);
+  transition: transform var(--t) var(--ease-emphasized, ease);
+}
+
+.mode-switch[data-active='workflow'] .mode-switch__thumb {
+  transform: translateX(100%);
+}
+
 .mode-switch__btn {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
   height: 24px;
   padding: 0 10px;
   border: 0;
@@ -107,12 +128,14 @@
   color: var(--text-3);
   font-size: 11.5px;
   cursor: pointer;
-  transition: background var(--t), color var(--t);
+  transition: color var(--t);
+}
+
+.mode-switch__btn:hover {
+  color: var(--text);
 }
 
 .mode-switch__btn[aria-pressed='true'] {
-  background: var(--bg);
   color: var(--text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.07);
 }
 
