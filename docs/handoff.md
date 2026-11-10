@@ -42,7 +42,7 @@ python runtime/tests/selfcheck_paper.py               # 12/12 条论文断言（
 需要显示器的部分：
 
 ```bash
-npm run smoke:window   # 真起窗口，112/112，写 screenshots/window-smoke.{png,json} 与各页截图
+npm run smoke:window   # 真起窗口，114/114，写 screenshots/window-smoke.{png,json} 与各页截图
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
 
@@ -64,8 +64,8 @@ CI：<https://github.com/Escap1ng/mathmodel-studio/actions>。0.1.0 尚未在 CI
 | 编排闭环：K2→K3→换一批→选择→阶段四；跨进程恢复 | 同上 C12/C13 | 强（本机） |
 | DSH 内核：流式、工具、取消、续聊复用、缺少 dsh 时明确报错 | `selfcheck_channel.py --core dsh` 31/31 | 强（本机） |
 | 打包后 DSH 缺失的报错与密钥边界 | 真实 packaged resources 负向 17/17（2026-11-04，改名后已恢复） | 强（本机） |
-| 内核切换：设置落盘、运行时重启、DSH 下离线演示禁用、切回恢复 | G7-11 五条 | 强（本机） |
-| 界面端到端 112 条：K2→K3→解释→选择、阶段四真跑、图表、评分、论文、附件、多会话、右栏、内核切换 | G7 112/112 | 强（本机） |
+| 内核路由：有 DSH 走 DSH、离线演示走 Python，界面不暴露切换 | G7-11 一条 | 强（本机） |
+| 界面端到端 114 条：K2→K3→解释→选择（含五维雷达）、阶段四真跑、图表、评分、论文、附件、多会话、通用/数模分段切换与按模式收合偏好、过程总览默认页 | G7 114/114 | 强（本机） |
 | 图表工作台、评分卡、论文排版与三道门禁 | G9 19/19、G10 12/12、G7 对应段落 | 强（演示数据/演示稿） |
 | 门禁能抓住坏稿；缺工具 / 坏 TeX / 缺稿件 | G10 反向 P6–P9 | 强（反向） |
 | 0.1.0 的 NSIS 安装包 | 未构建 | **未证** |
@@ -101,18 +101,18 @@ CI：<https://github.com/Escap1ng/mathmodel-studio/actions>。0.1.0 尚未在 CI
 
 已做：
 
-1. 对话优先工作台：默认 chat，单按钮进入/退出全流程。
+1. 对话优先工作台：默认通用模式，「通用 | 数模」分段切换。
 2. `suggest_models` 工具与选模卡事件；chat 模式点卡转消息。
 3. DSH 适配层：进程管理、WS follow、事件映射、取消、续聊复用、闲置回收。
-4. 设置页内核切换、`settings.json` 持久化、`providerViews` 的 `unavailable` 约束。
+4. `settings.json` 持久化与 `providerViews` 的 `unavailable` 约束仍在；设置页不提供内核开关（自动路由）。
 5. 打包布线：SDK 版本记录、`MMS_DSH_*` 环境、resources 路径探测。
-6. 门禁：G4 55、G7 112、DSH 31、G9 19、G10 12、G11 13、G12 14、G13 10。
+6. 门禁：G4 55、G7 114、DSH 31、G9 19、G10 12、G11 13、G12 14、G13 10。
 7. 发布规范 `docs/release.md`；版本重置为 0.1.0，旧 Release/tag 已删。
 
 仍欠：
 
 - 0.1.0 安装包重建与干净机安装验证。
-- CI 在 0.1.0 上复跑（含 Windows 真起窗）。
+- CI 已于 2026-11-10 在 0.1.0 复跑（ubuntu 真起窗）；Windows 真起窗仍未进 CI。
 - DSH 侧选模卡、技能与工作台端点。
 - DSH 内核下旧会话 resume 兼容、跨 sidecar 重启续聊。
 - 真实厂商连通性、Linux 桌面 safeStorage 可用分支。
@@ -191,7 +191,7 @@ src/renderer/src/
   components/common/        ContextMenu、SelectMenu、FileChips
   lib/chat.ts               事件折叠的纯函数
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
-tests/window-smoke.cjs      真启动断言（112 条）+ 截图与 JSON 结论
+tests/window-smoke.cjs      真启动断言（114 条）+ 截图与 JSON 结论
 docs/release.md             发布格式规范
 .github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu）
 ```
