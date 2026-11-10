@@ -24,10 +24,10 @@
 ---
 
 <p align="center">
-  <img src="docs/images/workbench.png" alt="MathModel Studio: conversation and phase rail on the left, K3 model-choice cards in the middle" width="100%">
+  <img src="docs/images/workbench.png" alt="MathModel Studio: general-mode welcome with the segmented General / Modeling switch" width="100%">
 </p>
 
-<p align="center"><sub>Workspace: conversation and phase rail on the left, three K3 candidate cards in the middle</sub></p>
+<p align="center"><sub>General mode: welcome page with generic starters; the workspace pane is down to a files-only icon strip</sub></p>
 
 > **Design principle**: anything a machine can verify goes to a gate; anything that requires judgement stays with the user, with each decision point rendered as UI.
 >
@@ -44,20 +44,24 @@ MathModel Studio targets contestants and researchers who are already working thr
 
 ## Interface
 
-Screenshots come from the real UI at 1.5× pixel density: the first is a maximized window, the rest are crops from a 1440×900 window. Conversation content comes from the offline demo and contains no real problem statement or key.
+Screenshots come from the real UI at 1.5× pixel density: full-row shots come from a 1440×900 window, panel crops come from a 1500×900 window. Conversation content comes from the offline demo and contains no real problem statement or key.
 
-<p align="center"><img src="docs/images/decision.png" width="100%" alt="K3 model-choice cards: three candidate routes with aligned fields"></p>
+<p align="center"><img src="docs/images/decision.png" width="100%" alt="K3 model-choice cards: five-dimension radar comparison"></p>
 
-<p align="center"><sub>K3 model choice: three candidate routes side by side — choose one directly or read the explanation first</sub></p>
+<p align="center"><sub>K3 model choice: three candidates with a five-dimension radar (innovation, explainability, accuracy, speed, ease); difficulty and effort are inverted so the outer edge is always better</sub></p>
 
-| Scoring and deduction targets | Paper typesetting and PDF preview |
+| Process overview with artifact chips | Five-dimension score and deduction targets |
 | --- | --- |
-| <img src="docs/images/score.png" width="100%" alt="Five-dimension score and deduction details"> | <img src="docs/images/paper.png" width="100%" alt="Paper typesetting and PDF preview"> |
-| <sub>Five dimensions, deductions and in-text targets</sub> | <sub>xelatex → pandoc → three gates and page-level preview</sub> |
+| <img src="docs/images/process.png" width="100%" alt="Process overview: seven-node pipeline with artifact chips"> | <img src="docs/images/score.png" width="100%" alt="Five-dimension score and deduction details"> |
+| <sub>The seven-phase pipeline is colored by state; chips jump to the matching page</sub> | <sub>Five dimensions, deductions and in-text targets</sub> |
 
-<p align="center"><img src="docs/images/conversation.png" width="100%" alt="Conversation, tool cards and gates"></p>
+<p align="center"><img src="docs/images/paper.png" width="64%" alt="Paper typesetting with page-level PDF preview"></p>
 
-<p align="center"><sub>Conversation: streamed replies, tool cards and the four-row gate result on one timeline</sub></p>
+<p align="center"><sub>Paper: xelatex → pandoc → three delivery gates, previewed page by page with pdf.js</sub></p>
+
+<p align="center"><img src="docs/images/conversation.png" width="100%" alt="Conversation with streamed reply and tool card"></p>
+
+<p align="center"><sub>Conversation: streamed replies, collapsible thinking and tool cards on one timeline</sub></p>
 
 ## Status
 

@@ -24,10 +24,10 @@
 ---
 
 <p align="center">
-  <img src="docs/images/workbench.png" alt="MathModel Studio：左侧会话与阶段轨道，中间 K3 选模卡" width="100%">
+  <img src="docs/images/workbench.png" alt="MathModel Studio：通用模式欢迎页，底部「通用 | 数模」分段切换" width="100%">
 </p>
 
-<p align="center"><sub>工作台：左侧会话与阶段轨道，中间三条候选的 K3 选模卡</sub></p>
+<p align="center"><sub>通用模式：欢迎页与通用快捷提问，右侧只剩文件页图标</sub></p>
 
 > **设计原则**：能自动校验的交给门禁，需要判断的留给人，判断点做成界面。
 >
@@ -44,20 +44,24 @@ MathModel Studio 面向正在推进建模工作、准备交付的参赛者与研
 
 ## 界面
 
-截图来自实际界面（1.5 倍像素密度）：首图是最大化窗口，其余裁自 1440×900 窗口。会话内容来自离线演示，没有真实赛题和密钥。
+截图来自实际界面（1.5 倍像素密度）：整行大图来自 1440×900 窗口，面板图裁自 1500×900 窗口。会话内容来自离线演示，没有真实赛题和密钥。
 
-<p align="center"><img src="docs/images/decision.png" width="100%" alt="K3 选模卡：三条候选路线与字段对照"></p>
+<p align="center"><img src="docs/images/decision.png" width="100%" alt="K3 选模卡：五维雷达与字段对照"></p>
 
-<p align="center"><sub>K3 选模：三条候选路线逐项对比，可直接选，也可先看解释</sub></p>
+<p align="center"><sub>K3 选模：三条候选附五维雷达（创新、解释、精度、速度、易做），越靠外越好，难度与耗时已反向</sub></p>
 
-| 评分与扣分定位 | 论文排版与 PDF 预览 |
+| 过程总览与产物芯片 | 五维评分与扣分定位 |
 | --- | --- |
-| <img src="docs/images/score.png" width="100%" alt="五维评分与扣分明细"> | <img src="docs/images/paper.png" width="100%" alt="论文排版与 PDF 预览"> |
-| <sub>五维得分、扣分明细和正文定位</sub> | <sub>xelatex → pandoc → 三道门禁与页级预览</sub> |
+| <img src="docs/images/process.png" width="100%" alt="过程总览：七节点管线与产物芯片"> | <img src="docs/images/score.png" width="100%" alt="五维评分与扣分明细"> |
+| <sub>七阶段管线按状态着色，点芯片直达对应页</sub> | <sub>五维得分、扣分明细和正文定位</sub> |
 
-<p align="center"><img src="docs/images/conversation.png" width="100%" alt="对话、工具卡与门禁"></p>
+<p align="center"><img src="docs/images/paper.png" width="64%" alt="论文排版与页级 PDF 预览"></p>
 
-<p align="center"><sub>对话：流式回复、工具卡和四项门禁结果在同一条时间线上</sub></p>
+<p align="center"><sub>论文：xelatex → pandoc → 三道交付门禁，pdf.js 页级预览</sub></p>
+
+<p align="center"><img src="docs/images/conversation.png" width="100%" alt="对话：流式回复与工具卡"></p>
+
+<p align="center"><sub>对话：流式回复、折叠思考与工具卡在同一条时间线上</sub></p>
 
 ## 当前状态
 
