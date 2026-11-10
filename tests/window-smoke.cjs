@@ -1793,7 +1793,7 @@ async function main() {
   record(
     'G7-10 右栏可收起为图标条',
     collapsedPane.pane <= 60 &&
-      collapsedPane.icons === 7 &&
+      collapsedPane.icons === 8 &&
       collapsedPane.tabs === 0 &&
       collapsedPane.splitter === 'none' &&
       collapsedPane.gateDots === 4 &&
@@ -1814,7 +1814,7 @@ async function main() {
   record(
     'G7-10 点图标展开并切到对应页',
     reopenedPane.pane > 800 &&
-      reopenedPane.tabs === 7 &&
+      reopenedPane.tabs === 8 &&
       reopenedPane.paper &&
       reopenedPane.selected === 'true',
     JSON.stringify(reopenedPane)
@@ -1861,6 +1861,18 @@ async function main() {
     'G7-12 建模态阶段轨道整块展开',
     g712Workflow.track > 120,
     `track=${g712Workflow.track}`
+  )
+
+  // 进入数模默认落在过程总览：七节点管线 + 面板挂载。
+  const g713Process = await win.webContents.executeJavaScript(`({
+    selected: document.querySelector('.tab[data-tab="process"]')?.getAttribute('aria-selected'),
+    panel: !!document.querySelector('[data-panel="process"]'),
+    nodes: document.querySelectorAll('.process-node').length
+  })`)
+  record(
+    'G7-13 过程总览为建模默认页',
+    g713Process.selected === 'true' && g713Process.panel && g713Process.nodes === 7,
+    JSON.stringify(g713Process)
   )
 
   await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="chat"]')?.click()`)

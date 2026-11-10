@@ -1,4 +1,5 @@
 export const TABS = [
+  { id: 'process', label: '总览', icon: '览' },
   { id: 'figure', label: '图表', icon: '图' },
   { id: 'paper', label: '论文', icon: '论' },
   { id: 'code', label: '代码', icon: '码' },
@@ -15,6 +16,7 @@ export function tabsForMode(mode: 'workflow' | 'chat'): (typeof TABS)[number][] 
 }
 
 export const TAB_GROUPS: { label: string; ids: TabId[] }[] = [
+  { label: '过程', ids: ['process'] },
   { label: '产出', ids: ['figure', 'paper', 'code'] },
   { label: '评审', ids: ['score', 'gate'] },
   { label: '资料', ids: ['log', 'files'] }

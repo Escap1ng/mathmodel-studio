@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { GateRow, ScoreDeduction, WorkbenchState } from '../../../../shared/api'
+import type { PhaseState } from '../../lib/phases'
 import FilesPanel from './FilesPanel'
 import FigurePanel from './FigurePanel'
 import PaperPanel from './PaperPanel'
@@ -7,6 +8,7 @@ import ScorePanel from './ScorePanel'
 import GatePanel from './GatePanel'
 import CodePanel from './CodePanel'
 import LogPanel from './LogPanel'
+import ProcessPanel from './ProcessPanel'
 import { errorText } from '../../lib/format'
 import { TABS, TAB_GROUPS, tabsForMode, type TabId } from './tabs'
 
@@ -20,6 +22,11 @@ interface Props {
   projectId: string | null
   /** 工作台产物的会话作用域；空值让 runtime 回落到最近会话 */
   sessionId: string | null
+  /** 过程总览：七阶段状态、当前阶段、已选模型与待决卡 */
+  phases: Record<number, PhaseState>
+  currentPhase?: number
+  resolvedModel: string | null
+  pendingKind: string | null
 }
 
 function GateSummary({ rows, onOpen }: { rows: GateRow[]; onOpen: () => void }) {
@@ -47,10 +54,14 @@ export default function WorkspacePane({
   onToggle,
   mode,
   projectId,
-  sessionId
+  sessionId,
+  phases,
+  currentPhase,
+  resolvedModel,
+  pendingKind
 }: Props) {
   const scope = sessionId ?? undefined
-  const [active, setActive] = useState<TabId>('figure')
+  const [active, setActive] = useState<TabId>('process')
   const [state, setState] = useState<WorkbenchState | null>(null)
   const [loading, setLoading] = useState(false)
   const [rendering, setRendering] = useState(false)
@@ -124,6 +135,11 @@ export default function WorkspacePane({
     // runtime 就绪或当前会话变化时重拉；渲染结果由 renderFigure 直接回填。
     // eslint 未启用，避免把 renderFigure 写进依赖导致反复载入。
   }, [runtimeReady, scope])
+
+  // 进入数模就落在过程总览：模式切换本身是一次上下文重置。
+  useEffect(() => {
+    if (mode === 'workflow') setActive('process')
+  }, [mode])
 
   // 阶段四把图登记成新版本后，主进程之外的改动不会走 renderFigure，靠事件回拉一次状态。
   useEffect(() => {
@@ -241,11 +257,21 @@ export default function WorkspacePane({
               <FilesPanel projectId={projectId} />
             ) : (
               <>
-                {!state && !error && active !== 'files' ? (
+                {!state && !error && active !== 'files' && active !== 'process' ? (
                   <div className="card">运行时准备好后载入工作台…</div>
                 ) : null}
                 {error && active !== 'figure' && active !== 'files' ? (
                   <div className="panel__error" role="alert">{error}</div>
+                ) : null}
+                {active === 'process' ? (
+                  <ProcessPanel
+                    state={state}
+                    phases={phases}
+                    currentPhase={currentPhase}
+                    resolvedModel={resolvedModel}
+                    pendingKind={pendingKind}
+                    onGoto={setActive}
+                  />
                 ) : null}
                 {active === 'files' ? <FilesPanel projectId={projectId} /> : null}
                 {state && active === 'figure' ? (

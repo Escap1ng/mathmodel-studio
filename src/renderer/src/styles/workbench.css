@@ -1037,3 +1037,118 @@
     align-items: start;
   }
 }
+
+/* —— 过程总览：七节点管线 —— */
+.process {
+  position: relative;
+  margin: 0;
+  padding: 6px 0 6px 24px;
+  list-style: none;
+}
+
+.process::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 18px;
+  bottom: 18px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.process-node {
+  position: relative;
+  padding: 8px 0 10px;
+}
+
+.process-node__dot {
+  position: absolute;
+  left: -20px;
+  top: 13px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.process-node--running .process-node__dot,
+.process-node--waiting .process-node__dot {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.process-node--passed .process-node__dot {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.process-node--failed .process-node__dot {
+  border-color: var(--fail);
+  background: var(--fail);
+}
+
+.process-node__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.process-node__num {
+  min-width: 14px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.process-node__name {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.process-node__state {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.process-node--running .process-node__state,
+.process-node--waiting .process-node__state {
+  color: var(--accent);
+}
+
+.process-node--passed .process-node__state {
+  color: var(--ok);
+}
+
+.process-node--failed .process-node__state {
+  color: var(--fail);
+}
+
+.process-chip {
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-2);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+
+.process-chip:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.process-chip--static {
+  cursor: default;
+}
+
+.process-chip--static:hover {
+  background: var(--chrome-2);
+  color: var(--text-2);
+}

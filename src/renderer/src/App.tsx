@@ -941,6 +941,16 @@ export default function App() {
     }
     return null
   }, [entries])
+  // 末个已决的选模卡给出「已选：名」，过程总览据此标出选定模型。
+  const resolvedModel = useMemo(() => {
+    for (let index = entries.length - 1; index >= 0; index--) {
+      const card = entries[index].interrupt
+      if (card?.card === 'model-choice' && card.resolved?.startsWith('已选：')) {
+        return card.resolved.slice('已选：'.length)
+      }
+    }
+    return null
+  }, [entries])
   const pending = Boolean(pendingCard)
   const currentPhase = currentPhaseOf(phases)
   const measuredPane = (): number =>
@@ -1057,6 +1067,10 @@ export default function App() {
         mode={mode}
         projectId={activeKind === 'workflow' ? activeId : null}
         sessionId={activeKind === 'workflow' ? activeId : null}
+        phases={phases}
+        currentPhase={currentPhase}
+        resolvedModel={resolvedModel}
+        pendingKind={pendingCard?.card ?? null}
       />
       <div
         className="splitter splitter--col"
