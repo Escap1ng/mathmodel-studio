@@ -1084,6 +1084,13 @@ async function main() {
   )
   record('G7-7 阶段 3 停在等你选', k3.phase3 === 'waiting', `阶段 3 状态=${k3.phase3}`)
 
+  const k3Radar = await win.webContents.executeJavaScript(
+    `[...document.querySelectorAll('.decision[data-card="model-choice"]')]
+      .find((c) => !c.querySelector('.decision__resolved'))
+      ?.querySelectorAll('.candidate__radar svg').length ?? 0`
+  )
+  record('G7-7 选模卡含五维雷达', k3Radar === 3, `雷达=${k3Radar}`)
+
   await win.webContents.executeJavaScript(
     `[...document.querySelectorAll('.decision[data-card="model-choice"]')].find((c) => !c.querySelector('.decision__resolved'))?.querySelector('[data-action="explain"]')?.click()`
   )

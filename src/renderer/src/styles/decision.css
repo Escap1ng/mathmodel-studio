@@ -183,6 +183,53 @@
   line-height: 1.7;
 }
 
+/* 五维雷达：灰网格 + 选中卡走强调色；只作对比，数值以右侧规格表为准 */
+.decision__radar-note {
+  margin: 6px 0 0;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.candidate__radar {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 10px;
+}
+
+.candidate__radar svg {
+  overflow: visible;
+}
+
+.candidate__radar-grid polygon {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.candidate__radar-grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.candidate__radar-label {
+  fill: var(--text-3);
+  font-family: var(--font-cjk);
+  font-size: 8px;
+}
+
+.candidate__radar-fill {
+  fill: var(--surface-2);
+  stroke: var(--text-3);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.candidate__radar-fill--pick {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
 .candidate__spec {
   display: grid;
   grid-template-columns: 1fr 1fr;
