@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 107
+const MIN_ASSERTIONS = 114
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -51,6 +51,8 @@ const REQUIRED_ASSERTIONS = [
   'G7-6 四家预设模型名来自官方文档',
   'G7-6 OpenAI 格式可填端点与开关',
   'G7-6 预设模型与上下文/深度选择器',
+  'G7-7 选模卡含五维雷达',
+  'G7-13 过程总览为建模默认页',
   'G7-6 上下文与深度可切换',
   'G7-6 上下文与深度随设置落盘',
   'G7-6 Key 落盘只有密文或明确拒绝',
