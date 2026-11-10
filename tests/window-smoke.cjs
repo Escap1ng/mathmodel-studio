@@ -256,8 +256,8 @@ async function main() {
     `platform=${process.platform}，应用菜单=${appMenu === null ? 'null' : 'still set'}`
   )
   record(
-    'G7-4 问答默认收起为 7 图标',
-    dom.icons === 7 && dom.tabs === 0 && dom.pane <= 60,
+    'G7-4 问答默认收起仅文件图标',
+    dom.icons === 1 && dom.tabs === 0 && dom.pane <= 60,
     `icons=${dom.icons}，tabs=${dom.tabs}，pane=${dom.pane}`
   )
   record(
@@ -308,7 +308,7 @@ async function main() {
   })()`)
   record(
     'G7-4 空状态大框与加号居中',
-    drop.found && drop.hasPlus && drop.hitLabel === '选择赛题或数据文件' && drop.w >= 560 && drop.h >= 280 && drop.dx <= 2,
+    drop.found && drop.hasPlus && drop.hitLabel === '选择文件' && drop.w >= 560 && drop.h >= 280 && drop.dx <= 2,
     `框 ${drop.w}x${drop.h}，加号偏移 ${drop.dx}px，命中区=${JSON.stringify(drop.hitLabel)}`
   )
   record(
@@ -355,7 +355,7 @@ async function main() {
     const shot = await capture(win)
     writeFileSync(join(OUT_DIR, 'dropzone.png'), shot.toPNG())
 
-    // 文件页：答辩模式默认收起，先用文件图标展开成标签态，后续 tab 用例在展开态继续。
+    // 文件页：答辩模式默认收起，先用文件图标展开；通用模式只出文件面板，没有标签条。
     await win.webContents.executeJavaScript(
       `document.querySelector('.workspace-icon[data-tab="files"]')?.click()`
     )
@@ -363,18 +363,16 @@ async function main() {
     const expandedTabs = await win.webContents.executeJavaScript(`({
       pane: Math.round(document.querySelector('.workspace')?.getBoundingClientRect().width ?? 0),
       tabs: document.querySelectorAll('.tab').length,
+      files: !!document.querySelector('.panel[data-panel="files"]'),
       stored: localStorage.getItem('mms.workspaceCollapsed.chat')
     })`)
     record(
-      'G7-4 图标展开后 7 个标签',
-      expandedTabs.pane > 100 && expandedTabs.tabs === 7 && expandedTabs.stored === '0',
+      'G7-4 文件图标展开为文件面板',
+      expandedTabs.pane > 100 && expandedTabs.tabs === 0 && expandedTabs.files && expandedTabs.stored === '0',
       JSON.stringify(expandedTabs)
     )
-    // 文件页：切过去应当看到工作区路径，并在列表里看到刚拖进来的文件；
+    // 文件页：展开后应当看到工作区路径，并在列表里看到刚拖进来的文件；
     // 移除并刷新后，条目要跟着消失（列表读的是磁盘，不是缓存）。
-    await win.webContents.executeJavaScript(
-      `document.querySelector('.tab[data-tab="files"]')?.click()`
-    )
     const sawFiles = await waitFor(
       win,
       `[...document.querySelectorAll('.file-row__name')].some((n) => n.textContent === 'drag-problem.csv')`,
@@ -1547,6 +1545,9 @@ async function main() {
     return 'reopened'
   })()`)
   await sleep(260)
+  // 通用模式只有文件页；宽屏用例要全量标签，先切到数模模式（进入即自动展开）。
+  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="workflow"]')?.click()`)
+  await sleep(650)
   win.setContentSize(2400, 1200)
   await waitFor(
     win,
@@ -1787,7 +1788,7 @@ async function main() {
     tabs: document.querySelectorAll('.tab').length,
     splitter: getComputedStyle(document.querySelector('[data-splitter="pane"]')).display,
     gateDots: document.querySelectorAll('.workspace__gate-dots i').length,
-    stored: localStorage.getItem('mms.workspaceCollapsed.chat')
+    stored: localStorage.getItem('mms.workspaceCollapsed.workflow')
   })`)
   record(
     'G7-10 右栏可收起为图标条',
@@ -1818,6 +1819,10 @@ async function main() {
       reopenedPane.selected === 'true',
     JSON.stringify(reopenedPane)
   )
+
+  // 回到通用模式，验证收合偏好确实按模式分开记。
+  await win.webContents.executeJavaScript(`document.querySelector('.mode-switch__btn[data-mode="chat"]')?.click()`)
+  await sleep(650)
 
   // —— G7-12 模式变阵：手动偏好、切换过渡、自动展开、阶段轨道换手与恢复 ——
   await win.webContents.executeJavaScript(`document.querySelector('.workspace__toggle')?.click()`)

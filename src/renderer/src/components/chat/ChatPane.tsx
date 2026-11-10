@@ -659,7 +659,7 @@ export default function ChatPane({
             ? '可以只发附件，也可以补充说明'
             : mode === 'workflow'
               ? '粘贴赛题正文，也可以粘贴截图或拖入文件'
-              : '描述这道题，或粘贴题目正文与截图'
+              : '想聊点什么？也可以直接拖入文件'
 
   const attachNotice = attachError ?? (rejected.length > 0 ? rejected.join('；') : null)
 
@@ -872,9 +872,11 @@ export default function ChatPane({
           >
             {contextLabel} · {depthLabel}
           </button>
-          <span className="pill" data-role="phase-pill">
-            {phaseText}
-          </span>
+          {mode === 'workflow' ? (
+            <span className="pill" data-role="phase-pill">
+              {phaseText}
+            </span>
+          ) : null}
           {streaming ? (
             <button type="button" className="pill pill--send pill--stop" onClick={onStop}>
               停止

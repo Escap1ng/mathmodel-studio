@@ -1054,6 +1054,7 @@ export default function App() {
         runtimeReady={runtime.state === 'ready'}
         collapsed={workspaceCollapsed}
         onToggle={toggleWorkspace}
+        mode={mode}
         projectId={activeKind === 'workflow' ? activeId : null}
         sessionId={activeKind === 'workflow' ? activeId : null}
       />

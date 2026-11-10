@@ -2,6 +2,7 @@ import type { StagedFile } from '../../../../shared/api'
 import FileChips from '../common/FileChips'
 
 interface Props {
+  mode: 'workflow' | 'chat'
   files: StagedFile[]
   rejected: string[]
   failure: string | null
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function DropZone({
+  mode,
   files,
   rejected,
   failure,
@@ -22,7 +24,17 @@ export default function DropZone({
   onRemove,
   onReveal
 }: Props) {
-  const title = busy ? '正在加入…' : dragging ? '松手即添加' : '把赛题与附件拖到这里'
+  const title = busy
+    ? '正在加入…'
+    : dragging
+      ? '松手即添加'
+      : mode === 'chat'
+        ? '把文件拖到这里'
+        : '把赛题与附件拖到这里'
+  const note =
+    mode === 'chat'
+      ? '问答与附件会出现在这一列；文件暂存在本机工作区，发消息时一并交给模型。'
+      : '对话流、选模卡、门禁结果与评分明细都会出现在这一列；右侧工作台放图、论文、代码与日志。'
 
   return (
     <div className="chat__empty dropzone-area" data-drag={dragging ? 'true' : undefined}>
@@ -30,7 +42,7 @@ export default function DropZone({
         <button
           type="button"
           className="dropzone__hit"
-          aria-label="选择赛题或数据文件"
+          aria-label={mode === 'chat' ? '选择文件' : '选择赛题或数据文件'}
           onClick={onPick}
         />
         <span className="dropzone__plus" aria-hidden="true">
@@ -67,9 +79,7 @@ export default function DropZone({
           </button>
         </div>
       </div>
-      <p className="chat__empty-note">
-        对话流、选模卡、门禁结果与评分明细都会出现在这一列；右侧工作台放图、论文、代码与日志。
-      </p>
+      <p className="chat__empty-note">{note}</p>
     </div>
   )
 }

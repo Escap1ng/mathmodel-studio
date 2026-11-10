@@ -2,10 +2,10 @@ import DropZone from './DropZone'
 import type { StagedFile } from '../../../../shared/api'
 
 const CHAT_PROMPTS = [
-  '什么问题适合灰色预测 GM(1,1)？举两个例子',
-  '蒙特卡洛模拟的基本步骤和适用场景',
-  '写个 Python 脚本：读取 Excel 两列并画趋势图',
-  '线性规划和整数规划怎么选？'
+  '帮我把这段话改写得更清楚',
+  '列出两种方案，比较成本与风险',
+  '解释一个概念，并给个生活里的例子',
+  '把这份表格的要点总结成三条'
 ]
 
 interface Props {
@@ -39,15 +39,16 @@ export default function WelcomeScreen({
     <div className="welcome">
       <div className="welcome__intro">
         <h1 className="welcome__title">
-          {mode === 'workflow' ? '把赛题贴进来' : '今天做哪道题'}
+          {mode === 'workflow' ? '把赛题贴进来' : '今天聊点什么'}
         </h1>
         <p className="welcome__lead">
           {mode === 'workflow'
             ? '直接粘贴题目正文，或把文件拖进下面的框；完全不会的地方先说「帮我理解这道题」。'
-            : '先随便聊，聊明白再投进全流程建模也不迟。'}
+            : '问答、写作、分析都可以；要跑建模全流程时，切到「数模」。'}
         </p>
       </div>
       <DropZone
+        mode={mode}
         files={files}
         rejected={rejected}
         failure={failure}
@@ -78,7 +79,7 @@ export default function WelcomeScreen({
             data-action="enter-workflow"
             onClick={onEnterWorkflow}
           >
-            进入全流程建模 →
+            进入数模模式 →
           </button>
         </>
       ) : null}

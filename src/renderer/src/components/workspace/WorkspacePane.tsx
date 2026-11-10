@@ -8,12 +8,14 @@ import GatePanel from './GatePanel'
 import CodePanel from './CodePanel'
 import LogPanel from './LogPanel'
 import { errorText } from '../../lib/format'
-import { TABS, TAB_GROUPS, type TabId } from './tabs'
+import { TABS, TAB_GROUPS, tabsForMode, type TabId } from './tabs'
 
 interface Props {
   runtimeReady: boolean
   collapsed: boolean
   onToggle: () => void
+  /** 通用模式只留文件页，数模模式恢复全量标签 */
+  mode: 'workflow' | 'chat'
   /** 当前建模会话 id：文件页据此显示赛题项目文件夹 */
   projectId: string | null
   /** 工作台产物的会话作用域；空值让 runtime 回落到最近会话 */
@@ -43,6 +45,7 @@ export default function WorkspacePane({
   runtimeReady,
   collapsed,
   onToggle,
+  mode,
   projectId,
   sessionId
 }: Props) {
@@ -153,12 +156,14 @@ export default function WorkspacePane({
           </button>
         ) : (
           <>
-            <span className="workspace__name">工作台</span>
-            {state ? (
-              <GateSummary rows={state.gate} onOpen={() => setActive('gate')} />
-            ) : (
-              <span className="workspace__hint">载入中…</span>
-            )}
+            <span className="workspace__name">{mode === 'chat' ? '文件' : '工作台'}</span>
+            {mode === 'workflow' ? (
+              state ? (
+                <GateSummary rows={state.gate} onOpen={() => setActive('gate')} />
+              ) : (
+                <span className="workspace__hint">载入中…</span>
+              )
+            ) : null}
             <button
               type="button"
               className="workspace__toggle"
@@ -174,7 +179,7 @@ export default function WorkspacePane({
 
       {collapsed ? (
         <div className="workspace__icons">
-          {state ? (
+          {state && mode === 'workflow' ? (
             <div
               className="workspace__gate-dots"
               title={state.gate.map((row) => `${row.label}：${row.detail}`).join('\n')}
@@ -184,7 +189,7 @@ export default function WorkspacePane({
               ))}
             </div>
           ) : null}
-          {TABS.map((tab) => (
+          {tabsForMode(mode).map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -203,100 +208,108 @@ export default function WorkspacePane({
         </div>
       ) : (
         <>
-          <div className="tabs" role="tablist">
-            {TAB_GROUPS.map((group) => (
-              <div className="tabs__group" key={group.label}>
-                <span className="tabs__label">{group.label}</span>
-                <div className="tabs__set">
-                  {group.ids.map((id) => {
-                    const tab = TABS.find((item) => item.id === id)
-                    if (!tab) return null
-                    return (
-                      <button
-                        key={tab.id}
-                        role="tab"
-                        className="tab"
-                        data-tab={tab.id}
-                        aria-selected={tab.id === active}
-                        onClick={() => setActive(tab.id)}
-                      >
-                        {tab.label}
-                      </button>
-                    )
-                  })}
+          {mode === 'workflow' ? (
+            <div className="tabs" role="tablist">
+              {TAB_GROUPS.map((group) => (
+                <div className="tabs__group" key={group.label}>
+                  <span className="tabs__label">{group.label}</span>
+                  <div className="tabs__set">
+                    {group.ids.map((id) => {
+                      const tab = TABS.find((item) => item.id === id)
+                      if (!tab) return null
+                      return (
+                        <button
+                          key={tab.id}
+                          role="tab"
+                          className="tab"
+                          data-tab={tab.id}
+                          aria-selected={tab.id === active}
+                          onClick={() => setActive(tab.id)}
+                        >
+                          {tab.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
 
           <div className="workspace__body" role="tabpanel">
-            {!state && !error && active !== 'files' ? (
-              <div className="card">运行时准备好后载入工作台…</div>
-            ) : null}
-            {error && active !== 'figure' && active !== 'files' ? (
-              <div className="panel__error" role="alert">{error}</div>
-            ) : null}
-            {active === 'files' ? <FilesPanel projectId={projectId} /> : null}
-            {state && active === 'figure' ? (
-              <FigurePanel
-                state={state}
-                template={template}
-                theme={theme}
-                rendering={rendering}
-                error={error}
-                onTemplate={(value) => {
-                  setTemplate(value)
-                }}
-                onTheme={(value) => {
-                  setTheme(value)
-                }}
-                onRender={() => void renderFigure(template, theme)}
-                onRollback={(version) => {
-                  void window.studio.workbench
-                    .rollback(version, scope)
-                    .then((result) => {
-                      setState(result.state)
-                      const picked = result.state.figure.versions.find((v) => v.id === result.state.figure.active)
-                      if (picked) {
-                        setTemplate(picked.template)
-                        setTheme(picked.theme)
-                      }
-                    })
-                    .catch((err: unknown) => setError(errorText(err)))
-                }}
-              />
-            ) : null}
-            {state && active === 'score' ? (
-              <ScorePanel
-                state={state}
-                roundNo={roundNo}
-                vetoMode={vetoMode}
-                deduction={deduction}
-                onRound={(round) => {
-                  setVetoMode(false)
-                  setRoundNo(round)
-                  setDeduction(null)
-                }}
-                onVeto={(value) => {
-                  setVetoMode(value)
-                  setDeduction(null)
-                }}
-                onDeduction={setDeduction}
-              />
-            ) : null}
-            {state && active === 'gate' ? <GatePanel state={state} /> : null}
-            {state && active === 'code' ? <CodePanel state={state} onGoto={setActive} /> : null}
-            {state && active === 'log' ? <LogPanel state={state} onGoto={setActive} /> : null}
-            {state && active === 'paper' ? (
-              <PaperPanel
-                state={state}
-                building={building}
-                error={error}
-                page={paperPage}
-                onPage={setPaperPage}
-                onBuild={() => void buildPaper()}
-              />
-            ) : null}
+            {mode === 'chat' ? (
+              <FilesPanel projectId={projectId} />
+            ) : (
+              <>
+                {!state && !error && active !== 'files' ? (
+                  <div className="card">运行时准备好后载入工作台…</div>
+                ) : null}
+                {error && active !== 'figure' && active !== 'files' ? (
+                  <div className="panel__error" role="alert">{error}</div>
+                ) : null}
+                {active === 'files' ? <FilesPanel projectId={projectId} /> : null}
+                {state && active === 'figure' ? (
+                  <FigurePanel
+                    state={state}
+                    template={template}
+                    theme={theme}
+                    rendering={rendering}
+                    error={error}
+                    onTemplate={(value) => {
+                      setTemplate(value)
+                    }}
+                    onTheme={(value) => {
+                      setTheme(value)
+                    }}
+                    onRender={() => void renderFigure(template, theme)}
+                    onRollback={(version) => {
+                      void window.studio.workbench
+                        .rollback(version, scope)
+                        .then((result) => {
+                          setState(result.state)
+                          const picked = result.state.figure.versions.find((v) => v.id === result.state.figure.active)
+                          if (picked) {
+                            setTemplate(picked.template)
+                            setTheme(picked.theme)
+                          }
+                        })
+                        .catch((err: unknown) => setError(errorText(err)))
+                    }}
+                  />
+                ) : null}
+                {state && active === 'score' ? (
+                  <ScorePanel
+                    state={state}
+                    roundNo={roundNo}
+                    vetoMode={vetoMode}
+                    deduction={deduction}
+                    onRound={(round) => {
+                      setVetoMode(false)
+                      setRoundNo(round)
+                      setDeduction(null)
+                    }}
+                    onVeto={(value) => {
+                      setVetoMode(value)
+                      setDeduction(null)
+                    }}
+                    onDeduction={setDeduction}
+                  />
+                ) : null}
+                {state && active === 'gate' ? <GatePanel state={state} /> : null}
+                {state && active === 'code' ? <CodePanel state={state} onGoto={setActive} /> : null}
+                {state && active === 'log' ? <LogPanel state={state} onGoto={setActive} /> : null}
+                {state && active === 'paper' ? (
+                  <PaperPanel
+                    state={state}
+                    building={building}
+                    error={error}
+                    page={paperPage}
+                    onPage={setPaperPage}
+                    onBuild={() => void buildPaper()}
+                  />
+                ) : null}
+              </>
+            )}
           </div>
         </>
       )}

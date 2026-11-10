@@ -9,6 +9,11 @@ export const TABS = [
 ] as const
 export type TabId = (typeof TABS)[number]['id']
 
+/** 通用模式只留文件页；数模模式恢复全量标签。 */
+export function tabsForMode(mode: 'workflow' | 'chat'): (typeof TABS)[number][] {
+  return mode === 'chat' ? TABS.filter((tab) => tab.id === 'files') : [...TABS]
+}
+
 export const TAB_GROUPS: { label: string; ids: TabId[] }[] = [
   { label: '产出', ids: ['figure', 'paper', 'code'] },
   { label: '评审', ids: ['score', 'gate'] },
