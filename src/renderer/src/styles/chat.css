@@ -92,6 +92,22 @@
   gap: 16px;
 }
 
+/* 切换模式后欢迎区重新落位 */
+.shell[data-mode-animating='true'] .welcome {
+  animation: welcome-in 240ms var(--ease-emphasized) both;
+}
+
+@keyframes welcome-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* DropZone 根自带的 height:100% 在欢迎屏里改成接管剩余高度，标题与快捷区不挤它 */
 .welcome > .chat__empty {
   height: auto;
