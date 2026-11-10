@@ -296,6 +296,8 @@ export default function ChatPane({
   const atBottomRef = useRef(true)
   const [hasNew, setHasNew] = useState(false)
   const firstIdRef = useRef<string | null>(null)
+  // 输入框高度由 ResizeObserver 写 ref，渲染期不再发 getBoundingClientRect。
+  const composerHeightRef = useRef(140)
 
   const onStreamScroll = (): void => {
     const el = streamRef.current
@@ -318,22 +320,30 @@ export default function ChatPane({
     setHasNew(false)
   }
 
+  const scrollFrameRef = useRef(0)
+
   useEffect(() => {
     const el = streamRef.current
     if (!el) return
     const firstId = entries[0]?.id ?? null
     const switched = firstId !== firstIdRef.current
     firstIdRef.current = firstId
-    // 刚切会话，或最后一条是自己发出的：总是到底。流式推进只跟随本来就停在底部的人。
-    if (switched || entries[entries.length - 1]?.role === 'user') {
-      atBottomRef.current = true
-      setAtBottom(true)
-      setHasNew(false)
-      el.scrollTop = el.scrollHeight
-      return
-    }
-    if (atBottomRef.current) el.scrollTop = el.scrollHeight
-    else setHasNew(true)
+    const lastRole = entries[entries.length - 1]?.role
+    // 同一帧只量一次、写一次；流式 token 连来时不会被每块重排卡住。
+    cancelAnimationFrame(scrollFrameRef.current)
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      // 刚切会话，或最后一条是自己发出的：总是到底。流式推进只跟随本来就停在底部的人。
+      if (switched || lastRole === 'user') {
+        atBottomRef.current = true
+        setAtBottom(true)
+        setHasNew(false)
+        el.scrollTop = el.scrollHeight
+        return
+      }
+      if (atBottomRef.current) el.scrollTop = el.scrollHeight
+      else setHasNew(true)
+    })
+    return () => cancelAnimationFrame(scrollFrameRef.current)
   }, [entries])
 
   const ready = runtime.state === 'ready'
@@ -352,6 +362,17 @@ export default function ChatPane({
       /* 本地存储不可用时只保留本次会话 */
     }
   }, [composerHeight])
+
+  useEffect(() => {
+    const el = composerRef.current
+    if (!el) return
+    const observer = new ResizeObserver((records) => {
+      const height = records[0]?.contentRect.height
+      if (height) composerHeightRef.current = Math.round(height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     if (composerHeight == null) return
@@ -786,7 +807,7 @@ export default function ChatPane({
           role="separator"
           aria-orientation="horizontal"
           aria-label="调整输入框高度"
-          aria-valuenow={Math.round(composerHeight ?? composerRef.current?.getBoundingClientRect().height ?? 140)}
+          aria-valuenow={Math.round(composerHeight ?? composerHeightRef.current)}
           tabIndex={0}
           data-splitter="composer"
           data-dragging={resizingComposer ? 'true' : undefined}

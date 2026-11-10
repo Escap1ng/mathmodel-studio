@@ -222,12 +222,15 @@ export default function App() {
   }, [entries])
 
   useEffect(() => {
-    try {
-      if (paneWidth == null) window.localStorage.removeItem(PANE_STORAGE_KEY)
-      else window.localStorage.setItem(PANE_STORAGE_KEY, String(paneWidth))
-    } catch {
-      /* 本地存储不可用时只保留本次会话内的宽度 */
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        if (paneWidth == null) window.localStorage.removeItem(PANE_STORAGE_KEY)
+        else window.localStorage.setItem(PANE_STORAGE_KEY, String(paneWidth))
+      } catch {
+        /* 本地存储不可用时只保留本次会话内的宽度 */
+      }
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [paneWidth])
 
   useEffect(() => {
@@ -1077,7 +1080,11 @@ export default function App() {
         role="separator"
         aria-orientation="vertical"
         aria-label="调整工作台宽度"
-        aria-valuenow={Math.round(measuredPane())}
+        aria-valuenow={
+          workspaceCollapsed
+            ? 56
+            : Math.round(paneWidth ?? clampPaneWidth(Math.round(window.innerWidth * 0.38)))
+        }
         tabIndex={0}
         data-splitter="pane"
         data-dragging={resizingPane ? 'true' : undefined}
