@@ -70,11 +70,20 @@ interface Props {
 const CANDIDATE_LEVEL: Record<string, number> = { 低: 1, 中: 2, 中高: 2.5, 高: 3 }
 const RADAR_AXES = ['创新', '解释', '精度', '速度', '易做']
 
-/** 「N–M 小时」取中点；解析不到就放弃这维，不让雷达瞎画。 */
+/** 耗时折算成小时；带天/周单位的按倍率换算，认不出单位就放弃这维，不让雷达瞎画。 */
+const ETA_UNITS: [RegExp, number][] = [
+  [/天|day/i, 24],
+  [/周|星期|week/i, 168],
+  [/小时|hour|hr\b/i, 1]
+]
+
 function etaHours(eta: string): number | null {
+  const units = ETA_UNITS.filter(([pattern]) => pattern.test(eta))
+  if (units.length !== 1) return null
   const nums = eta.match(/\d+(?:\.\d+)?/g)
   if (!nums || nums.length === 0) return null
-  return nums.map(Number).reduce((sum, value) => sum + value, 0) / nums.length
+  const sum = nums.map(Number).reduce((acc, value) => acc + value, 0)
+  return (sum / nums.length) * units[0][1]
 }
 
 function radarValues(candidate: ModelCandidate, speed: number | null): number[] | null {
