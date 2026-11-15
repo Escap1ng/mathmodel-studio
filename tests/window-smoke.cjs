@@ -1404,16 +1404,33 @@ async function main() {
     `非白像素 ${(scoreInk.ratio * 100).toFixed(2)}%（阈值 ${MIN_INK_RATIO * 100}%）`
   )
 
+  // 0.2.0 起评分按会话隔离：建模会话里是真实轮次（这里 fake 兜底一轮 86 达标），
+  // 熔断/红线口径经「示例数据」入口验，不与真实数据混放。
+  const realRounds = await win.webContents.executeJavaScript(
+    `document.querySelectorAll('[data-panel="score"] .score-round[data-round]').length`
+  )
+  record(
+    'G7-8 会话评分只展示真实轮次（不混演示三轮）',
+    realRounds === 1,
+    `真实轮次按钮=${realRounds}`
+  )
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="demo"]')?.click()`)
+  const demoOn = await waitFor(
+    win,
+    `document.querySelectorAll('[data-panel="score"] .score-round[data-round]').length === 3`,
+    5000
+  )
   await win.webContents.executeJavaScript(`document.querySelector('.score-round[data-round="3"]')?.click()`)
   const breaker = await waitFor(
     win,
     `!!document.querySelector('.breaker-bar') && (document.querySelector('[data-role="score-total"]')?.textContent || '').includes('84')`,
     5000
   )
-  record('G7-8 第三轮低于 85 显示熔断提示', breaker, `熔断条=${breaker}`)
+  record('G7-8 第三轮低于 85 显示熔断提示', demoOn && breaker, `示例三轮=${demoOn} 熔断条=${breaker}`)
   await win.webContents.executeJavaScript(`document.querySelector('[data-action="veto"]')?.click()`)
   const veto = await waitFor(win, `!!document.querySelector('.veto-bar')`, 5000)
   record('G7-8 一票否决示例不进入循环', veto, `红线条=${veto}`)
+  await win.webContents.executeJavaScript(`document.querySelector('[data-action="demo"]')?.click()`)
 
   await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="gate"]')?.click()`)
   const gateRows = await waitFor(win, `document.querySelectorAll('[data-gate-row]').length === 4`, 5000)

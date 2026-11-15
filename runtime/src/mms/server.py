@@ -654,6 +654,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             # 评分优先读本会话真实轮次；没有时回落演示数据。章节门禁同样优先查本会话论文。
             score = workbench_score.state(self.server.root, data_dir=data_root)
+            score["is_demo"] = not workbench_score._real_cards(data_root)
+            demo_rounds, demo_veto = workbench_score.demo_rounds(self.server.root)
+            score["demo"] = {"rounds": demo_rounds, "veto": demo_veto}
             chapter = score.get("chapter", {})
             round_row = next(
                 (r for r in score.get("rounds", []) if r.get("round") == score.get("defaultRound")),

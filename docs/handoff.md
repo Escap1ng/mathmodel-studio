@@ -42,7 +42,7 @@ python runtime/tests/selfcheck_paper.py               # 12/12 条论文断言（
 需要显示器的部分：
 
 ```bash
-npm run smoke:window   # 真起窗口，115 条断言，写 screenshots/window-smoke.{png,json} 与各页截图
+npm run smoke:window   # 真起窗口，116 条断言，写 screenshots/window-smoke.{png,json} 与各页截图
 npm run verify:window  # 独立读 JSON 并复算读数
 ```
 
@@ -193,7 +193,7 @@ src/renderer/src/
   components/common/        ContextMenu、SelectMenu、FileChips
   lib/chat.ts               事件折叠的纯函数
 scripts/                    G1/G1 反向/G8/G8 反向/G6/G6b 与契约校验
-tests/window-smoke.cjs      真启动断言（115 条）+ 截图与 JSON 结论
+tests/window-smoke.cjs      真启动断言（116 条）+ 截图与 JSON 结论
 docs/release.md             发布格式规范
 .github/workflows/ci.yml    gates（ubuntu+windows，含 G9/G10）与 window-smoke（ubuntu）
 ```

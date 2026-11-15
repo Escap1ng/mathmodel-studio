@@ -89,6 +89,23 @@ def score_dir(data_dir: Path) -> Path:
     return data_dir / "workbench" / "score"
 
 
+def demo_rounds(root: Path | None = None) -> tuple[list[dict], dict | None]:
+    """演示三轮与否决示例：供评分页「示例」入口展示口径，不与真实会话数据混放。"""
+    root = root or repo_root()
+    demo = json.loads(DEMO_SCORES.read_text(encoding="utf-8"))
+    rounds = []
+    with tempfile.TemporaryDirectory(prefix="mms-score-demo-") as temp:
+        workdir = Path(temp)
+        previous = None
+        for card in demo.get("rounds", []):
+            result = _run_card(root, card, workdir)
+            result["changes"] = _changes(result, previous)
+            rounds.append(result)
+            previous = result
+        veto = _run_card(root, demo.get("veto", {}), workdir) if demo.get("veto") else None
+    return rounds, veto
+
+
 def save_card(data_dir: Path, card: dict) -> Path:
     """真实评分轮落盘：<会话>/workbench/score/round-N.json。"""
     target = score_dir(data_dir)

@@ -259,6 +259,10 @@ export interface ScoreState {
   rounds: ScoreRound[]
   veto: ScoreRound | null
   defaultRound: number
+  /** 当前展示的是演示数据（会话尚无真实评分轮次）。 */
+  is_demo?: boolean
+  /** 演示三轮与否决示例，供「示例」入口展示口径，不与真实数据混放。 */
+  demo?: { rounds: ScoreRound[]; veto: ScoreRound | null }
   chapter?: ChapterState
   error?: string
 }

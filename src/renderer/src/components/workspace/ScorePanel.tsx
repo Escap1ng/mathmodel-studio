@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ScoreDeduction, WorkbenchState } from '../../../../shared/api'
 import { DIM_SHORT, verdictText } from './helpers'
 
@@ -18,8 +19,13 @@ export default function ScorePanel({
   onVeto: (value: boolean) => void
   onDeduction: (value: ScoreDeduction | null) => void
 }) {
-  const rounds = state.score.rounds
-  const round = vetoMode ? state.score.veto : rounds.find((r) => r.round === roundNo) ?? rounds[0]
+  // 真实会话评分与演示口径分开：示例入口只在显式切换后展示演示三轮/红线，
+  // 不混进会话自己的轮次里。
+  const [showDemo, setShowDemo] = useState(false)
+  const demo = state.score.demo
+  const rounds = showDemo && demo ? demo.rounds : state.score.rounds
+  const veto = showDemo && demo ? demo.veto : state.score.veto
+  const round = vetoMode ? veto : rounds.find((r) => r.round === roundNo) ?? rounds[0]
   if (!round) return <div className="panel__error">评分数据为空</div>
   const badge = verdictText(round)
   const changes = round.changes ?? []
@@ -39,20 +45,37 @@ export default function ScorePanel({
               第 {r.round} 轮
             </button>
           ))}
-          <button
-            type="button"
-            className="score-round score-round--veto"
-            data-action="veto"
-            aria-pressed={vetoMode}
-            onClick={() => onVeto(!vetoMode)}
-          >
-            红线示例
-          </button>
+          {demo ? (
+            <button
+              type="button"
+              className="score-round"
+              data-action="demo"
+              aria-pressed={showDemo}
+              onClick={() => {
+                setShowDemo(!showDemo)
+                onVeto(false)
+              }}
+            >
+              示例数据
+            </button>
+          ) : null}
+          {veto ? (
+            <button
+              type="button"
+              className="score-round score-round--veto"
+              data-action="veto"
+              aria-pressed={vetoMode}
+              onClick={() => onVeto(!vetoMode)}
+            >
+              红线示例
+            </button>
+          ) : null}
         </div>
         <span className={`score-badge score-badge--${round.veto ? 'veto' : round.pass ? 'pass' : 'fix'}`} data-role="score-verdict">
           {badge}
         </span>
       </div>
+      {showDemo ? <p className="panel__hint">示例数据：演示评分口径，非本会话的真实评审。</p> : null}
 
       {round.veto ? (
         <div className="veto-bar" role="alert">
