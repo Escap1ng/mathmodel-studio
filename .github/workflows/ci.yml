@@ -67,8 +67,19 @@ jobs:
         # 不需要真窗口：它自己造 10 份合成结果，验证「ok=true 但读数不对」「关键断言被删」都会红
         run: npm run verify:window:selftest
 
+      - name: 装排版依赖（G4/G11 全链与 G10 都要真编 PDF，只在 ubuntu 跑）
+        # 0.2.0 起通道/编排自检覆盖阶段五论文生成，需要 xelatex/pandoc；
+        # 必须放在 G4 之前。Windows 的 gates job 不装 TeX（体积与时长不划算），
+        # 下面的 G4/G11/G10 用 MMS_PAPER_SKIP=1 显式跳过排版断言并打印「未验证」。
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq pandoc texlive-xetex texlive-lang-chinese texlive-latex-extra
+
       - name: G4 通道自检（握手、鉴权、SSE、取消、续传）
         # 起真 Python 子进程和本地假 OpenAI 端点；不需要窗口、不联网、不需要 Key
+        env:
+          MMS_PAPER_SKIP: ${{ matrix.os == 'windows-latest' && '1' || '' }}
         run: python runtime/tests/selfcheck_channel.py
 
       - name: G4/G5 反向覆盖（坏事件、Key 泄漏、假 provider 关闭）
@@ -80,7 +91,9 @@ jobs:
       - name: G3 CLI 退出码契约
         run: python runtime/tests/selfcheck.py
 
-      - name: G11 编排状态机（起题、确认、换一批、选模）
+      - name: G11 编排状态机（起题、确认、换一批、选模、全链）
+        env:
+          MMS_PAPER_SKIP: ${{ matrix.os == 'windows-latest' && '1' || '' }}
         run: python runtime/tests/selfcheck_orchestrator.py
 
       - name: G11 反向覆盖（默认族写坏、关键词族清空必须变红）
@@ -97,12 +110,6 @@ jobs:
 
       - name: G9 工作台（真渲两版、回滚、评分）
         run: python runtime/tests/selfcheck_workbench.py
-
-      - name: 装排版依赖（G10 要真编 PDF，只在 ubuntu 跑）
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -yq pandoc texlive-xetex texlive-lang-chinese texlive-latex-extra
 
       - name: G10 论文排版（xelatex → pandoc → 三道门禁）
         # Windows 的 gates job 不装 TeX/MiKTeX（体积与安装时长都不划算），显式跳过并在文档里记成未证；

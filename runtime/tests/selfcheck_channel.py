@@ -28,6 +28,13 @@ SCHEMA_PATH = ROOT / "schemas" / "chat-events.schema.json"
 SENTINEL = "sk-test-SENTINEL-DO-NOT-LEAK"
 EVENT_TYPES = {"token", "reasoning", "tool_call", "compaction", "artifact", "interrupt", "gate", "phase", "error", "done"}
 from mms.provider import apply_reasoning, find_provider  # noqa: E402
+from mms import paper_build  # noqa: E402
+
+# 与 G10 同一约定：没有 TeX 的环境显式 MMS_PAPER_SKIP=1 跳过排版断言，
+# 跳过打印「未验证」，不当成通过。ubuntu gates 装齐 TeX 后走全链。
+PAPER_SKIP = os.environ.get("MMS_PAPER_SKIP") == "1"
+PAPER_OK = paper_build.env_status()["ok"]
+FULL_CHAIN = PAPER_OK and not PAPER_SKIP
 
 
 def lint_event(ev) -> list[str]:
@@ -768,17 +775,27 @@ def tests() -> None:
             status, latest = wf.json("GET", "/sessions/latest")
             session = latest.get("session") or {}
             last_text = session.get("messages", [{}])[-1].get("content", "") if session.get("messages") else ""
-            check(
-                "C12 点运行后阶段 4/5/6 全链完成，待决清空",
-                status == 200
-                and ran_statuses.get(4) == "passed"
-                and ran_statuses.get(5) == "passed"
-                and ran_statuses.get(6) == "passed"
-                and session.get("pending") is None
-                and ran[-1]["data"].get("reason") == "stop"
-                and "阶段六完成" in last_text,
-                f"状态 {ran_statuses} pending={session.get('pending')} 文本={last_text[:60]}",
-            )
+            if FULL_CHAIN:
+                check(
+                    "C12 点运行后阶段 4/5/6 全链完成，待决清空",
+                    status == 200
+                    and ran_statuses.get(4) == "passed"
+                    and ran_statuses.get(5) == "passed"
+                    and ran_statuses.get(6) == "passed"
+                    and session.get("pending") is None
+                    and ran[-1]["data"].get("reason") == "stop"
+                    and "阶段六完成" in last_text,
+                    f"状态 {ran_statuses} pending={session.get('pending')} 文本={last_text[:60]}",
+                )
+            else:
+                print("SKIP 缺少排版工具或 MMS_PAPER_SKIP=1：C12/C18 只验到阶段四（未验证阶段五六）")
+                check(
+                    "C12 点运行后阶段 4 完成（排版跳过，未验证阶段五六）",
+                    status == 200
+                    and ran_statuses.get(4) == "passed"
+                    and session.get("pending") is None,
+                    f"状态 {ran_statuses} pending={session.get('pending')}",
+                )
             check(
                 "C12 K3 的历史消息标了已选，K2 标了已确认",
                 [m for m in session.get("messages", []) if m.get("interrupt") and m["interrupt"].get("resolved")]
@@ -914,31 +931,32 @@ def tests() -> None:
                 status == 200 and run_statuses.get(4) == "passed",
                 f"HTTP {status} 状态 {run_statuses}",
             )
-            p5_gates = [e for e in run_events if e["event"] == "gate"]
-            gate_ids = {e["data"].get("skill") for e in p5_gates}
-            p5_paper = [e for e in run_events if e["event"] == "artifact" and e["data"].get("kind") == "paper"]
-            p6_score = [e for e in run_events if e["event"] == "artifact" and e["data"].get("kind") == "score"]
-            check(
-                "C18 全链事件符合契约：三类门禁、论文与评分产物、阶段五六通过",
-                not run_problems
-                and run_statuses.get(5) == "passed"
-                and run_statuses.get(6) == "passed"
-                and gate_ids == {"phrasing", "style", "chapters"}
-                and len(p5_paper) == 1
-                and len(p6_score) == 1,
-                f"判据={run_how} {run_problems[:2]} gates={sorted(gate_ids)} paper={len(p5_paper)} score={len(p6_score)} 状态={run_statuses}",
-            )
-            status, wb = wf4.json("GET", f"/workbench/state?session={sid4}")
-            wb_rounds = (wb.get("score") or {}).get("rounds") or []
-            wb_last = wb_rounds[-1] if wb_rounds else {}
-            check(
-                "C18 工作台按会话读到真实评分轮次（非演示三轮）",
-                status == 200
-                and 1 <= len(wb_rounds) < 3
-                and wb_last.get("total") == 86
-                and bool(wb_last.get("pass")),
-                f"HTTP {status} rounds={len(wb_rounds)} total={wb_last.get('total')}",
-            )
+            if FULL_CHAIN:
+                p5_gates = [e for e in run_events if e["event"] == "gate"]
+                gate_ids = {e["data"].get("skill") for e in p5_gates}
+                p5_paper = [e for e in run_events if e["event"] == "artifact" and e["data"].get("kind") == "paper"]
+                p6_score = [e for e in run_events if e["event"] == "artifact" and e["data"].get("kind") == "score"]
+                check(
+                    "C18 全链事件符合契约：三类门禁、论文与评分产物、阶段五六通过",
+                    not run_problems
+                    and run_statuses.get(5) == "passed"
+                    and run_statuses.get(6) == "passed"
+                    and gate_ids == {"phrasing", "style", "chapters"}
+                    and len(p5_paper) == 1
+                    and len(p6_score) == 1,
+                    f"判据={run_how} {run_problems[:2]} gates={sorted(gate_ids)} paper={len(p5_paper)} score={len(p6_score)} 状态={run_statuses}",
+                )
+                status, wb = wf4.json("GET", f"/workbench/state?session={sid4}")
+                wb_rounds = (wb.get("score") or {}).get("rounds") or []
+                wb_last = wb_rounds[-1] if wb_rounds else {}
+                check(
+                    "C18 工作台按会话读到真实评分轮次（非演示三轮）",
+                    status == 200
+                    and 1 <= len(wb_rounds) < 3
+                    and wb_last.get("total") == 86
+                    and bool(wb_last.get("pass")),
+                    f"HTTP {status} rounds={len(wb_rounds)} total={wb_last.get('total')}",
+                )
         finally:
             wf4.stop()
     finally:

@@ -1603,6 +1603,8 @@ async function main() {
   )
 
   await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="paper"]')?.click()`)
+  // 会话切换后工作台状态异步重载：先等面板真的挂上，再量布局，避免空元素抛错中断整份冒烟。
+  await waitFor(win, `!!document.querySelector('[data-panel="paper"] .paper-layout')`, 10000)
   const paperWide = await waitFor(
     win,
     `(() => {
@@ -1615,6 +1617,7 @@ async function main() {
     const l = document.querySelector('[data-panel="paper"] .paper-layout')
     const preview = document.querySelector('[data-panel="paper"] .paper-preview')
     const side = document.querySelector('[data-panel="paper"] .paper-layout__side')
+    if (!l || !preview || !side) return { columns: '', preview: 0, side: 0, missing: true }
     return {
       columns: getComputedStyle(l).gridTemplateColumns,
       preview: Math.round(preview.getBoundingClientRect().width),
@@ -1628,6 +1631,7 @@ async function main() {
   )
 
   await win.webContents.executeJavaScript(`document.querySelector('.tab[data-tab="score"]')?.click()`)
+  await waitFor(win, `!!document.querySelector('[data-panel="score"] .score-layout')`, 10000)
   const scoreWide = await waitFor(
     win,
     `(() => {
@@ -1640,6 +1644,7 @@ async function main() {
     const l = document.querySelector('[data-panel="score"] .score-layout')
     const main = document.querySelector('[data-panel="score"] .score-layout__main')
     const side = document.querySelector('[data-panel="score"] .score-layout__side')
+    if (!l || !main || !side) return { columns: '', main: 0, side: 0, missing: true }
     return {
       columns: getComputedStyle(l).gridTemplateColumns,
       main: Math.round(main.getBoundingClientRect().width),
@@ -1991,6 +1996,7 @@ app
   })
   .catch((err) => {
     console.error(`FAIL 冒烟脚本自身异常: ${err && err.stack ? err.stack : err}`)
+    for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.name}\n       ${r.detail}`)
     try {
       mkdirSync(OUT_DIR, { recursive: true })
       writeFileSync(
@@ -1999,8 +2005,10 @@ app
           {
             ok: false,
             total: results.length,
-            failed: results.length + 1,
-            error: String(err && err.message ? err.message : err)
+            failed: results.filter((r) => !r.ok).length + 1,
+            error: String(err && err.message ? err.message : err),
+            // 抛错前已记录的断言明细：远程失败时靠它定位，而不是只看到一个计数。
+            results: results.map((r) => ({ name: r.name, ok: r.ok, detail: r.detail }))
           },
           null,
           2

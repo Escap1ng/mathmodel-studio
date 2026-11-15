@@ -17,11 +17,16 @@ from pathlib import Path
 
 from checklib import ROOT, check, report
 
-from mms import llm, orchestrator, workbench_figure  # noqa: E402
+from mms import llm, orchestrator, paper_build, workbench_figure  # noqa: E402
 from mms.store import SessionStore  # noqa: E402
 
 # 阶段四的节奏停顿只影响观感，自检里关掉。
 os.environ.setdefault("MMS_WORKFLOW_DELAY_MS", "0")
+
+# 与 G10 同一约定：没有 TeX 的环境显式 MMS_PAPER_SKIP=1 跳过阶段五六断言，
+# 跳过打印「未验证」，不当成通过。
+PAPER_SKIP = os.environ.get("MMS_PAPER_SKIP") == "1"
+FULL_CHAIN = paper_build.env_status()["ok"] and not PAPER_SKIP
 
 # 不匹配任何关键词族：APMCM 那道英文机器人题面的形态。
 ENGLISH_PROBLEM = (
@@ -105,14 +110,22 @@ def run_checks(workdir: Path) -> None:
     )
     chosen = orchestrator.resume(store, record, "run", "")
     status = phase_status(record)
-    check(
-        "K3 点运行后阶段四五六全链跑完（离线兜底）、待决清空",
-        status.get(4) == "passed"
-        and status.get(5) == "passed"
-        and status.get(6) == "passed"
-        and record["pending"] is None,
-        f"phases={status} pending={record['pending']} events={[e['event'] for e in chosen]}",
-    )
+    if FULL_CHAIN:
+        check(
+            "K3 点运行后阶段四五六全链跑完（离线兜底）、待决清空",
+            status.get(4) == "passed"
+            and status.get(5) == "passed"
+            and status.get(6) == "passed"
+            and record["pending"] is None,
+            f"phases={status} pending={record['pending']} events={[e['event'] for e in chosen]}",
+        )
+    else:
+        print("SKIP 缺少排版工具或 MMS_PAPER_SKIP=1：K3/K7/L9–L14 只验到阶段四（未验证阶段五六）")
+        check(
+            "K3 点运行后阶段四跑完、待决清空（排版跳过，未验证阶段五六）",
+            status.get(4) == "passed" and record["pending"] is None,
+            f"phases={status} pending={record['pending']}",
+        )
 
     reloaded = SessionStore(workdir / "en.db").get("chat-1")
     check(
@@ -200,12 +213,11 @@ def run_checks(workdir: Path) -> None:
         f"artifact={bool(artifact)} outputs={sorted(outputs)}",
     )
     check(
-        "K7 阶段四：代码与结果落盘，阶段四五六全链完成",
+        "K7 阶段四：代码与结果落盘，阶段四通过" + ("、五六全链完成" if FULL_CHAIN else "（排版跳过）"),
         (code_dir / "solution.py").is_file()
         and (code_dir / "outputs" / "result.json").is_file()
         and status.get(4) == "passed"
-        and status.get(5) == "passed"
-        and status.get(6) == "passed"
+        and (status.get(5) == "passed" and status.get(6) == "passed" if FULL_CHAIN else True)
         and phase_record["pending"] is None,
         f"phases={status} pending={phase_record['pending']}",
     )
@@ -393,11 +405,10 @@ def run_llm_checks(workdir: Path) -> None:
         check("L9 代码卡上点确认被拒绝，不静默通过", guard_ok, "action guard")
         orchestrator.resume(cstore, crecord, "run", "")
         check(
-            "L9 点运行才执行，产物登记、全链通过",
+            "L9 点运行才执行，产物登记、阶段四通过" + ("、全链完成" if FULL_CHAIN else "（排版跳过）"),
             crun_called["n"] == 1
             and phase_status(crecord).get(4) == "passed"
-            and phase_status(crecord).get(5) == "passed"
-            and phase_status(crecord).get(6) == "passed"
+            and (phase_status(crecord).get(5) == "passed" and phase_status(crecord).get(6) == "passed" if FULL_CHAIN else True)
             and crecord["pending"] is None,
             f"runs={crun_called['n']} phases={phase_status(crecord)}",
         )
@@ -434,10 +445,9 @@ def run_llm_checks(workdir: Path) -> None:
     )
     orchestrator.resume(fstore, frecord, "run", "", provider=fake)
     check(
-        "L10 第二轮（fake 返回基线脚本）运行成功，全链完成",
+        "L10 第二轮（fake 返回基线脚本）运行成功" + ("，全链完成" if FULL_CHAIN else "（排版跳过）"),
         phase_status(frecord).get(4) == "passed"
-        and phase_status(frecord).get(5) == "passed"
-        and phase_status(frecord).get(6) == "passed"
+        and (phase_status(frecord).get(5) == "passed" and phase_status(frecord).get(6) == "passed" if FULL_CHAIN else True)
         and frecord["pending"] is None,
         f"phases={phase_status(frecord)}",
     )
@@ -461,6 +471,9 @@ def run_llm_checks(workdir: Path) -> None:
         f"phases={phase_status(nrecord)} text={ntext[:60]!r}",
     )
 
+def run_paper_checks(workdir: Path) -> None:
+    """L11–L14：阶段五六全链（论文真排版、真实评分、否决）。需要 TeX，仅在排版可用时跑。"""
+    fake = {"id": "fake", "base_url": "", "tool_calling": True}
     # L11 阶段五：fake 兜底样例稿真排版，产物落盘、门禁事件齐全、兜底有标注
     pstore = SessionStore(workdir / "paper.db")
     precord = pstore.create("ff5566778899", "fake", "fake-stream", PLAIN_PROBLEM)
@@ -622,6 +635,8 @@ def main(argv: list[str]) -> int:
     try:
         run_checks(workdir)
         run_llm_checks(workdir)
+        if FULL_CHAIN:
+            run_paper_checks(workdir)
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
