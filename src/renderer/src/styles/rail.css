@@ -44,12 +44,12 @@
 /* ——— 会话列表折叠容器 ——— */
 
 .rail__head {
-  padding: 14px 16px 10px;
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
   border-bottom: 0;
 }
 
 .rail__title {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -57,13 +57,13 @@
 }
 
 .rail__empty {
-  margin-top: 6px;
+  margin-top: var(--sp-2);
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 
 .phases {
-  padding: 10px 8px 16px;
+  padding: var(--sp-2) var(--sp-3) var(--sp-4);
   overflow: auto;
 }
 
@@ -71,8 +71,8 @@
   display: grid;
   grid-template-columns: 16px 1fr auto;
   align-items: baseline;
-  gap: 6px;
-  padding: 9px 6px;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-2);
   border-radius: var(--radius-sm);
   transition: background var(--t);
 }
@@ -96,7 +96,7 @@
 
 .phase__name {
   font-family: var(--font-cjk);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   line-height: 1.45;
 }
 
@@ -107,7 +107,7 @@
 }
 
 .phase__state {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-3);
   white-space: nowrap;
 }

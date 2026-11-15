@@ -135,14 +135,14 @@
 .mode-switch__btn {
   position: relative;
   z-index: 1;
-  height: 24px;
-  min-width: 52px;
-  padding: 0 10px;
+  height: 26px;
+  min-width: 56px;
+  padding: 0 var(--sp-3);
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--t);

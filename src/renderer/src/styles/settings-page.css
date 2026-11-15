@@ -16,31 +16,31 @@
 .settings__nav {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 18px 10px;
+  gap: var(--sp-1);
+  padding: var(--sp-5) var(--sp-3);
   background: var(--surface);
   overflow: auto;
 }
 
 .settings__nav-title {
-  padding: 0 8px 8px;
+  padding: 0 var(--sp-2) var(--sp-3);
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
 }
 
 .settings__nav-note {
-  margin: auto 8px 0;
-  padding-top: 12px;
+  margin: auto var(--sp-2) 0;
+  padding-top: var(--sp-3);
   color: var(--text-3);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   line-height: 1.6;
 }
 
 .provider-chip--row {
   width: 100%;
   justify-content: flex-start;
-  padding: 7px 9px;
+  padding: var(--sp-2) var(--sp-3);
   border-color: transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -70,7 +70,7 @@
 .provider-chip__state {
   margin-left: auto;
   color: var(--text-3);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 400;
 }
 
@@ -100,17 +100,17 @@
 .model-presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: var(--sp-2);
 }
 
 .model-chip {
-  padding: 3px 9px;
+  padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   cursor: pointer;
   transition: border-color var(--t), color var(--t), background var(--t);
 }
@@ -136,14 +136,14 @@
 }
 
 .seg__btn {
-  min-width: 58px;
-  height: 26px;
-  padding: 0 12px;
+  min-width: 60px;
+  height: 28px;
+  padding: 0 var(--sp-3);
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition: background var(--t), color var(--t), box-shadow var(--t);

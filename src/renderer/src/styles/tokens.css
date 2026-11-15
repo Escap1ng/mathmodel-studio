@@ -34,6 +34,22 @@
   --radius-sm: 6px;
   --radius-pill: 999px;
 
+  /* 字号五档：正文 15 / 界面 13.5 / 次要 12.5 / 微标 11.5，标题另计。
+     收敛原先 9.5–34px 的二十余档，次要信息不再小到费眼。 */
+  --fs-body: 15px;
+  --fs-ui: 13.5px;
+  --fs-sm: 12.5px;
+  --fs-xs: 11.5px;
+
+  /* 间距阶梯：4 / 8 / 12 / 16 / 24 / 32 / 48。留白靠这套档位，不写零碎数值。 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
   --font-ui: 'Segoe UI', 'HarmonyOS Sans SC', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-cjk: 'HarmonyOS Sans SC', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-mono: 'Maple Mono NF CN', 'JetBrains Mono', 'Cascadia Mono', ui-monospace, 'SFMono-Regular', monospace;

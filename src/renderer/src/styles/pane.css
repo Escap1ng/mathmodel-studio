@@ -11,8 +11,8 @@
 
 .tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px 8px 4px;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3) var(--sp-1);
   background: transparent;
   overflow-x: auto;
   /* 窄栏里宁可横向滑动，也不要出现一条压住标签的滚动条 */
@@ -28,10 +28,10 @@
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   background: transparent;
-  padding: 4px 12px;
+  padding: 5px var(--sp-3);
   color: var(--text-2);
   font-family: var(--font-cjk);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   line-height: 1.6;
   white-space: nowrap;
   cursor: pointer;
@@ -59,9 +59,9 @@
 .workspace__body {
   flex: 1;
   overflow: auto;
-  padding: 18px;
+  padding: var(--sp-5);
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   /* 右栏宽度可拖拽，版式按容器宽度而不是视口宽度切 */
   container-type: inline-size;
   container-name: pane;
@@ -112,13 +112,13 @@
 
 .card {
   background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border: 0;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-1);
-  padding: 14px;
+  padding: var(--sp-5);
 }
 
 .card + .card {
-  margin-top: 10px;
+  margin-top: var(--sp-3);
 }
 

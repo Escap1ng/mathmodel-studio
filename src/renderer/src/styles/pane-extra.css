@@ -12,40 +12,43 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 45px;
-  padding: 8px 10px 8px 12px;
+  gap: var(--sp-2);
+  min-height: 48px;
+  padding: var(--sp-3) var(--sp-3) var(--sp-2) var(--sp-4);
   background: transparent;
 }
 
 .workspace__name {
   color: var(--text);
   font-family: var(--font-cjk);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-weight: 600;
   white-space: nowrap;
 }
 
 .workspace__hint {
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
 }
 
 .workspace__toggle {
   margin-left: auto;
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--text-2);
+  background: transparent;
+  color: var(--text-3);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: var(--shadow-1);
   transition: color var(--t), background var(--t);
+}
+
+.workspace__toggle:hover {
+  background: var(--bg);
 }
 
 .workspace__toggle:hover {
@@ -68,16 +71,15 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  padding: 3px 9px;
+  padding: var(--sp-1) var(--sp-3);
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--bg);
   color: var(--text-2);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: var(--shadow-1);
 }
 
 .gate-summary:hover {
@@ -110,8 +112,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 10px 0;
+  gap: var(--sp-2);
+  padding: var(--sp-3) 0;
 }
 
 .workspace__gate-dots {
@@ -122,56 +124,55 @@
 }
 
 .workspace-icon {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: transparent;
   color: var(--text-2);
   font-family: var(--font-cjk);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   cursor: pointer;
-  transition: background var(--t), color var(--t), box-shadow var(--t);
+  transition: background var(--t), color var(--t);
 }
 
 .workspace-icon:hover {
   background: var(--bg);
   color: var(--text);
-  box-shadow: var(--shadow-1);
 }
 
 .tabs {
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: var(--sp-1) var(--sp-4);
   overflow: visible;
 }
 
 .tabs__group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-2);
 }
 
 .tabs__label {
   padding: 0 2px;
   color: var(--text-3);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
 }
 
 .tabs__set {
   display: flex;
-  gap: 2px;
+  gap: var(--sp-1);
 }
 
 .panel__bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: var(--sp-4);
 }
 
 .panel__bar .panel__meta {

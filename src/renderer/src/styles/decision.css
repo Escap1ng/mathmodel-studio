@@ -1,42 +1,42 @@
 /* —— M3：决策卡 —— */
 .decision {
-  margin: 16px 0 6px;
-  padding: 18px 20px 16px;
+  margin: var(--sp-5) 0 var(--sp-2);
+  padding: var(--sp-5);
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
 .decision__head {
-  margin-bottom: 14px;
+  margin-bottom: var(--sp-4);
 }
 
 .decision__kicker {
   display: inline-block;
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-1);
   color: var(--accent);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
 }
 
 .decision__title {
-  margin: 0 0 4px;
+  margin: 0 0 var(--sp-2);
   font-family: var(--font-cjk);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
 }
 
 .decision__intro {
   margin: 0;
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
 }
 
 .decision__questions {
   display: grid;
-  gap: 7px;
+  gap: var(--sp-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -45,45 +45,64 @@
 .decision__questions li {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: baseline;
-  padding: 9px 12px;
+  padding: var(--sp-3) var(--sp-4);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg);
 }
 
 .decision__q-index {
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
 }
 
 .decision__q-text {
   font-family: var(--font-cjk);
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   line-height: 1.65;
 }
 
 .decision__q-data {
   color: var(--warn);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
 .decision__meta {
   display: grid;
-  gap: 4px;
-  margin-top: 10px;
+  gap: var(--sp-1);
+  margin-top: var(--sp-3);
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   line-height: 1.6;
+}
+
+/* K4 代码确认卡：生成的求解脚本预览，可滚动、等宽 */
+.decision__code {
+  margin: 0;
+  padding: var(--sp-4);
+  max-height: 320px;
+  overflow: auto;
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  white-space: pre;
+  tab-size: 4;
+}
+
+.decision__code code {
+  font: inherit;
 }
 
 .decision__foot {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 14px;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
 }
 
 .decision__foot .btn--primary,
@@ -93,7 +112,7 @@
 
 .decision__resolved {
   color: var(--ok);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -109,20 +128,20 @@
 .decision__batch {
   margin-left: auto;
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
 }
 
 .decision__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .candidate {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 14px 14px 12px;
+  padding: var(--sp-4);
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: var(--bg);
@@ -137,8 +156,8 @@
 .candidate__head {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-bottom: 8px;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
 }
 
 .candidate__index {
@@ -146,12 +165,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--surface-2);
   color: var(--text-3);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -159,7 +178,7 @@
   margin: 0;
   min-width: 0;
   font-family: var(--font-cjk);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-weight: 600;
   line-height: 1.4;
 }
@@ -167,33 +186,33 @@
 .candidate__badge {
   flex: none;
   margin-left: auto;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   white-space: nowrap;
 }
 
 .candidate__idea {
-  margin: 0 0 12px;
+  margin: 0 0 var(--sp-3);
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
 }
 
 /* 五维雷达：灰网格 + 选中卡走强调色；只作对比，数值以右侧规格表为准 */
 .decision__radar-note {
-  margin: 6px 0 0;
+  margin: var(--sp-2) 0 0;
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .candidate__radar {
   display: flex;
   justify-content: center;
-  margin: 0 0 10px;
+  margin: 0 0 var(--sp-3);
 }
 
 .candidate__radar svg {
@@ -233,13 +252,13 @@
 .candidate__spec {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 9px 12px;
-  margin: 0 0 12px;
+  gap: var(--sp-3) var(--sp-3);
+  margin: 0 0 var(--sp-3);
 }
 
 .candidate__spec > div {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -249,28 +268,28 @@
 
 .candidate__spec dt {
   color: var(--text-3);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   line-height: 1.4;
 }
 
 .candidate__spec dd {
   margin: 0;
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
 }
 
 .candidate__reason {
-  margin: 0 0 12px;
+  margin: 0 0 var(--sp-3);
   color: var(--text-2);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   line-height: 1.65;
 }
 
 .candidate__actions {
   display: flex;
-  gap: 6px;
+  gap: var(--sp-2);
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: var(--sp-3);
 }
 

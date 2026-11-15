@@ -31,10 +31,6 @@ export default function DropZone({
       : mode === 'chat'
         ? '把文件拖到这里'
         : '把赛题与附件拖到这里'
-  const note =
-    mode === 'chat'
-      ? '问答与附件会出现在这一列；文件暂存在本机工作区，发消息时一并交给模型。'
-      : '对话流、选模卡、门禁结果与评分明细都会出现在这一列；右侧工作台放图、论文、代码与日志。'
 
   return (
     <div className="chat__empty dropzone-area" data-drag={dragging ? 'true' : undefined}>
@@ -79,7 +75,6 @@ export default function DropZone({
           </button>
         </div>
       </div>
-      <p className="chat__empty-note">{note}</p>
     </div>
   )
 }

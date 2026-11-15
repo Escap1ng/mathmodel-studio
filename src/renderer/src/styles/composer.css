@@ -1,10 +1,11 @@
 .chat__composer {
   position: relative;
-  padding: 12px 24px 18px;
+  /* 上内边距保持 12px：分隔条的空心长条按这个值骑在卡片顶边上 */
+  padding: 12px var(--sp-5) var(--sp-5);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-3);
 }
 
 .composer[data-resized='true'] .composer__input {
@@ -19,17 +20,17 @@
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
   background: var(--surface);
-  padding: 12px 14px;
+  padding: var(--sp-4);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-3);
   transition: background var(--t), border-color var(--t), box-shadow var(--t);
 }
 
-/* 输入区是一整块浅绿卡：聚焦时整卡发光，而不是给 textarea 描边 */
+/* 输入区是一整块浅底卡：聚焦时整卡微微发亮，而不是给 textarea 描边 */
 .composer:focus-within {
   background: var(--bg);
-  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
@@ -47,7 +48,7 @@
   outline: 0;
   resize: none;
   font-family: var(--font-cjk);
-  font-size: 15px;
+  font-size: var(--fs-body);
   line-height: 1.6;
   background: transparent;
   min-height: 44px;
@@ -59,7 +60,7 @@
   max-width: 760px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-2);
   min-width: 0;
 }
 
@@ -67,8 +68,8 @@
   border: 1px solid transparent;
   background: var(--bg);
   border-radius: var(--radius-pill);
-  padding: 4px 11px;
-  font-size: 12px;
+  padding: 5px 12px;
+  font-size: var(--fs-sm);
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
