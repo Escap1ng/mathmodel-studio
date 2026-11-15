@@ -77,6 +77,9 @@ class SessionStore:
             columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}
             if "workspace" not in columns:
                 conn.execute("ALTER TABLE sessions ADD COLUMN workspace TEXT")
+            # 旧库没有 picked 列：选模结果落盘，阶段四按它生成代码。
+            if "picked" not in columns:
+                conn.execute("ALTER TABLE sessions ADD COLUMN picked TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path, timeout=10)
@@ -101,6 +104,7 @@ class SessionStore:
             "messages": json.loads(row["messages"]),
             "batch": row["batch"],
             "workspace": row["workspace"] if "workspace" in keys else None,
+            "picked": json.loads(row["picked"]) if "picked" in keys and row["picked"] else None,
         }
 
     def create(
@@ -119,6 +123,7 @@ class SessionStore:
             "messages": [],
             "batch": 1,
             "workspace": workspace,
+            "picked": None,
         }
         with self.lock, self._connect() as conn:
             conn.execute(
@@ -188,13 +193,14 @@ class SessionStore:
         record["updated"] = time.time()
         with self.lock, self._connect() as conn:
             conn.execute(
-                "UPDATE sessions SET updated = ?, phases = ?, pending = ?, messages = ?, batch = ? WHERE id = ?",
+                "UPDATE sessions SET updated = ?, phases = ?, pending = ?, messages = ?, batch = ?, picked = ? WHERE id = ?",
                 (
                     record["updated"],
                     dump_json(record["phases"]),
                     dump_json(record["pending"]) if record["pending"] is not None else None,
                     dump_json(record["messages"]),
                     record["batch"],
+                    dump_json(record["picked"]) if record.get("picked") is not None else None,
                     record["id"],
                 ),
             )
@@ -213,4 +219,5 @@ def snapshot(record: dict | None) -> dict | None:
         "pending": record["pending"],
         "messages": record["messages"],
         "batch": record["batch"],
+        "picked": record.get("picked"),
     }

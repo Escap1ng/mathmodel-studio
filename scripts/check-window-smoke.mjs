@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_FILE = join(ROOT, 'screenshots/window-smoke.json')
 // 新增断言时同步抬高这里：它的作用是「断言集合被删空」也会判失败
-const MIN_ASSERTIONS = 114
+const MIN_ASSERTIONS = 115
 const MIN_THRESHOLD_FLOOR = 0.01
 const EXPECT_SIZE = '1440x900'
 // 只认条数不够：把关键断言整条删掉、再拿凑数的 A 行补齐，条数照样够。
@@ -61,7 +61,8 @@ const REQUIRED_ASSERTIONS = [
   'G7-7 附件随消息送给模型',
   'G7-7 重开后附件还原且不铺正文',
   'G7-7 runtime 重启后仍停在 K3',
-  'G7-7 选择后阶段 4 进入且待决清空',
+  'G7-7 选模后挂出代码确认卡且未执行',
+  'G7-7 点运行后阶段 4 完成且待决清空',
   'G7-7 问答会话进入历史列表',
   'G7-7 新对话清空当前消息',
   'G7-7 切换历史会话恢复消息',

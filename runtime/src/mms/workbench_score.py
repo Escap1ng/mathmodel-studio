@@ -85,22 +85,64 @@ def _changes(current: dict, previous: dict | None) -> list[dict]:
     return out
 
 
-def state(root: Path | None = None) -> dict:
+def score_dir(data_dir: Path) -> Path:
+    return data_dir / "workbench" / "score"
+
+
+def save_card(data_dir: Path, card: dict) -> Path:
+    """真实评分轮落盘：<会话>/workbench/score/round-N.json。"""
+    target = score_dir(data_dir)
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / f"round-{int(card.get('round', 0))}.json"
+    path.write_text(json.dumps(card, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def _real_cards(data_dir: Path | None) -> list[dict]:
+    if data_dir is None:
+        return []
+    target = score_dir(data_dir)
+    if not target.is_dir():
+        return []
+    cards: list[tuple[int, dict]] = []
+    for path in target.glob("round-*.json"):
+        try:
+            card = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(card, dict) and isinstance(card.get("round"), int):
+            cards.append((card["round"], card))
+    return [card for _, card in sorted(cards)]
+
+
+def state(root: Path | None = None, data_dir: Path | None = None) -> dict:
     root = root or repo_root()
-    demo = json.loads(DEMO_SCORES.read_text(encoding="utf-8"))
+    real = _real_cards(data_dir)
+    if real:
+        cards = real
+        veto_card = None
+    else:
+        demo = json.loads(DEMO_SCORES.read_text(encoding="utf-8"))
+        cards = demo.get("rounds", [])
+        veto_card = demo.get("veto")
     rounds = []
     with tempfile.TemporaryDirectory(prefix="mms-score-") as temp:
         workdir = Path(temp)
         previous = None
-        for card in demo.get("rounds", []):
+        for card in cards:
             result = _run_card(root, card, workdir)
             result["changes"] = _changes(result, previous)
             rounds.append(result)
             previous = result
-        veto = _run_card(root, demo.get("veto", {}), workdir) if demo.get("veto") else None
+        veto = _run_card(root, veto_card, workdir) if veto_card else None
 
     chapter_script = root / "skills" / "mathmodel-score" / "code" / "check_chapters.py"
+    # 章节门禁优先查本会话真实论文；没有论文时回落内置样例。
     sample = root / "skills" / "mathmodel-score" / "examples" / "chapter-sample.tex"
+    if data_dir is not None:
+        paper_tex = data_dir / "workbench" / "paper" / "paper.tex"
+        if paper_tex.is_file():
+            sample = paper_tex
     code, stdout, stderr = _run_script(
         chapter_script, [str(sample), "--json"], root
     )

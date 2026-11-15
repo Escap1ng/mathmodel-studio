@@ -859,9 +859,9 @@ async function main() {
   )
   if (!backToFake) throw new Error('切回离线演示 provider 失败，拒绝继续以免带着假 Key 联网')
 
-  // —— 内核：界面不再暴露开关，离线演示始终可用 ——
-  // 真实服务商由 runtime 自动路由到 DSH；离线演示固定走 python。这里验设置页没有开关、
-  // 离线演示没有被摘掉，避免运行时网关把「没有 Key 的用户」挡在门外。
+  // —— 内核：单 Python 内核，界面不暴露开关，离线演示始终可用 ——
+  // DSH 双内核已移除；这里验设置页没有内核开关、离线演示没有被摘掉，
+  // 避免运行时网关把「没有 Key 的用户」挡在门外。
   await win.webContents.executeJavaScript(`document.querySelector('.pill--model')?.click()`)
   await sleep(250)
   const coreUi = await win.webContents.executeJavaScript(`({
@@ -1187,12 +1187,24 @@ async function main() {
     const card = [...document.querySelectorAll('.decision[data-card="model-choice"]')].find((c) => !c.querySelector('.decision__resolved'))
     card?.querySelector('[data-action="choose"][data-choice="${pick}"]')?.click()
   })()`)
-  const chosen = await waitFor(
+  const codeCardReady = await waitFor(
     win,
-    `document.querySelector('.rail .phase[data-phase="4"]')?.dataset.state === 'running' && [...document.querySelectorAll('.msg--assistant .msg__text')].some((n) => n.textContent.includes('已选择'))`,
-    15000
+    `!!document.querySelector('.decision[data-card="code-confirm"]:not(:has(.decision__resolved))') && document.querySelector('.rail .phase[data-phase="4"]')?.dataset.state === 'running'`,
+    30000
   )
-  const snapChosen = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  const snapCode = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  const codePreview = await win.webContents.executeJavaScript(`({
+    hasCode: (document.querySelector('.decision[data-card="code-confirm"] [data-role="code-preview"]')?.textContent ?? '').length > 100,
+    runEnabled: document.querySelector('.decision[data-card="code-confirm"] [data-action="run"]')?.disabled === false
+  })`)
+  record(
+    'G7-7 选模后挂出代码确认卡且未执行',
+    codeCardReady &&
+      snapCode?.session?.pending?.card === 'code-confirm' &&
+      codePreview.hasCode &&
+      codePreview.runEnabled,
+    `卡片就绪=${codeCardReady} pending=${snapCode?.session?.pending?.card} 代码预览=${codePreview.hasCode} 运行键=${codePreview.runEnabled}`
+  )
   const phaseChosen = await win.webContents.executeJavaScript(`({
     p3: document.querySelector('.rail .phase[data-phase="3"]')?.dataset.state ?? null,
     p4: document.querySelector('.rail .phase[data-phase="4"]')?.dataset.state ?? null,
@@ -1203,17 +1215,23 @@ async function main() {
       .map((b) => ({ action: b.dataset.action, disabled: b.disabled, opacity: getComputedStyle(b).opacity }))
   })`)
   record(
-    'G7-7 选择后阶段 4 进入且待决清空',
-    chosen &&
-      phaseChosen.p3 === 'passed' &&
-      phaseChosen.p4 === 'running' &&
-      snapChosen?.session?.pending === null,
-    `阶段3=${phaseChosen.p3} 阶段4=${phaseChosen.p4} pending=${snapChosen?.session?.pending} 停止键=${phaseChosen.stop}`
-  )
-  record(
     'G7-7 已选卡的动作按钮已禁用',
-    phaseChosen.actions.length > 0 && phaseChosen.actions.every((b) => b.disabled),
-    `动作按钮 ${JSON.stringify(phaseChosen.actions)}`
+    phaseChosen.p3 === 'passed' && phaseChosen.actions.length > 0 && phaseChosen.actions.every((b) => b.disabled),
+    `阶段3=${phaseChosen.p3} 动作按钮 ${JSON.stringify(phaseChosen.actions)}`
+  )
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.decision[data-card="code-confirm"] [data-action="run"]')?.click()`
+  )
+  const ranOk = await waitFor(
+    win,
+    `document.querySelector('.rail .phase[data-phase="4"]')?.dataset.state === 'passed' && [...document.querySelectorAll('.msg--assistant .msg__text')].some((n) => n.textContent.includes('阶段四完成'))`,
+    120000
+  )
+  const snapRan = await win.webContents.executeJavaScript(`window.studio.session.latest()`)
+  record(
+    'G7-7 点运行后阶段 4 完成且待决清空',
+    ranOk && snapRan?.session?.pending === null,
+    `运行完成=${ranOk} pending=${snapRan?.session?.pending}`
   )
 
   // —— M4：工作台图表、主题、回滚、评分与门禁 ——
@@ -1800,7 +1818,7 @@ async function main() {
   record(
     'G7-10 右栏可收起为图标条',
     collapsedPane.pane <= 60 &&
-      collapsedPane.icons === 8 &&
+      collapsedPane.icons === 7 &&
       collapsedPane.tabs === 0 &&
       collapsedPane.splitter === 'none' &&
       collapsedPane.gateDots === 4 &&
@@ -1821,7 +1839,7 @@ async function main() {
   record(
     'G7-10 点图标展开并切到对应页',
     reopenedPane.pane > 800 &&
-      reopenedPane.tabs === 8 &&
+      reopenedPane.tabs === 7 &&
       reopenedPane.paper &&
       reopenedPane.selected === 'true',
     JSON.stringify(reopenedPane)

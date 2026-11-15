@@ -6,6 +6,8 @@ requirements 里只有 numpy 与 matplotlib，基线用最小二乘直接算。
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 import subprocess
@@ -194,6 +196,62 @@ def main() -> int:
 if __name__ == "__main__":
     raise SystemExit(main())
 '''
+
+
+def profile_data(path: Path, sample_rows: int = 5) -> dict:
+    """给 LLM 的数据画像：形状、列名、样本行、各列缺失数。只读，不改文件。"""
+    raw = path.read_bytes()
+    text = None
+    for encoding in ("utf-8-sig", "gbk", "utf-8"):
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        return {"file": path.name, "error": "数据文件无法解码（试过 utf-8-sig / gbk / utf-8）"}
+    delimiter = "\t" if path.suffix.lower() == ".tsv" else ","
+    rows = [row for row in csv.reader(io.StringIO(text), delimiter=delimiter) if any(cell.strip() for cell in row)]
+    if len(rows) < 2:
+        return {"file": path.name, "error": "数据行数不足：至少需要表头加一行数据"}
+    header = [cell.strip() or f"col{i + 1}" for i, cell in enumerate(rows[0])]
+    body = rows[1:]
+    missing: dict[str, int] = {}
+    for index, name in enumerate(header):
+        count = 0
+        for row in body:
+            cell = row[index].strip() if index < len(row) else ""
+            try:
+                float(cell)
+            except ValueError:
+                count += 1
+        missing[name] = count
+    return {
+        "file": path.name,
+        "rows": len(body),
+        "cols": len(header),
+        "columns": header,
+        "sample": body[:sample_rows],
+        "missing": missing,
+    }
+
+
+def validate_script(code: str) -> list[str]:
+    """LLM 生成的求解脚本执行前的静态检查：返回问题清单，空列表表示通过。"""
+    problems: list[str] = []
+    try:
+        compile(code, "solution.py", "exec")
+    except SyntaxError as exc:
+        problems.append(f"语法错误（第 {exc.lineno} 行）：{exc.msg}")
+    if "--data" not in code:
+        problems.append("脚本必须接受 --data 参数")
+    if "--out" not in code:
+        problems.append("脚本必须接受 --out 参数")
+    if "result.json" not in code:
+        problems.append("脚本必须写出 result.json")
+    if "figure." not in code and "figure{" not in code:
+        problems.append("脚本必须输出 figure.png / figure.pdf / figure.svg 三件图")
+    return problems
 
 
 def find_data(workspace: Path) -> Path | None:

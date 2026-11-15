@@ -88,12 +88,21 @@
         "properties": {
           "data": {
             "type": "object",
-            "required": ["kind", "path"],
+            "required": ["kind"],
+            "anyOf": [
+              { "required": ["path"] },
+              { "required": ["outputs"] }
+            ],
             "additionalProperties": false,
             "properties": {
               "kind": { "type": "string" },
               "path": { "type": "string" },
-              "url": { "type": "string" }
+              "url": { "type": "string" },
+              "version": { "type": "string" },
+              "outputs": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              }
             }
           }
         }

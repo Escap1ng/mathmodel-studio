@@ -179,10 +179,29 @@ function parseResumeInput(raw: unknown): ResumeInput {
   const sessionId = typeof obj.sessionId === 'string' ? obj.sessionId.trim() : ''
   const action = obj.action
   if (!sessionId) throw new Error('缺少会话 id')
-  if (action !== 'confirm' && action !== 'reroll' && action !== 'choose') throw new Error('未知决策动作')
+  if (action !== 'confirm' && action !== 'reroll' && action !== 'choose' && action !== 'run') {
+    throw new Error('未知决策动作')
+  }
   const choice = typeof obj.choice === 'string' ? obj.choice : undefined
   if (action === 'choose' && !choice) throw new Error('缺少候选 id')
-  return { sessionId, action, choice }
+  let provider: ResumeInput['provider']
+  const ctx = obj.provider
+  if (ctx && typeof ctx === 'object') {
+    const p = ctx as Record<string, unknown>
+    const providerId = typeof p.providerId === 'string' ? p.providerId.trim() : ''
+    if (providerId) {
+      provider = {
+        providerId,
+        model: typeof p.model === 'string' ? p.model : undefined,
+        thinking:
+          p.thinking === 'medium' || p.thinking === 'high' || p.thinking === 'max'
+            ? (p.thinking as ThinkingDepth)
+            : undefined,
+        sendThinking: typeof p.sendThinking === 'boolean' ? p.sendThinking : undefined
+      }
+    }
+  }
+  return { sessionId, action, choice, provider }
 }
 
 function attachStream(chatId: string, sender: WebContents): void {
@@ -278,7 +297,26 @@ ipcMain.handle('chat:resume', async (event, raw: unknown) => {
   const input = parseResumeInput(raw)
   // 续聊沿用会话自己的项目目录；老会话没登记过时退回全局工作区。
   const workspace = projectFolderFor(input.sessionId) ?? workspacePath()
-  await channel.resumeSession(input.sessionId, input.action, input.choice ?? '', workspace)
+  // K2/K3 起由 LLM 生产内容：恢复时把服务商上下文带上，Key 从安全存储按次取出。
+  // 没带 provider（旧渲染层）或没配 Key 时不报错，runtime 回退确定性路径。
+  let providerPayload: Record<string, unknown> | undefined
+  const ctx = input.provider
+  if (ctx?.providerId) {
+    const list = await providerViews()
+    const view = list.providers.find((p) => p.id === ctx.providerId)
+    if (view) {
+      const apiKey = view.id === 'fake' ? '' : apiKeyFor(view.id)
+      providerPayload = {
+        providerId: view.id,
+        model: ctx.model || view.model,
+        baseUrl: view.custom ? view.baseUrl : undefined,
+        thinking: view.sendThinking ? ctx.thinking ?? view.thinkingDepth : '',
+        sendThinking: view.sendThinking,
+        ...(apiKey ? { apiKey } : {})
+      }
+    }
+  }
+  await channel.resumeSession(input.sessionId, input.action, input.choice ?? '', workspace, providerPayload)
   attachStream(input.sessionId, event.sender)
   return { ok: true, chatId: input.sessionId }
 })

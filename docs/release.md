@@ -14,7 +14,7 @@
 vX.Y.Z · 一句话主题
 ```
 
-示例：`v0.1.0 · DSH 内核与对话优先工作台`。主题只写这一版最主要的变化，不堆功能清单。
+示例：`v0.2.0 · 数模全链跑通与单内核`。主题只写这一版最主要的变化，不堆功能清单。
 
 ## 正文结构
 
@@ -33,8 +33,8 @@ vX.Y.Z · 一句话主题
 ## 校验
 - 安装包：`mathmodel-studio-X.Y.Z-setup.exe`，<字节数> 字节（约 <MB> MB）
 - SHA-256：`<hash>`
-- 随包组件：Python <版本>、pandoc <版本>、deepseek-harness-sdk <版本>
-- 门禁：`npm run gate` 通过；窗口冒烟 <N>/<N>；DSH 自检 <N>/<N>
+- 随包组件：Python <版本>、pandoc <版本>
+- 门禁：`npm run gate` 通过；窗口冒烟 <N>/<N>
 - 签名：<有/无自签名证书及信任状态>
 
 ## 已知问题
@@ -51,7 +51,7 @@ vX.Y.Z · 一句话主题
 
 1. `VERSION`、`package.json`、`runtime/pyproject.toml`、`runtime/src/mms/__init__.py` 均为同一版本。
 2. `CHANGELOG.md` 有无对应版本条目。
-3. `npm run gate` 全绿；`npm run smoke:window` 全绿；`npm run check:channel:dsh` 全绿。
+3. `npm run gate` 全绿；`npm run smoke:window` 全绿。
 4. 工作区干净，tag 指向的提交与构建来源一致；构建后核对安装包内的 `VERSION`。
 5. 在 Release 正文「校验」中写入安装包字节数、SHA-256 与构建来源提交。
 

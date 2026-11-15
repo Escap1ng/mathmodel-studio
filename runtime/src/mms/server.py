@@ -94,25 +94,9 @@ def fake_enabled() -> bool:
     return os.environ.get("MMS_FAKE_PROVIDER") == "1"
 
 
-def explicit_core() -> str | None:
-    value = (os.environ.get("MMS_CORE") or "").strip().lower()
-    return value if value in ("python", "dsh") else None
-
-
 def core_name() -> str:
-    """当前默认对话内核：显式 MMS_CORE 优先，否则有 dsh 就用 DSH。
-
-    聊天路由另有一条：离线演示固定走 python，不依赖 dsh 是否安装。
-    """
-    forced = explicit_core()
-    if forced:
-        return forced
-    try:
-        from .dsh_adapter import dsh_available
-
-        return "dsh" if dsh_available() else "python"
-    except Exception:
-        return "python"
+    """对话内核：0.2.0 起只有自研 Python 内核（DSH 双内核已移除）。"""
+    return "python"
 
 
 def provider_rows(fake: bool | None = None) -> list[dict]:
@@ -426,7 +410,11 @@ class ChatSession:
 
 
 class WorkflowSession(ChatSession):
-    """M3 编排会话：复用事件缓冲与 SSE 语义，内容由状态机产生。"""
+    """编排会话：复用事件缓冲与 SSE 语义，内容由状态机产生。
+
+    provider/api_key/model 按次传入：K2/K3 由 LLM 生产内容，
+    没有 Key 时状态机回退确定性路径。Key 不进 store、不进事件。
+    """
 
     def __init__(
         self,
@@ -436,20 +424,33 @@ class WorkflowSession(ChatSession):
         action: str,
         choice: str,
         workspace: str = "",
+        provider: dict | None = None,
+        api_key: str = "",
+        model: str = "",
+        depth: str = "",
     ):
-        super().__init__(chat_id, {}, "", "", [], workspace=workspace)
+        super().__init__(chat_id, provider or {}, api_key, model, [], workspace=workspace)
         self.store = store
         self.record = record
         self.action = action
         self.choice = choice
+        self.depth = depth
 
     def _run(self) -> None:
         try:
+            deltas = lambda kind, text: self.append(kind, {"text": text})
+            provider = self.provider if self.provider.get("id") else None
             if self.action == "start":
-                events = orchestrator.start(self.store, self.record)
+                events = orchestrator.start(
+                    self.store, self.record,
+                    provider=provider, api_key=self.api_key, model=self.model,
+                    should_stop=self.should_stop, on_delta=deltas,
+                )
             else:
                 events = orchestrator.resume_iter(
-                    self.store, self.record, self.action, self.choice, self.workspace
+                    self.store, self.record, self.action, self.choice, self.workspace,
+                    provider=provider, api_key=self.api_key, model=self.model,
+                    should_stop=self.should_stop, on_delta=deltas,
                 )
             for ev in events:
                 if self.cancelled:
@@ -458,7 +459,8 @@ class WorkflowSession(ChatSession):
                 if delay:
                     self._pause(float(delay))
                 self.append(ev["event"], ev["data"])
-            self.finish("stop" if self.action == "choose" else "waiting")
+            # 状态机跑完后仍挂着待决卡（K2/K3/代码确认）就是等待用户，不是结束。
+            self.finish("waiting" if self.record.get("pending") else "stop")
         except CancelledError:
             self.finish("cancelled")
         except ValueError as exc:
@@ -547,10 +549,6 @@ class Handler(BaseHTTPRequestHandler):
             return
         parsed = urlparse(self.path)
         if parsed.path == "/health":
-            try:
-                from .dsh_adapter import dsh_version
-            except Exception:
-                dsh_version = None
             self._json(
                 200,
                 {
@@ -558,7 +556,6 @@ class Handler(BaseHTTPRequestHandler):
                     "version": __version__,
                     "fake": self.server.fake,
                     "core": core_name(),
-                    "dshVersion": dsh_version() if dsh_version else None,
                     "pid": os.getpid(),
                 },
             )
@@ -655,8 +652,8 @@ class Handler(BaseHTTPRequestHandler):
         data_root = self._scoped_dir(session_id)
         figure = workbench_figure.state_payload(self.server.root, data_root)
         try:
-            # 评分与章节门禁用的是内置 demo 文稿，不随会话隔离。
-            score = workbench_score.state(self.server.root)
+            # 评分优先读本会话真实轮次；没有时回落演示数据。章节门禁同样优先查本会话论文。
+            score = workbench_score.state(self.server.root, data_dir=data_root)
             chapter = score.get("chapter", {})
             round_row = next(
                 (r for r in score.get("rounds", []) if r.get("round") == score.get("defaultRound")),
@@ -764,6 +761,19 @@ class Handler(BaseHTTPRequestHandler):
         code, result = paper_build.build(
             self._scoped_dir(session_id), self.server.root
         )
+        # 手动构建成功也推进阶段五：阶段轨道与工作台状态保持一致。
+        if code == 0 and session_id:
+            record = self.server.store.get(session_id)
+            if record:
+                changed = False
+                for row in record["phases"]:
+                    if row["phase"] == 5 and row["status"] != "passed":
+                        row["status"] = "passed"
+                        changed = True
+                    if row["phase"] == 6 and row["status"] == "idle" and changed:
+                        row["status"] = "idle"
+                if changed:
+                    self.server.store.put(record)
         state = self._workbench(session_id)
         deliverables = {
             kind: str((row or {}).get("path") or "")
@@ -842,16 +852,6 @@ class Handler(BaseHTTPRequestHandler):
         if mode not in ("chat", "workflow"):
             self._error(400, "mode", f"未知对话模式: {mode}")
             return
-        forced = explicit_core()
-        if mode == "chat" and forced == "dsh" and provider_id == "fake":
-            self._error(
-                400,
-                "core",
-                "显式 MMS_CORE=dsh 时离线演示不可用；请去掉该环境变量或选择真实服务商",
-            )
-            return
-        # 自动路由：离线演示固定走 python；其余用默认内核（有 dsh 即 DSH）。
-        backend = forced or ("python" if provider_id == "fake" else core_name())
         workspace = str(body.get("workspace") or "")
         raw_goal = next((m["content"] for m in messages if m["role"] == "user"), "")
         goal = " ".join(str(raw_goal).split())[:80]
@@ -859,22 +859,9 @@ class Handler(BaseHTTPRequestHandler):
             problem = next(m["content"] for m in reversed(messages) if m["role"] == "user")
             record = self.server.store.create(chat_id, provider_id, model, problem, workspace)
             session: ChatSession = WorkflowSession(
-                chat_id, self.server.store, record, "start", "", workspace=workspace
-            )
-        elif backend == "dsh":
-            from .dsh_adapter import DshChatSession
-
-            session = DshChatSession(
-                chat_id,
-                provider,
-                api_key,
-                model,
-                messages,
-                depth=depth,
-                context_tokens=context_tokens,
-                send_thinking=send_thinking,
-                goal=goal,
-                workspace=workspace,
+                chat_id, self.server.store, record, "start", "", workspace=workspace,
+                provider=provider, api_key=api_key, model=model,
+                depth=depth if send_thinking else "",
             )
         else:
             session = ChatSession(
@@ -900,7 +887,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         action = str(body.get("action") or "")
         choice = str(body.get("choice") or "")
-        if action not in ("confirm", "reroll", "choose"):
+        if action not in ("confirm", "reroll", "choose", "run"):
             self._error(400, "action", f"未知动作: {action}")
             return
         if action == "choose" and not choice:
@@ -913,6 +900,32 @@ class Handler(BaseHTTPRequestHandler):
         if not record.get("pending"):
             self._error(409, "pending", "这个会话没有等待中的决策")
             return
+        # Key 按次传入：恢复时没带 Key（旧客户端或离线演示）不报错，
+        # 状态机回退确定性路径，卡片上会标明兜底。
+        provider: dict | None = None
+        api_key = str(body.get("apiKey") or "")
+        provider_id = str(body.get("providerId") or record.get("provider") or "")
+        model = str(body.get("model") or record.get("model") or "")
+        depth = str(body.get("thinking") or "")
+        if depth and depth not in DEPTHS:
+            self._error(400, "thinking", f"未知思维深度: {depth}")
+            return
+        if provider_id == "fake":
+            if self.server.fake:
+                provider = {"id": "fake", "display": "离线演示", "tool_calling": True, "base_url": ""}
+                model = model or "fake-stream"
+        elif provider_id:
+            candidate = find_provider(provider_id)
+            if candidate:
+                if candidate.get("custom"):
+                    candidate["base_url"] = str(body.get("baseUrl") or "")
+                try:
+                    validate_base_url(candidate.get("base_url") or "")
+                except ProviderError as exc:
+                    self._error(400, "base_url", str(exc))
+                    return
+                if api_key:
+                    provider = candidate
         session = WorkflowSession(
             session_id,
             self.server.store,
@@ -920,6 +933,10 @@ class Handler(BaseHTTPRequestHandler):
             action,
             choice,
             workspace=str(body.get("workspace") or ""),
+            provider=provider,
+            api_key=api_key if provider else "",
+            model=model,
+            depth=depth if body.get("sendThinking") is not False else "",
         )
         with self.server.sessions_lock:
             self.server.sessions[session_id] = session
@@ -1014,16 +1031,7 @@ def serve(port: int = 0) -> int:
 
     thread = threading.Thread(target=server.serve_forever, name="mms-http", daemon=True)
     thread.start()
-    try:
-        stop.wait()
-        server.shutdown()
-        server.server_close()
-    finally:
-        if core_name() == "dsh":
-            try:
-                from .dsh_adapter import shutdown_dsh_runtime
-
-                shutdown_dsh_runtime()
-            except Exception:
-                traceback.print_exc(file=sys.stderr)
+    stop.wait()
+    server.shutdown()
+    server.server_close()
     return 0

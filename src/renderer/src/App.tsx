@@ -134,6 +134,7 @@ function phaseMap(snapshot: SessionSnapshot): Record<number, PhaseState> {
 function resolvedLabel(action: DecisionAction, name: string): string {
   if (action === 'choose') return `已选：${name}`
   if (action === 'reroll') return '已换一批'
+  if (action === 'run') return '已运行'
   return '已确认'
 }
 
@@ -829,7 +830,20 @@ export default function App() {
     activeChat.current = sid
     activeAssistant.current = assistantId
     try {
-      const result = await window.studio.chat.resume({ sessionId: sid, action, choice })
+      const result = await window.studio.chat.resume({
+        sessionId: sid,
+        action,
+        choice,
+        // K2/K3 起由 LLM 生产内容：带上当前服务商，Key 由主进程从安全存储补齐。
+        provider: provider
+          ? {
+              providerId: provider.id,
+              model: provider.model,
+              thinking: provider.thinkingDepth,
+              sendThinking: provider.sendThinking
+            }
+          : undefined
+      })
       activeChat.current = result.chatId
       const queued = buffered.current.get(result.chatId) ?? []
       buffered.current.clear()

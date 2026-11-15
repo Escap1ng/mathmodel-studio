@@ -1,5 +1,4 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ReasoningSpec, RuntimeStatus } from '../shared/api'
 
@@ -36,16 +35,6 @@ interface RequestOptions {
   method?: string
   body?: unknown
   signal?: AbortSignal
-}
-
-function dshBin(root: string): string | null {
-  for (const candidate of [
-    join(root, 'vendor', 'python', 'Scripts', 'dsh.exe'),
-    join(root, 'python', 'Scripts', 'dsh.exe')
-  ]) {
-    if (existsSync(candidate)) return candidate
-  }
-  return null
 }
 
 export class Channel {
@@ -92,7 +81,6 @@ export class Channel {
 
   private async launch(): Promise<void> {
     this.setStatus({ state: 'starting' })
-    const dsh = dshBin(this.root)
     const child = spawn(this.python, [join(this.root, 'runtime', 'cli.py'), 'serve', '--port', '0'], {
       cwd: this.root,
       windowsHide: true,
@@ -100,13 +88,7 @@ export class Channel {
         ...process.env,
         MMS_HOME: this.root,
         ...(this.dataDir ? { MMS_DATA_DIR: this.dataDir } : {}),
-        // 内核由 runtime 自动路由（真实服务商走 DSH，离线演示走 python），这里不再注入 MMS_CORE
-        ...(this.dataDir ? { MMS_DSH_HOME: join(this.dataDir, 'dsh') } : {}),
-        MMS_DSH_PROFILE: 'mms',
         MMS_PYTHON: this.python,
-        // 找到了才注入：dev 时 dsh 在 vendor/python，打包后在 <resources>/python/Scripts。
-        // 注入一个不存在的路径会让 runtime 的 find_dsh 直接报错，所以缺失时留给回退逻辑。
-        ...(dsh ? { MMS_DSH_BIN: dsh } : {}),
         // 打包后 runtime 在只读的安装目录里；.pyc 统一写到 userData，别污染 resources
         ...(this.dataDir ? { PYTHONPYCACHEPREFIX: join(this.dataDir, 'pycache') } : {}),
         PYTHONIOENCODING: 'utf-8',
@@ -249,11 +231,12 @@ export class Channel {
     sessionId: string,
     action: string,
     choice: string,
-    workspace?: string
+    workspace?: string,
+    provider?: Record<string, unknown>
   ): Promise<void> {
     await this.request(`/sessions/${encodeURIComponent(sessionId)}/resume`, {
       method: 'POST',
-      body: { action, choice, workspace }
+      body: { action, choice, workspace, ...(provider ?? {}) }
     })
   }
 

@@ -7,7 +7,6 @@ import PaperPanel from './PaperPanel'
 import ScorePanel from './ScorePanel'
 import GatePanel from './GatePanel'
 import CodePanel from './CodePanel'
-import LogPanel from './LogPanel'
 import ProcessPanel from './ProcessPanel'
 import { errorText } from '../../lib/format'
 import { TABS, TAB_GROUPS, tabsForMode, type TabId } from './tabs'
@@ -323,7 +322,6 @@ export default function WorkspacePane({
                 ) : null}
                 {state && active === 'gate' ? <GatePanel state={state} /> : null}
                 {state && active === 'code' ? <CodePanel state={state} onGoto={setActive} /> : null}
-                {state && active === 'log' ? <LogPanel state={state} onGoto={setActive} /> : null}
                 {state && active === 'paper' ? (
                   <PaperPanel
                     state={state}

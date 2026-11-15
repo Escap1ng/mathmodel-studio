@@ -5,7 +5,6 @@ provider 路径用 127.0.0.1 上的假 OpenAI 端点（含 429 重试、reasonin
 tool_calls 增量拼装）。
 
 每条断言都能失败；--selftest 用多份坏事件证明事件判据本身会拒绝它们。
---core dsh 另起本地假 OpenAI 与 dsh web，验证适配层的流式、工具与取消。
 退出码：0 全部通过 / 1 有断言失败 / 2 用法错误
 """
 
@@ -157,12 +156,6 @@ class Channel:
         env = {**os.environ}
         env.pop("MMS_FAKE_PROVIDER", None)
         env.pop("MMS_FAKE_DELAY_MS", None)
-        # 外壳环境可能带着 MMS_CORE；测试默认锁定到 python，除非显式覆盖。
-        # 传 "" 表示不设置，用来验证自动路由。
-        core = (env_extra or {}).get("MMS_CORE")
-        env["MMS_CORE"] = "python" if core is None else core
-        if not env["MMS_CORE"]:
-            del env["MMS_CORE"]
         if fake:
             env["MMS_FAKE_PROVIDER"] = "1"
         env.update(env_extra or {})
@@ -704,7 +697,7 @@ def tests() -> None:
                 and len(questions) >= 2
                 and len(attachments) == 1
                 and attachments[0].get("name") == "sales.csv"
-                and "附件" in card.get("payload", {}).get("warning", ""),
+                and bool(card.get("payload", {}).get("warning")),
                 f"card={card.get('card')} questions={len(questions)} attachments={attachments}",
             )
             check(
@@ -755,18 +748,36 @@ def tests() -> None:
             status, _ = wf.json("POST", f"/sessions/{sid}/resume", {"action": "choose", "choice": pick})
             chosen, _ = wf.events(sid)
             chosen_statuses = {e["data"]["phase"]: e["data"]["status"] for e in chosen if e["event"] == "phase"}
+            code_card = next((e["data"] for e in chosen if e["event"] == "interrupt"), {})
+            status, latest = wf.json("GET", "/sessions/latest")
+            session = latest.get("session") or {}
+            check(
+                "C12 选择后阶段 3 过、挂出代码确认卡，脚本未执行",
+                status == 200
+                and chosen_statuses.get(3) == "passed"
+                and chosen_statuses.get(4) == "running"
+                and code_card.get("card") == "code-confirm"
+                and bool(code_card.get("payload", {}).get("code"))
+                and session.get("pending", {}).get("card") == "code-confirm"
+                and chosen[-1]["data"].get("reason") == "waiting",
+                f"状态 {chosen_statuses} card={code_card.get('card')} reason={chosen[-1]['data'].get('reason')}",
+            )
+            status, _ = wf.json("POST", f"/sessions/{sid}/resume", {"action": "run"})
+            ran, _ = wf.events(sid)
+            ran_statuses = {e["data"]["phase"]: e["data"]["status"] for e in ran if e["event"] == "phase"}
             status, latest = wf.json("GET", "/sessions/latest")
             session = latest.get("session") or {}
             last_text = session.get("messages", [{}])[-1].get("content", "") if session.get("messages") else ""
             check(
-                "C12 选择后阶段 3 过、阶段 4 真跑完，待决清空",
+                "C12 点运行后阶段 4/5/6 全链完成，待决清空",
                 status == 200
-                and chosen_statuses.get(3) == "passed"
-                and chosen_statuses.get(4) == "passed"
+                and ran_statuses.get(4) == "passed"
+                and ran_statuses.get(5) == "passed"
+                and ran_statuses.get(6) == "passed"
                 and session.get("pending") is None
-                and chosen[-1]["data"].get("reason") == "stop"
-                and "阶段四完成" in last_text,
-                f"状态 {chosen_statuses} pending={session.get('pending')} 文本={last_text[:60]}",
+                and ran[-1]["data"].get("reason") == "stop"
+                and "阶段六完成" in last_text,
+                f"状态 {ran_statuses} pending={session.get('pending')} 文本={last_text[:60]}",
             )
             check(
                 "C12 K3 的历史消息标了已选，K2 标了已确认",
@@ -825,432 +836,114 @@ def tests() -> None:
             )
         finally:
             wf3.stop()
-    finally:
-        shutil.rmtree(workdir, ignore_errors=True)
 
-    finish()
-
-
-def tests_dsh() -> None:
-    try:
-        from mms.dsh_adapter import find_dsh
-
-        dsh = find_dsh()
-    except Exception as exc:  # noqa: BLE001
-        check("D0 找到 dsh 可执行文件", False, f"设置 MMS_DSH_BIN 或装到 vendor/python/Scripts：{exc}")
-        finish()
-
-    workdir = Path(tempfile.mkdtemp(prefix="mms-dsh-core-"))
-    wsdir = workdir / "ws"
-    wsdir.mkdir()
-    home = workdir / "dsh"
-    upstream = fake_openai(tool_name=None, rate_limit=False)
-    channel = None
-    try:
+        # C16 工作流 LLM 管道：fake 按阶段脚本出内容；resume 带 Key 时密钥不落盘不进事件
+        wf4 = Channel(fake=True, env_extra={"MMS_DATA_DIR": workdir})
         try:
-            channel = Channel(
-                fake=False,
-                env_extra={
-                    "MMS_CORE": "dsh",
-                    "MMS_DSH_BIN": str(dsh),
-                    "MMS_DSH_HOME": str(home),
-                    "MMS_DATA_DIR": str(workdir),
-                },
-            )
-        except Exception as exc:  # noqa: BLE001
-            check("D1 DSH sidecar 能启动", False, repr(exc))
-            finish()
-        status, health = channel.json("GET", "/health")
-        check(
-            "D1 /health 报告 core=dsh",
-            status == 200 and health.get("core") == "dsh",
-            f"HTTP {status} {health}",
-        )
-        check(
-            "D1b /health 报告 dshVersion",
-            status == 200 and (health.get("dshVersion") or "").startswith("0.2."),
-            f"dshVersion={health.get('dshVersion')}",
-        )
-
-        base = f"http://127.0.0.1:{upstream.server_address[1]}/v1"
-        body = {
-            "providerId": "custom",
-            "model": "fake-model",
-            "apiKey": SENTINEL,
-            "baseUrl": base,
-            "workspace": str(wsdir),
-            "messages": [{"role": "user", "content": "你好"}],
-        }
-        status, started = channel.start_chat(body)
-        check("D2 DSH 对话能启动", status == 200 and started.get("ok") is True, f"HTTP {status} {started}")
-        events, raw = channel.events(started.get("chatId", ""))
-        problems, how = schema_validate(events)
-        check("D2 事件符合契约", not problems, f"判据 {how}；{problems[:3]}")
-        ids = [int(e["id"]) for e in events]
-        check("D2 事件 id 从 1 连续递增", ids == list(range(1, len(events) + 1)), f"{ids[:5]}…{ids[-2:]}")
-        kinds = [e["event"] for e in events]
-        check(
-            "D2 同时出现 reasoning/token/done",
-            {"reasoning", "token", "done"} <= set(kinds) and kinds.count("token") >= 2,
-            f"{kinds}",
-        )
-        check(
-            "D2 done.reason=stop 且 done 在最后",
-            bool(events) and events[-1]["event"] == "done" and events[-1]["data"].get("reason") == "stop",
-            str(events[-1] if events else None),
-        )
-        check("D2 密钥不进入 SSE", SENTINEL not in raw, "已扫描整条 SSE")
-
-        upstream.tool_name = "skill"
-        upstream.tool_args = '{"name":"mathmodel-core"}'
-        upstream.delay = 0.0
-        status, started_tool = channel.start_chat(
-            {**body, "messages": [{"role": "user", "content": "加载核心技能"}]}
-        )
-        tool_events, _ = channel.events(started_tool.get("chatId", ""))
-        tool_problems, _ = schema_validate(tool_events)
-        running = [e for e in tool_events if e["event"] == "tool_call" and e["data"].get("status") == "running"]
-        finished_tool = [e for e in tool_events if e["event"] == "tool_call" and e["data"].get("status") in ("ok", "error")]
-        check(
-            "D2b DSH 工具先 running 后结束",
-            status == 200 and bool(running) and bool(finished_tool) and not tool_problems,
-            f"HTTP {status} running={len(running)} finished={len(finished_tool)} problems={tool_problems[:2]}",
-        )
-        check(
-            "D2b 技能工具执行成功",
-            bool(finished_tool)
-            and finished_tool[0]["data"].get("status") == "ok"
-            and "mathmodel-core" in json.dumps(finished_tool[0]["data"], ensure_ascii=False),
-            str(finished_tool[:1])[:300],
-        )
-        tool_kinds = [e["event"] for e in tool_events]
-        check(
-            "D2b 工具回合仍有 token 与 done",
-            "token" in tool_kinds and tool_kinds[-1] == "done",
-            f"{tool_kinds}",
-        )
-
-        upstream.tool_name = "mcp__mms__list_templates"
-        upstream.tool_args = "{}"
-        upstream.delay = 0.0
-        status, started_mcp = channel.start_chat(
-            {**body, "messages": [{"role": "user", "content": "列出模板"}]}
-        )
-        mcp_events, _ = channel.events(started_mcp.get("chatId", ""))
-        mcp_problems, _ = schema_validate(mcp_events)
-        running_mcp = [e for e in mcp_events if e["event"] == "tool_call" and e["data"].get("status") == "running"]
-        finished_mcp = [e for e in mcp_events if e["event"] == "tool_call" and e["data"].get("status") in ("ok", "error")]
-        check(
-            "D2c MCP 工具可用并跑完",
-            status == 200 and bool(running_mcp) and bool(finished_mcp) and not mcp_problems,
-            f"HTTP {status} running={len(running_mcp)} finished={len(finished_mcp)} problems={mcp_problems[:2]}",
-        )
-        result = finished_mcp[0]["data"].get("result") if finished_mcp else {}
-        check(
-            "D2c MCP 工具 result.total == 25",
-            isinstance(result, dict) and result.get("total") == 25,
-            f"{json.dumps(result, ensure_ascii=False)[:300]}",
-        )
-        try:
-            from mms.invoke import list_templates
-
-            expected_templates = list_templates()
-        except Exception as exc:  # noqa: BLE001
-            expected_templates = None
-        expected_counts: dict[str, int] = {}
-        for row in expected_templates or []:
-            skill = str(row.get("skill") or "")
-            expected_counts[skill] = expected_counts.get(skill, 0) + 1
-        check(
-            "D2c MCP 工具结果与 CLI 逐字段一致",
-            isinstance(expected_templates, list)
-            and isinstance(result, dict)
-            and result.get("templates") == expected_templates
-            and result.get("by_skill") == expected_counts,
-            f"result.templates={len((result or {}).get('templates') or [])} expected={len(expected_templates or [])} by_skill={result.get('by_skill') if isinstance(result, dict) else None}",
-        )
-
-        upstream.tool_name = "mcp__mms__suggest_models"
-        upstream.tool_args = '{"question": "预测未来三个月的销量", "batch": 1}'
-        upstream.delay = 0.0
-        status, started_card = channel.start_chat(
-            {**body, "messages": [{"role": "user", "content": "该用什么模型？"}]}
-        )
-        card_events, _ = channel.events(started_card.get("chatId", ""))
-        interrupts = [e for e in card_events if e["event"] == "interrupt"]
-        payload = interrupts[0]["data"].get("payload", {}) if interrupts else {}
-        cards = payload.get("candidates") or []
-        from mms import orchestrator as _orch
-
-        expected_cards = _orch.model_candidates("预测未来三个月的销量", 1)
-        check(
-            "D2d DSH 选模卡通过 interrupt 推送",
-            status == 200
-            and bool(interrupts)
-            and interrupts[0]["data"].get("card") == "model-choice"
-            and len(cards) == 3
-            and [c.get("name") for c in cards] == [c.get("name") for c in expected_cards],
-            f"HTTP {status} interrupts={len(interrupts)} cards={[c.get('name') for c in cards]}",
-        )
-        upstream.tool_name = None
-        upstream.tool_args = '{"unused": true}'
-
-        # 供应商与思考档位映射：代码级断言 base_url/effort。
-        from mms import dsh_adapter, dsh_provider
-        from mms.provider import find_provider
-
-        deepseek = find_provider("deepseek")
-        check(
-            "D6a deepseek 思考档位映射",
-            dsh_provider.effort_table(deepseek, "deepseek-v4-pro")
-            == {"medium": "low", "high": "high", "max": "max"},
-            f"efforts={dsh_provider.effort_table(deepseek, 'deepseek-v4-pro')}",
-        )
-        qwen = find_provider("qwen")
-        check(
-            "D6b qwen 思考档位映射",
-            dsh_provider.effort_table(qwen, "qwen3.8-max")
-            == {"medium": "medium", "high": "high", "max": "max"},
-            f"efforts={dsh_provider.effort_table(qwen, 'qwen3.8-max')}",
-        )
-        kimi = find_provider("kimi")
-        check(
-            "D6c kimi-k2.x 关思考",
-            dsh_provider.effort_table(kimi, "kimi-k2.6") == {}
-            and dsh_provider.default_effort(kimi, "kimi-k2.6", "max", True) is None,
-            f"efforts={dsh_provider.effort_table(kimi, 'kimi-k2.6')}",
-        )
-        custom = find_provider("custom")
-        custom["base_url"] = base
-        patch = dsh_adapter.build_patch(custom, "custom-model", wsdir, 50_000, "max", True)
-        check(
-            "D6d custom 思考档位与 baseURL",
-            f'baseURL: {json.dumps(base)}' in patch
-            and 'reasoningEffort: "max"' in patch
-            and "reasoningEfforts:\n              off:\n" in patch,
-            f"baseURL={base in patch} effort={('reasoningEffort: \"max\"' in patch)}",
-        )
-
-        # DSH 线上行为： reasoning_effort/max 与 sendThinking=False
-        records_before = len(upstream.records)
-        status, started_effort = channel.start_chat(
-            {**body, "messages": [{"role": "user", "content": "深度演示"}], "thinking": "max"}
-        )
-        channel.events(started_effort.get("chatId", ""))
-        deep_bodies = [r["body"] for r in upstream.records[records_before:] if isinstance(r["body"], dict) and (r["body"].get("messages") or [])]
-        check(
-            "D6e thinking=max 发送 wire effort",
-            bool(deep_bodies) and any(b.get("reasoning_effort") == "max" for b in deep_bodies),
-            f"bodies={[b.get('reasoning_effort') for b in deep_bodies]}",
-        )
-        records_before = len(upstream.records)
-        status, started_off = channel.start_chat(
-            {
-                **body,
-                "messages": [{"role": "user", "content": "关闭思考"}],
-                "thinking": "max",
-                "sendThinking": False,
-            }
-        )
-        channel.events(started_off.get("chatId", ""))
-        off_bodies = [r["body"] for r in upstream.records[records_before:] if isinstance(r["body"], dict) and (r["body"].get("messages") or [])]
-        check(
-            "D6f sendThinking=false 不发送 effort",
-            bool(off_bodies) and all("reasoning_effort" not in b for b in off_bodies),
-            f"bodies={[b.get('reasoning_effort') for b in off_bodies]}",
-        )
-
-        # 同一会话的续聊：第二轮只把新增 user 发给 provider，不重建 session。
-        upstream.tool_name = None
-        upstream.tool_args = '{"unused": true}'
-        upstream.delay = 0.0
-        status, started_first = channel.start_chat(
-            {**body, "messages": [{"role": "user", "content": "一轮"}]}
-        )
-        records_before = len(upstream.records)
-        first_events, _ = channel.events(started_first.get("chatId", ""))
-        first_user = [
-            m
-            for r in upstream.records[records_before:]
-            if isinstance(r["body"], dict)
-            for m in (r["body"].get("messages") or [])
-            if isinstance(m, dict) and m.get("role") == "user"
-        ]
-        check(
-            "D7a 首轮 prompt 只有第一问",
-            bool(first_user)
-            and started_first.get("chatId")
-            and first_user[0].get("content") == "一轮"
-            and len(first_events) > 0
-            and first_events[-1]["event"] == "done",
-            f"first_user={first_user[:1]} last_events={first_events[-1] if first_events else None}",
-        )
-        status, started_second = channel.start_chat(
-            {
-                **body,
-                "messages": [
-                    {"role": "user", "content": "一轮"},
-                    {"role": "assistant", "content": "第一句回复"},
-                    {"role": "user", "content": "两轮"},
-                ],
-            }
-        )
-        records_before2 = len(upstream.records)
-        second_events, _ = channel.events(started_second.get("chatId", ""))
-        tail_user = [
-            m
-            for r in upstream.records[records_before2:]
-            if isinstance(r["body"], dict)
-            for m in (r["body"].get("messages") or [])
-            if isinstance(m, dict) and m.get("role") == "user"
-        ]
-        check(
-            "D7b 续聊只发新增 user，不重发 transcript",
-            bool(tail_user) and tail_user[-1].get("content") == "两轮" and not tail_user[-1].get("content").endswith("一轮") and bool(second_events) and second_events[-1]["event"] == "done",
-            f"tail_user={tail_user[-1] if tail_user else None} last_events={second_events[-1] if second_events else None}",
-        )
-
-        # 取消：慢速假模型，收到第一个 token 后调 /cancel
-        upstream.delay = 0.4
-        status, started2 = channel.start_chat(
-            {
-                **body,
-                "messages": [{"role": "user", "content": "慢速演示"}],
-            }
-        )
-        chat2 = started2.get("chatId", "")
-        conn, resp = channel.open_events(chat2)
-        frames = []
-        first_token = None
-        try:
-            deadline = time.monotonic() + 20
-            while time.monotonic() < deadline:
-                frame = read_frame(resp)
-                if frame is None:
-                    break
-                frames.append(frame)
-                if frame["event"] == "token":
-                    first_token = frame
-                    break
-            check("D3 取消前收到 token", first_token is not None, f"已读 {len(frames)} 帧")
-            cancel_start = time.monotonic()
-            status_cancel, _ = channel.json("POST", f"/chats/{chat2}/cancel")
-            check("D3 取消请求被接受", status_cancel == 200, f"HTTP {status_cancel}")
-            while time.monotonic() - cancel_start < 10:
-                frame = read_frame(resp)
-                if frame is None:
-                    break
-                frames.append(frame)
-        finally:
-            conn.close()
-        latency = time.monotonic() - cancel_start if first_token is not None else -1
-        check(
-            "D3 3 秒内 done=cancelled 且 done 在最后",
-            bool(frames)
-            and frames[-1]["event"] == "done"
-            and frames[-1]["data"].get("reason") == "cancelled"
-            and latency <= 3.0,
-            f"最后事件 {frames[-1] if frames else None}，延迟 {latency:.2f}s",
-        )
-        cancel_problems, _ = schema_validate(frames)
-        check("D3 取消后的事件仍符合契约", not cancel_problems, f"{cancel_problems[:3]}")
-        cancel_ids = [int(e["id"]) for e in frames]
-        check(
-            "D3 取消后 id 仍连续递增",
-            cancel_ids == list(range(1, len(cancel_ids) + 1)),
-            f"{cancel_ids[:5]}…{cancel_ids[-2:]}",
-        )
-
-        # 负向：DSH 二进制指向不存在路径，启动应明确报错，不能静默回退。
-        negative = Channel(
-            fake=False,
-            env_extra={
-                "MMS_CORE": "dsh",
-                "MMS_DSH_BIN": str(workdir / "missing" / "dsh.exe"),
-                "MMS_DSH_HOME": str(home),
-                "MMS_DATA_DIR": str(workdir),
-            },
-        )
-        try:
-            status, neg_started = negative.start_chat(
-                {
-                    **body,
-                    "messages": [{"role": "user", "content": "缺 DSH"}],
-                }
-            )
-            neg_events, neg_raw = negative.events(neg_started.get("chatId", ""))
-            neg_errors = [e for e in neg_events if e["event"] == "error"]
-            neg_tail = neg_events[-1] if neg_events else None
-            check(
-                "D8 DSH 缺失时明确报错",
-                status == 200
-                and any(
-                    "找不到 dsh" in json.dumps(e["data"], ensure_ascii=False)
-                    or "MMS_DSH_BIN" in json.dumps(e["data"], ensure_ascii=False)
-                    for e in neg_errors
-                )
-                and neg_tail is not None
-                and neg_tail["event"] == "done"
-                and neg_tail["data"].get("reason") == "error",
-                f"errors={[e['data'] for e in neg_errors][:1]} tail={neg_tail}",
-            )
-            check(
-                "D8 报错不含密钥",
-                SENTINEL not in neg_raw and SENTINEL not in (negative.stderr or ""),
-                "已扫描事件与 stderr",
-            )
-        finally:
-            negative.stop()
-
-        # 自动路由：不设 MMS_CORE 时默认 DSH；离线演示固定走 python，不需要 Key 与 dsh 对话。
-        auto = Channel(
-            fake=True,
-            env_extra={"MMS_CORE": "", "MMS_DSH_HOME": str(home), "MMS_DATA_DIR": str(workdir)},
-        )
-        try:
-            status, health_auto = auto.json("GET", "/health")
-            check(
-                "D9 未指定内核时 /health 报 dsh",
-                status == 200 and health_auto.get("core") == "dsh",
-                f"HTTP {status} {health_auto}",
-            )
-            status, started_auto = auto.start_chat(
+            status, started = wf4.start_chat(
                 {
                     "providerId": "fake",
                     "model": "fake-stream",
-                    "messages": [{"role": "user", "content": "离线演示"}],
+                    "mode": "workflow",
+                    "messages": [{"role": "user", "content": "问题1 预测销量。问题2 给出建议。"}],
                 }
             )
-            auto_events, auto_raw = auto.events(started_auto.get("chatId", ""))
+            sid4 = started.get("chatId", "")
+            events4, raw4 = wf4.events(sid4)
+            card4 = next((e["data"] for e in events4 if e["event"] == "interrupt"), {})
+            warning4 = str(card4.get("payload", {}).get("warning") or "")
             check(
-                "D9 离线演示自动落到 python 并跑完",
+                "C16 fake 工作流起题走阶段脚本，K2 卡标明离线演示",
                 status == 200
-                and bool(auto_events)
-                and auto_events[-1]["event"] == "done"
-                and auto_events[-1]["data"].get("reason") == "stop"
-                and SENTINEL not in auto_raw,
-                f"HTTP {status} tail={auto_events[-1] if auto_events else None}",
+                and card4.get("card") == "problem-confirm"
+                and "离线演示" in warning4,
+                f"HTTP {status} card={card4.get('card')} warning={warning4[:40]!r}",
+            )
+            status, _ = wf4.json(
+                "POST",
+                f"/sessions/{sid4}/resume",
+                {"action": "confirm", "providerId": "fake", "model": "fake-stream", "apiKey": SENTINEL},
+            )
+            k34, raw34 = wf4.events(sid4)
+            problems4, how4 = schema_validate(k34)
+            status, latest4 = wf4.json("GET", "/sessions/latest")
+            session4 = latest4.get("session") or {}
+            check(
+                "C16 带 Key 恢复仍走通 K3，事件符合契约且不含密钥",
+                status == 200
+                and not problems4
+                and any(e["event"] == "interrupt" and e["data"].get("card") == "model-choice" for e in k34)
+                and SENTINEL not in raw34
+                and SENTINEL not in json.dumps(session4, ensure_ascii=False),
+                f"HTTP {status} 判据={how4} {problems4[:2]}",
+            )
+            check(
+                "C16 fake 恢复不带 Key 也走通（旧客户端兼容）",
+                wf4.json("POST", f"/sessions/{sid4}/resume", {"action": "reroll"})[0] == 200,
+                "reroll 无 Key",
+            )
+
+            # C17 代码确认卡走通道：事件符合契约，动作守卫有效，运行后阶段四过
+            status, _ = wf4.json("POST", f"/sessions/{sid4}/resume", {"action": "choose", "choice": "c1"})
+            code_events, code_raw = wf4.events(sid4)
+            code_problems, code_how = schema_validate(code_events)
+            code_card = next((e["data"] for e in code_events if e["event"] == "interrupt"), {})
+            check(
+                "C17 代码确认卡事件符合契约且带代码",
+                status == 200
+                and not code_problems
+                and code_card.get("card") == "code-confirm"
+                and bool(code_card.get("payload", {}).get("code"))
+                and code_events[-1]["data"].get("reason") == "waiting",
+                f"HTTP {status} 判据={code_how} {code_problems[:2]} card={code_card.get('card')}",
+            )
+            status, _ = wf4.json("POST", f"/sessions/{sid4}/resume", {"action": "confirm"})
+            guard_events, _ = wf4.events(sid4)
+            guard_error = next((e["data"].get("message", "") for e in guard_events if e["event"] == "error"), "")
+            check(
+                "C17 代码卡上点确认被拒（动作守卫）",
+                status == 200 and "确认赛题" in guard_error,
+                f"HTTP {status} error={guard_error[:60]!r}",
+            )
+            status, _ = wf4.json("POST", f"/sessions/{sid4}/resume", {"action": "run"})
+            run_events, run_raw = wf4.events(sid4)
+            run_problems, run_how = schema_validate(run_events)
+            run_statuses = {e["data"]["phase"]: e["data"]["status"] for e in run_events if e["event"] == "phase"}
+            check(
+                "C17 通道点运行后阶段四通过",
+                status == 200 and run_statuses.get(4) == "passed",
+                f"HTTP {status} 状态 {run_statuses}",
+            )
+            p5_gates = [e for e in run_events if e["event"] == "gate"]
+            gate_ids = {e["data"].get("skill") for e in p5_gates}
+            p5_paper = [e for e in run_events if e["event"] == "artifact" and e["data"].get("kind") == "paper"]
+            p6_score = [e for e in run_events if e["event"] == "artifact" and e["data"].get("kind") == "score"]
+            check(
+                "C18 全链事件符合契约：三类门禁、论文与评分产物、阶段五六通过",
+                not run_problems
+                and run_statuses.get(5) == "passed"
+                and run_statuses.get(6) == "passed"
+                and gate_ids == {"phrasing", "style", "chapters"}
+                and len(p5_paper) == 1
+                and len(p6_score) == 1,
+                f"判据={run_how} {run_problems[:2]} gates={sorted(gate_ids)} paper={len(p5_paper)} score={len(p6_score)} 状态={run_statuses}",
+            )
+            status, wb = wf4.json("GET", f"/workbench/state?session={sid4}")
+            wb_rounds = (wb.get("score") or {}).get("rounds") or []
+            wb_last = wb_rounds[-1] if wb_rounds else {}
+            check(
+                "C18 工作台按会话读到真实评分轮次（非演示三轮）",
+                status == 200
+                and 1 <= len(wb_rounds) < 3
+                and wb_last.get("total") == 86
+                and bool(wb_last.get("pass")),
+                f"HTTP {status} rounds={len(wb_rounds)} total={wb_last.get('total')}",
             )
         finally:
-            auto.stop()
+            wf4.stop()
     finally:
-        if channel is not None:
-            channel.stop()
+        shutil.rmtree(workdir, ignore_errors=True)
 
-    leaks = []
-    for path in home.rglob("*"):
-        if not path.is_file():
-            continue
-        try:
-            if SENTINEL.encode("utf-8") in path.read_bytes():
-                leaks.append(str(path))
-        except OSError:
-            continue
-    check("D4 密钥不落在 DSH_HOME", not leaks, f"命中 {leaks[:3]}")
-    check("D5 密钥不进入 DSH stderr", SENTINEL not in (channel.stderr if channel else ""), "已扫描 stderr")
-    upstream.shutdown()
-    upstream.server_close()
-    shutil.rmtree(workdir, ignore_errors=True)
     finish()
 
 
@@ -1289,54 +982,15 @@ def selftest() -> None:
     raise SystemExit(0 if not bad else 1)
 
 
-def run_with_dsh_python(argv: list[str]) -> int | None:
-    """DSH 自检要用随包解释器：SDK 与 dsh.exe 都装在 vendor/python。
-
-    系统 python 未必装过 deepseek-harness-sdk，这时 /health 的 dshVersion 会是 None，
-    验的就不是要发布的组合。返回 None 表示已经在目标解释器里，继续跑。
-    Windows 上 os.execve 会把含空格的路径拼坏，所以走 subprocess 转发。
-    """
-    if os.environ.get("MMS_CHECK_REEXEC") == "1":
-        return None
-    vendor = ROOT / "vendor" / "python" / ("python.exe" if os.name == "nt" else "bin/python3")
-    if not vendor.is_file() or Path(sys.executable).resolve() == vendor.resolve():
-        return None
-    env = {**os.environ, "MMS_CHECK_REEXEC": "1"}
-    return subprocess.run(
-        [str(vendor), str(Path(__file__).resolve()), *argv],
-        cwd=str(ROOT),
-        env=env,
-    ).returncode
-
-
 def main(argv: list[str] | None = None) -> int:
     args = list(argv if argv is not None else sys.argv[1:])
-    core = "python"
-    rest: list[str] = []
-    index = 0
-    while index < len(args):
-        if args[index] == "--core":
-            if index + 1 >= len(args):
-                print("用法错误: --core 需要 python 或 dsh", file=sys.stderr)
-                return 2
-            core = args[index + 1]
-            index += 2
-            continue
-        rest.append(args[index])
-        index += 1
-    if "--selftest" in rest:
+    if "--selftest" in args:
         selftest()
-    unknown = [value for value in rest if value != "--selftest"]
-    if unknown or core not in ("python", "dsh"):
-        print(f"用法错误: 未知参数 {unknown or core}", file=sys.stderr)
+    unknown = [value for value in args if value != "--selftest"]
+    if unknown:
+        print(f"用法错误: 未知参数 {unknown}", file=sys.stderr)
         return 2
-    if core == "dsh":
-        forwarded = run_with_dsh_python([*args])
-        if forwarded is not None:
-            return forwarded
-        tests_dsh()
-    else:
-        tests()
+    tests()
     return 0
 
 

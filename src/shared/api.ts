@@ -88,12 +88,22 @@ export interface ChatStartResult {
   chatId: string
 }
 
-export type DecisionAction = 'confirm' | 'reroll' | 'choose'
+export type DecisionAction = 'confirm' | 'reroll' | 'choose' | 'run'
+
+/** 恢复决策时随请求带上服务商上下文：Key 由主进程从安全存储补齐，渲染层不接触。 */
+export interface ResumeProviderInput {
+  providerId?: string
+  model?: string
+  baseUrl?: string
+  thinking?: ThinkingDepth
+  sendThinking?: boolean
+}
 
 export interface ResumeInput {
   sessionId: string
   action: DecisionAction
   choice?: string
+  provider?: ResumeProviderInput
 }
 
 export interface InterruptCard {
@@ -126,6 +136,7 @@ export interface SessionSnapshot {
   pending: InterruptCard | null
   messages: SessionMessage[]
   batch: number
+  picked?: Record<string, unknown> | null
 }
 
 export interface SessionLatest {

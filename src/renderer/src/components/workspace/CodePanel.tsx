@@ -17,10 +17,12 @@ export default function CodePanel({ state, onGoto }: { state: WorkbenchState; on
               </div>
             ))}
           </div>
+          <pre className="code-block code-block--log" data-role="figure-stdout">{active.stdout || '（无标准输出）'}</pre>
+          {active.stderr ? <pre className="code-block code-block--error" data-role="figure-stderr">{active.stderr}</pre> : null}
         </div>
       ) : (
         <div className="panel__empty">
-          <p>还没有可复现的命令。渲染过图表后，这里会显示实际执行的命令与产物路径。</p>
+          <p>还没有可复现的命令。渲染过图表后，这里会显示实际执行的命令、产物路径与运行日志。</p>
           <button type="button" className="btn btn--primary btn--sm" data-action="goto-figure" onClick={() => onGoto('figure')}>
             去图表页渲染
           </button>

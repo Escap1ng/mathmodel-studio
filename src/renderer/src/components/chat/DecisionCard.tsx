@@ -326,6 +326,45 @@ function ModelChoice({ card, busy, resolving, onDecision, onExplain }: Props) {
   )
 }
 
+function CodeConfirm({ card, busy, resolving, onDecision }: Props) {
+  const payload = card.payload
+  const resolved = card.resolved
+  const code = text(payload.code)
+  const round = text(payload.round, '1')
+  return (
+    <section className="decision" data-card="code-confirm">
+      <div className="decision__head">
+        <span className="decision__kicker">决策点 K4 · 代码确认</span>
+        <h3 className="decision__title">{text(payload.title, '求解代码确认')}</h3>
+        <p className="decision__intro">{text(payload.intro)}</p>
+      </div>
+      <pre className="decision__code" data-role="code-preview">
+        <code>{code}</code>
+      </pre>
+      <div className="decision__meta">
+        <span>第 {round} 轮</span>
+        <span>数据：{text(payload.dataPath)}</span>
+        {payload.sample === true ? <span>内置示例数据</span> : null}
+      </div>
+      <div className="decision__foot">
+        {resolved ? <span className="decision__resolved">{resolved}</span> : null}
+        <ResolvingMark show={resolving === true} />
+        <button
+          type="button"
+          className="btn btn--primary"
+          data-action="run"
+          disabled={busy || Boolean(resolved)}
+          onClick={() => onDecision('run')}
+        >
+          运行
+        </button>
+      </div>
+    </section>
+  )
+}
+
 export default function DecisionCard(props: Props) {
-  return props.card.card === 'model-choice' ? <ModelChoice {...props} /> : <ProblemConfirm {...props} />
+  if (props.card.card === 'model-choice') return <ModelChoice {...props} />
+  if (props.card.card === 'code-confirm') return <CodeConfirm {...props} />
+  return <ProblemConfirm {...props} />
 }

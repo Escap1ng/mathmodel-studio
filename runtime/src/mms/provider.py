@@ -235,8 +235,76 @@ def _sleep_checked(seconds: float, should_stop) -> None:
         time.sleep(min(0.02, max(0.0, end - time.monotonic())))
 
 
+def _fake_stage_text(stage: str, messages: list[dict]) -> str | None:
+    """编排阶段的脚本化响应：内容与确定性路径同源，离线演示不冒充模型判断。"""
+    from . import baseline, orchestrator  # 局部 import：避免模块级循环依赖
+
+    if stage == "k2-problem":
+        user = next((str(m.get("content") or "") for m in messages if m.get("role") == "user"), "")
+        # 提示词模板形如「题面：\n…\n\n附件清单：…」；只取题面段，别把标签当题目。
+        problem = user.split("\n\n附件清单：", 1)[0]
+        if problem.startswith("题面：\n"):
+            problem = problem[len("题面：\n"):]
+        questions = orchestrator.split_questions(orchestrator.question_source(problem))
+        names = orchestrator.attachment_names(problem)
+        return json.dumps(
+            {
+                "questions": [
+                    {"id": f"q{i + 1}", "text": text, "data": "未附数据文件"}
+                    for i, text in enumerate(questions)
+                ],
+                "dataRoles": [],
+                "warning": (
+                    "离线演示：数据角色核对未接入，附件正文已并入题面。"
+                    if names
+                    else "离线演示：未附数据文件，确认后按文字题面继续。"
+                ),
+            },
+            ensure_ascii=False,
+        )
+    if stage == "k3-models":
+        user = next((str(m.get("content") or "") for m in messages if m.get("role") == "user"), "")
+        problem = user.split("\n\n附件清单：", 1)[0]
+        if problem.startswith("题面：\n"):
+            problem = problem[len("题面：\n"):]
+        return json.dumps({"candidates": orchestrator.model_candidates(problem)}, ensure_ascii=False)
+    if stage == "p4-code":
+        return json.dumps(
+            {"rationale": "离线演示：使用内置基线脚本，接真实模型后这里会按题生成代码。", "code": baseline.SCRIPT},
+            ensure_ascii=False,
+        )
+    if stage == "p5-paper":
+        # 离线兜底：演示样例稿（三门禁全绿）。编排层会在对话里标明是兜底。
+        sample = Path(__file__).with_name("paper_sample") / "paper.tex"
+        try:
+            return sample.read_text(encoding="utf-8")
+        except OSError:
+            return None
+    if stage == "p6-score":
+        import re
+
+        from . import score_gen
+
+        user = next((str(m.get("content") or "") for m in messages if m.get("role") == "user"), "")
+        match = re.search(r"第\s*(\d+)\s*轮", user)
+        round_no = int(match.group(1)) if match else 1
+        return json.dumps(score_gen.demo_card(round_no), ensure_ascii=False)
+    return None
+
+
 def fake_completion(messages: list[dict], on_delta, should_stop, delay: float = 0.02) -> Completion:
     """仅测试与离线演示：不发任何网络请求。由 MMS_FAKE_PROVIDER=1 显式启用。"""
+    from .llm import stage_of
+
+    stage = stage_of(messages)
+    if stage:
+        text = _fake_stage_text(stage, messages)
+        if text is not None:
+            for i in range(0, len(text), 512):
+                _sleep_checked(delay, should_stop)
+                on_delta("token", text[i : i + 512])
+            return Completion(content=text, finish_reason="stop")
+
     if any(m.get("role") == "tool" for m in messages):
         final = (
             "离线演示：共 25 个模板，20 张图表（matplotlib）+ 5 张示意图（JSON 驱动）。"
