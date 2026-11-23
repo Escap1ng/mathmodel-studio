@@ -1,34 +1,17 @@
 {
-  "name": "mathmodel-studio",
-  "version": "0.2.0",
+  "name": "mathmodel-studio-workspace",
   "private": true,
-  "description": "数学建模桌面工作台：题面 → 选模 → 代码 → 论文",
-  "author": "Escap1ng",
-  "license": "AGPL-3.0-only",
-  "main": "out/main/index.js",
+  "workspaces": ["desktop"],
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "preview": "electron-vite preview",
-    "pack:win": "npm run build && electron-builder --win --dir",
-    "dist:win": "npm run build && electron-builder --win nsis",
-    "vendor:python": "node scripts/prepare-vendor.mjs python",
-    "vendor:pandoc": "node scripts/prepare-vendor.mjs pandoc",
-    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
-    "smoke:window": "electron tests/window-smoke.cjs",
-    "mms": "python runtime/cli.py"
-  },
-  "devDependencies": {
-    "@types/node": "^26.6.5",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
-    "electron": "^44.8.0",
-    "electron-builder": "^26.18.0",
-    "electron-vite": "^6.0.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.4"
+    "dev": "npm --workspace mathmodel-studio run dev",
+    "build": "npm --workspace mathmodel-studio run build",
+    "preview": "npm --workspace mathmodel-studio run preview",
+    "typecheck": "npm --workspace mathmodel-studio run typecheck",
+    "pack:win": "npm --workspace mathmodel-studio run pack:win",
+    "dist:win": "npm --workspace mathmodel-studio run dist:win",
+    "vendor:python": "npm --workspace mathmodel-studio run vendor:python",
+    "vendor:pandoc": "npm --workspace mathmodel-studio run vendor:pandoc",
+    "smoke:window": "electron desktop/tests/window-smoke.cjs",
+    "mms": "python core/cli.py"
   }
 }

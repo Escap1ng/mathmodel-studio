@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""开发期入口：`python runtime/cli.py ...`（或 `npm run mms -- ...`）。
+"""内核入口：`python core/cli.py ...`（或 `npm run mms -- ...`）。
 
-把 `runtime/src` 加进 sys.path 后转调 `mms.cli`，这样在仓库根就能跑，
+把 `core/src` 加进 sys.path 后转调 `mms.cli`，这样在仓库根就能跑，
 不必先 pip install -e，也不必在 Windows 与 bash 之间换 PYTHONPATH 写法。
 """
 

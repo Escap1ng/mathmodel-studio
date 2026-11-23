@@ -19,7 +19,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const VENDOR = join(ROOT, 'vendor')
+const REPO = resolve(ROOT, '..')
+const VENDOR = join(REPO, 'vendor')
 
 const PBS_TAG = process.env['MMS_PBS_TAG'] || '20261026'
 const PY_VERSION = process.env['MMS_PY_VERSION'] || '3.12.16'
@@ -132,7 +133,7 @@ async function preparePython(force) {
   const version = run(PY_EXE, ['-c', 'import sys; print(sys.version)'], { stdio: 'pipe' })
   log(`解释器就绪：${String(version.stdout).trim().split('\n')[0]}`)
 
-  log(`安装 requirements.txt（索引 ${PIP_INDEX}）`)
+  log(`安装 core/requirements.txt（索引 ${PIP_INDEX}）`)
   run(PY_EXE, [
     '-m',
     'pip',
@@ -140,7 +141,7 @@ async function preparePython(force) {
     '--disable-pip-version-check',
     '--no-warn-script-location',
     '-r',
-    join(ROOT, 'requirements.txt'),
+    join(REPO, 'core', 'requirements.txt'),
     '-i',
     PIP_INDEX
   ])

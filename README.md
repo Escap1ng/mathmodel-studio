@@ -17,16 +17,16 @@
 | 方式 | 命令 | 说明 |
 | --- | --- | --- |
 | 桌面开发 | `npm install` → `npm run dev` | 启动 Electron 与本地 Python 运行时 |
-| 无界面跑一遍 | `python runtime/cli.py run --problem-file 题面.txt [--data 数据.csv] [--out 目录]` | 事件按 JSON Lines 输出；默认离线模式 |
+| 无界面跑一遍 | `python core/cli.py run --problem-file 题面.txt [--data 数据.csv] [--out 目录]` | 事件按 JSON Lines 输出；默认离线模式 |
 | 类型检查 | `npm run typecheck` | 主进程、preload、渲染层全覆盖 |
-| 构建 | `npm run build` | 产物在 `out/` |
+| 构建 | `npm run build` | 产物在 `desktop/out/` |
 | 真启动冒烟 | `npm run smoke:window` | 起生产入口，断言窗口、运行时与界面文本 |
 | 打包 | `npm run vendor:python`、`npm run vendor:pandoc` → `npm run dist:win` | 随包 Python 与 pandoc，输出 NSIS 安装包 |
 
 ## 环境要求
 
 - Node.js 22 及以上。
-- Python 3.12 及以上，并安装 `requirements.txt`（`numpy`、`matplotlib`）。
+- Python 3.12 及以上，并安装 `core/requirements.txt`（`numpy`、`matplotlib`）。
 - 生成 PDF 需要本机 `xelatex`；转 Word 需要 `pandoc`。缺失时求解结果仍保留，论文步骤会明确报缺。
 - 主平台为 Windows；macOS / Linux 可开发运行，未做安装包验证。
 
@@ -39,7 +39,7 @@
 
 ## 配置服务商
 
-设置弹窗内置 DeepSeek、通义千问、Kimi、智谱 GLM、OpenAI 格式端点与离线模式。预设模型与地址在 `runtime/src/mms/providers.json`，可自行增改。
+设置弹窗内置 DeepSeek、通义千问、Kimi、智谱 GLM、OpenAI 格式端点与离线模式。预设模型与地址在 `core/src/mms/providers.json`，可自行增改。
 
 - 真实服务商需要填写模型名与 API Key。
 - 自定义端点填到 `/v1` 为止，公网必须 https。
@@ -47,26 +47,38 @@
 
 ## 目录
 
+根目录是 npm workspace，只做脚本转发；内核与桌面端各自独立。
+
 ```
 .
-├─ src/
-│  ├─ main/          Electron 主进程：通道、设置、文件选择、产物打开
-│  ├─ preload/       窄 IPC 接口
-│  ├─ renderer/      单页 React 界面（赛题 / 进度 / 结果）
-│  └─ shared/        共享类型
-├─ runtime/
-│  ├─ cli.py         开发期入口：serve / run
+├─ core/                       Python 内核（不依赖 GUI）
+│  ├─ cli.py                   serve / run 入口
+│  ├─ pyproject.toml
+│  ├─ requirements.txt
 │  └─ src/mms/
-│     ├─ pipeline.py 一键流水线
-│     ├─ provider.py OpenAI 兼容流式客户端
-│     ├─ llm.py      JSON / 文本调用与重试
-│     ├─ baseline.py 数据画像、基线脚本、执行与产物收集
-│     ├─ paper_gen.py / paper_build.py  论文生成与排版
-│     ├─ server.py   本机 HTTP + SSE 通道
-│     └─ templates/  论文骨架与写作规范
-├─ tests/            真启动冒烟
-├─ scripts/          随包 Python / pandoc 准备
-└─ build/            图标与安装向导图
+│     ├─ pipeline.py           一键流水线
+│     ├─ provider.py           OpenAI 兼容流式客户端
+│     ├─ llm.py                JSON / 文本调用与重试
+│     ├─ baseline.py           数据画像、基线脚本、执行与产物收集
+│     ├─ paper_gen.py / paper_build.py   论文生成与排版
+│     ├─ server.py             本机 HTTP + SSE 通道
+│     └─ templates/            论文骨架与写作规范
+├─ desktop/                    Electron 桌面端
+│  ├─ src/
+│  │  ├─ main/                 通道、设置、文件选择、产物打开
+│  │  ├─ preload/              窄 IPC 接口
+│  │  ├─ renderer/             单页 React 界面（赛题 / 进度 / 结果）
+│  │  └─ shared/               共享类型
+│  ├─ tests/window-smoke.cjs   真启动冒烟
+│  ├─ scripts/prepare-vendor.mjs   随包 Python / pandoc 准备
+│  ├─ build/                   图标与安装向导图
+│  ├─ electron.vite.config.ts
+│  ├─ electron-builder.yml
+│  ├─ package.json             桌面端依赖与脚本
+│  └─ tsconfig*.json
+├─ package.json                npm workspace 入口
+├─ VERSION / LICENSE / THIRD_PARTY_NOTICES.md
+└─ vendor/                     随包 Python / pandoc（本机生成，不入库）
 ```
 
 ## 许可

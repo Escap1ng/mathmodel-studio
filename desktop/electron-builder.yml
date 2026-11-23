@@ -1,8 +1,8 @@
-# electron-builder 配置
+# electron-builder 配置（桌面端）
 #
-# 资源布局：runtime/VERSION/python/pandoc 都放在 resources/ 下，
-# 与 src/main/runtime-env.ts 的 APP_ROOT 对齐；app.asar 里只放 JS 产物。
-# vendor/python 与 vendor/pandoc 由 scripts/prepare-vendor.mjs 准备，不入库。
+# 资源布局：core/VERSION/python/pandoc 放在 resources/ 下，
+# 与 desktop/src/main/runtime-env.ts 的 APP_ROOT 对齐；app.asar 里只放 JS 产物。
+# vendor/python 与 vendor/pandoc 由 scripts/prepare-vendor.mjs 准备到仓库根 vendor/，不入库。
 appId: cn.escap1ng.mathmodel-studio
 productName: MathModel Studio
 copyright: Copyright © 2026 Escap1ng
@@ -21,23 +21,23 @@ files:
   - package.json
 
 extraResources:
-  - from: runtime
-    to: runtime
+  - from: ../core
+    to: core
     filter:
       - "**/*"
       - "!**/__pycache__/**"
       - "!**/*.pyc"
-  - from: VERSION
+  - from: ../VERSION
     to: VERSION
-  - from: LICENSE
+  - from: ../LICENSE
     to: LICENSE.txt
-  - from: THIRD_PARTY_NOTICES.md
+  - from: ../THIRD_PARTY_NOTICES.md
     to: THIRD_PARTY_NOTICES.md
-  - from: licenses
+  - from: ../licenses
     to: licenses
-  - from: vendor/python
+  - from: ../vendor/python
     to: python
-  - from: vendor/pandoc/pandoc.exe
+  - from: ../vendor/pandoc/pandoc.exe
     to: pandoc/pandoc.exe
 
 win:
