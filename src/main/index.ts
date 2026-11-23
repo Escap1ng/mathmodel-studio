@@ -1,107 +1,61 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from 'electron'
-import { APP_ROOT, runtimePython } from './runtime-env'
 import { readFileSync } from 'node:fs'
-import { randomBytes } from 'node:crypto'
-import { join } from 'node:path'
-import { Channel, type ChatEventPayload, type ProviderRow } from './channel'
-import type { RuntimeStatus } from '../shared/api'
-import { attachmentContext } from './extract'
-import {
-  adoptAttachments,
-  attachWorkspace,
-  discardStaged,
-  pickFiles,
-  revealStaged,
-  stageBlob,
-  stageFiles
-} from './files'
-import {
-  chooseWorkspace,
-  copyWorkspacePath,
-  createProjectFolder,
-  ensureWorkspace,
-  listWorkspace,
-  openProjectFolder,
-  openWorkspaceEntry,
-  projectFolderFor,
-  projectInfoFor,
-  rememberProject,
-  resetWorkspace,
-  revealWorkspace,
-  revealWorkspaceEntry,
-  trashWorkspaceEntry,
-  workspacePath
-} from './workspace'
-import type {
-  ChatStartInput,
-  ProviderList,
-  ProviderView,
-  ResumeInput,
-  SessionGet,
-  SessionLatest,
-  SessionList,
-  ThinkingDepth,
-  WorkbenchResult,
-  WorkbenchState
-} from '../shared/api'
+import { join, relative, isAbsolute } from 'node:path'
+import { APP_ROOT, runtimePython } from './runtime-env'
+import { Channel, type RuntimeProvider } from './channel'
+import { pickDataFiles, pickProblemFile } from './files'
 import {
   activeProviderId,
   apiKeyFor,
   clearProviderKey,
-  projectFoldersEnabled,
   publicProviders,
-  saveProvider,
-  type SaveProviderInput
+  saveProvider
 } from './settings'
+import type {
+  ProviderList,
+  ProviderView,
+  RunEvent,
+  RunInput,
+  RuntimeStatus,
+  SaveProviderInput
+} from '../shared/api'
 
 // 开发时 electron-vite 会注入 ELECTRON_RENDERER_URL；打包后走 out/renderer/index.html。
 const DEV_SERVER_URL = process.env['ELECTRON_RENDERER_URL']
+const RUNS_ROOT = join(app.getPath('userData'), 'runs')
 const channel = new Channel(APP_ROOT, runtimePython(), app.getPath('userData'))
 const activeStreams = new Map<string, AbortController>()
 
-type ChatInput = ChatStartInput
-
-function broadcastStatus(status: RuntimeStatus): void {
+channel.onStatus((status: RuntimeStatus) => {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send('runtime:status', status)
   }
-}
-
-channel.onStatus(broadcastStatus)
+})
 
 async function providerViews(): Promise<ProviderList> {
-  const { providers, fake } = await channel.providers()
+  const { providers } = await channel.providers()
   const saved = publicProviders()
-  const views: ProviderView[] = providers.map((row: ProviderRow) => {
-    const isFake = row.id === 'fake'
+  const views: ProviderView[] = providers.map((row: RuntimeProvider) => {
     const stored = saved[row.id]
     const models = row.models ?? []
     return {
       id: row.id,
       display: row.display,
       models,
-      model: stored?.model || models[0] || '',
+      model: stored?.model || row.model || models[0] || '',
       baseUrl: stored?.baseUrl || row.base_url || '',
-      requiresKey: !isFake && row.requires_key !== false,
-      toolCalling: Boolean(row.tool_calling),
+      requiresKey: Boolean(row.requires_key),
       custom: Boolean(row.custom),
-      configured: isFake || Boolean(stored?.configured),
-      contextLimit: stored?.context ?? 200_000,
-      contextMax: row.context_len ?? 1_000_000,
-      modelContexts: row.model_context,
-      thinkingDepth: stored?.depth ?? 'high',
-      sendThinking: stored?.sendThinking ?? !row.custom,
-      reasoning: row.reasoning,
+      configured: row.id === 'fake' || Boolean(stored?.configured),
       note: row.note
     }
   })
   const preferred = activeProviderId()
   const active =
-    views.find((v) => v.id === preferred) ??
-    views.find((v) => v.configured) ??
-    views.find((v) => v.id === 'fake') ??
+    views.find((view) => view.id === preferred) ??
+    views.find((view) => view.configured) ??
     views[0]
-  return { ok: true, providers: views, activeProvider: active?.id ?? '', fake }
+  return { ok: true, providers: views, activeProvider: active?.id ?? '' }
 }
 
 function parseSaveInput(raw: unknown): SaveProviderInput {
@@ -111,123 +65,75 @@ function parseSaveInput(raw: unknown): SaveProviderInput {
   const model = typeof obj.model === 'string' ? obj.model.trim() : ''
   if (!id) throw new Error('缺少服务商')
   if (!model) throw new Error('缺少模型名')
-  const contextTokens =
-    typeof obj.contextTokens === 'number' && Number.isFinite(obj.contextTokens)
-      ? obj.contextTokens
-      : undefined
-  const thinkingDepth =
-    obj.thinkingDepth === 'medium' || obj.thinkingDepth === 'high' || obj.thinkingDepth === 'max'
-      ? (obj.thinkingDepth as ThinkingDepth)
-      : undefined
   return {
     id,
     model,
     apiKey: typeof obj.apiKey === 'string' ? obj.apiKey : undefined,
-    baseUrl: typeof obj.baseUrl === 'string' ? obj.baseUrl : undefined,
-    contextTokens,
-    thinkingDepth,
-    sendThinking: typeof obj.sendThinking === 'boolean' ? obj.sendThinking : undefined
+    baseUrl: typeof obj.baseUrl === 'string' ? obj.baseUrl : undefined
   }
 }
 
-function parseChatInput(raw: unknown): ChatInput {
-  if (!raw || typeof raw !== 'object') throw new Error('对话请求格式不对')
+function parseRunInput(raw: unknown): RunInput {
+  if (!raw || typeof raw !== 'object') throw new Error('运行请求格式不对')
   const obj = raw as Record<string, unknown>
-  const providerId = typeof obj.providerId === 'string' ? obj.providerId : ''
-  const model = typeof obj.model === 'string' ? obj.model.trim() : ''
-  const list = obj.messages
+  const problem = typeof obj.problem === 'string' ? obj.problem.trim() : ''
+  const providerId = typeof obj.providerId === 'string' ? obj.providerId.trim() : ''
+  if (problem.length < 10) throw new Error('题面至少写一句完整的题目描述')
+  if (problem.length > 200_000) throw new Error('题面过长')
   if (!providerId) throw new Error('没有选择服务商')
-  if (!Array.isArray(list) || list.length === 0) throw new Error('消息为空')
-  if (list.length > 200) throw new Error('消息过多')
-  const messages: ChatInput['messages'] = []
-  let total = 0
-  for (const item of list) {
-    if (!item || typeof item !== 'object') throw new Error('消息格式不对')
-    const m = item as Record<string, unknown>
-    if (m.role !== 'user' && m.role !== 'assistant') throw new Error('消息角色不合法')
-    if (typeof m.content !== 'string') throw new Error('消息内容必须是文本')
-    total += m.content.length
-    if (total > 1_600_000) throw new Error('消息总长度超过上限')
-    messages.push({ role: m.role, content: m.content })
-  }
-  const thinking =
-    obj.thinking === 'medium' || obj.thinking === 'high' || obj.thinking === 'max'
-      ? (obj.thinking as ThinkingDepth)
-      : undefined
-  const contextTokens =
-    typeof obj.contextTokens === 'number' && Number.isFinite(obj.contextTokens)
-      ? obj.contextTokens
-      : undefined
-  const attachmentPaths = Array.isArray(obj.attachmentPaths)
-    ? obj.attachmentPaths.filter((item): item is string => typeof item === 'string' && Boolean(item)).slice(0, 20)
-    : undefined
+  const dataPaths = Array.isArray(obj.dataPaths)
+    ? obj.dataPaths.filter((item): item is string => typeof item === 'string' && Boolean(item)).slice(0, 10)
+    : []
   return {
+    problem,
+    dataPaths,
     providerId,
-    model,
-    mode: obj.mode === 'workflow' ? 'workflow' : 'chat',
-    messages,
-    thinking,
-    contextTokens,
-    sendThinking: typeof obj.sendThinking === 'boolean' ? obj.sendThinking : undefined,
-    attachmentPaths
+    model: typeof obj.model === 'string' ? obj.model.trim() : ''
   }
 }
 
-function parseResumeInput(raw: unknown): ResumeInput {
-  if (!raw || typeof raw !== 'object') throw new Error('恢复请求格式不对')
-  const obj = raw as Record<string, unknown>
-  const sessionId = typeof obj.sessionId === 'string' ? obj.sessionId.trim() : ''
-  const action = obj.action
-  if (!sessionId) throw new Error('缺少会话 id')
-  if (action !== 'confirm' && action !== 'reroll' && action !== 'choose' && action !== 'run') {
-    throw new Error('未知决策动作')
-  }
-  const choice = typeof obj.choice === 'string' ? obj.choice : undefined
-  if (action === 'choose' && !choice) throw new Error('缺少候选 id')
-  let provider: ResumeInput['provider']
-  const ctx = obj.provider
-  if (ctx && typeof ctx === 'object') {
-    const p = ctx as Record<string, unknown>
-    const providerId = typeof p.providerId === 'string' ? p.providerId.trim() : ''
-    if (providerId) {
-      provider = {
-        providerId,
-        model: typeof p.model === 'string' ? p.model : undefined,
-        thinking:
-          p.thinking === 'medium' || p.thinking === 'high' || p.thinking === 'max'
-            ? (p.thinking as ThinkingDepth)
-            : undefined,
-        sendThinking: typeof p.sendThinking === 'boolean' ? p.sendThinking : undefined
-      }
-    }
-  }
-  return { sessionId, action, choice, provider }
+function insideRuns(path: string): boolean {
+  if (!isAbsolute(path)) return false
+  const rel = relative(RUNS_ROOT, path)
+  return Boolean(rel) && !rel.startsWith('..') && !isAbsolute(rel)
 }
 
-function attachStream(chatId: string, sender: WebContents): void {
+function attachStream(runId: string, sender: WebContents): void {
   const controller = new AbortController()
-  activeStreams.set(chatId, controller)
+  activeStreams.set(runId, controller)
   void channel
     .stream(
-      chatId,
-      (ev: ChatEventPayload) => {
-        if (!sender.isDestroyed()) sender.send('chat:event', { chatId, ...ev })
+      runId,
+      (event: RunEvent) => {
+        if (!sender.isDestroyed()) sender.send('run:event', event)
       },
       controller.signal
     )
     .catch((err: unknown) => {
       if (controller.signal.aborted || sender.isDestroyed()) return
       const message = err instanceof Error ? err.message : String(err)
-      sender.send('chat:event', { chatId, id: '0', event: 'error', data: { message } })
-      sender.send('chat:event', { chatId, id: '0', event: 'done', data: { reason: 'error' } })
+      sender.send('run:event', {
+        runId,
+        id: '0',
+        event: 'done',
+        data: { ok: false, error: message, outputs: {} }
+      })
     })
-    .finally(() => activeStreams.delete(chatId))
+    .finally(() => activeStreams.delete(runId))
+}
+
+function appVersion(): string {
+  try {
+    return readFileSync(join(APP_ROOT, 'VERSION'), 'utf8').trim() || app.getVersion()
+  } catch {
+    return app.getVersion()
+  }
 }
 
 ipcMain.handle('app:meta', () => ({
-  version: app.getVersion(),
+  version: appVersion(),
   platform: process.platform,
-  Electron: process.versions.electron,
+  electron: process.versions.electron,
   chrome: process.versions.chrome
 }))
 
@@ -252,139 +158,60 @@ ipcMain.handle('providers:clear', async (_event, raw: unknown) => {
   return providerViews()
 })
 
-ipcMain.handle('chat:start', async (event, raw: unknown) => {
-  const input = parseChatInput(raw)
+ipcMain.handle('files:pick-problem', (event) => pickProblemFile(BrowserWindow.fromWebContents(event.sender)))
+
+ipcMain.handle('files:pick-data', (event) => pickDataFiles(BrowserWindow.fromWebContents(event.sender)))
+
+ipcMain.handle('run:start', async (event, raw: unknown) => {
+  const input = parseRunInput(raw)
   const list = await providerViews()
-  const view = list.providers.find((p) => p.id === input.providerId)
+  const view = list.providers.find((item) => item.id === input.providerId)
   if (!view) throw new Error('未知服务商')
   if (view.custom && !view.baseUrl) throw new Error('自定义端点还没填 base URL')
-  const apiKey = view.id === 'fake' ? '' : apiKeyFor(view.id)
+  const apiKey = view.id === 'fake' ? '' : apiKeyFor(view.id) ?? ''
   if (view.requiresKey && !apiKey) throw new Error('还没配置 API Key')
-
-  // 建模会话按赛题分文件夹；建目录失败就退回旧行为，发送不能被目录问题卡住。
-  let workspace = workspacePath()
-  let project: { name: string; path: string } | null = null
-  if (input.mode === 'workflow' && projectFoldersEnabled()) {
-    const firstText = input.messages.find((message) => message.role === 'user')?.content ?? ''
-    try {
-      project = await createProjectFolder(firstText, randomBytes(2).toString('hex'))
-      await adoptAttachments(input.attachmentPaths, project.path)
-      workspace = project.path
-    } catch {
-      project = null
+  const result = await channel.startRun({
+    problem: input.problem,
+    dataPaths: input.dataPaths,
+    provider: {
+      id: view.id,
+      model: input.model || view.model,
+      baseUrl: view.custom ? view.baseUrl : undefined,
+      apiKey
     }
-  }
-
-  const chatId = await channel.startChat({
-    providerId: view.id,
-    model: input.model || view.model,
-    mode: input.mode,
-    apiKey,
-    baseUrl: view.custom ? view.baseUrl : undefined,
-    messages: input.messages,
-    thinking: view.sendThinking ? input.thinking ?? view.thinkingDepth : '',
-    contextTokens: input.contextTokens ?? view.contextLimit,
-    sendThinking: view.sendThinking,
-    // 阶段四要在工作区里找数据文件；路径由主进程给，渲染层不碰文件系统。
-    workspace
   })
-  if (project) rememberProject(chatId, project)
-  attachStream(chatId, event.sender)
-  return { ok: true, chatId }
+  attachStream(result.runId, event.sender)
+  return result
 })
 
-ipcMain.handle('chat:resume', async (event, raw: unknown) => {
-  const input = parseResumeInput(raw)
-  // 续聊沿用会话自己的项目目录；老会话没登记过时退回全局工作区。
-  const workspace = projectFolderFor(input.sessionId) ?? workspacePath()
-  // K2/K3 起由 LLM 生产内容：恢复时把服务商上下文带上，Key 从安全存储按次取出。
-  // 没带 provider（旧渲染层）或没配 Key 时不报错，runtime 回退确定性路径。
-  let providerPayload: Record<string, unknown> | undefined
-  const ctx = input.provider
-  if (ctx?.providerId) {
-    const list = await providerViews()
-    const view = list.providers.find((p) => p.id === ctx.providerId)
-    if (view) {
-      const apiKey = view.id === 'fake' ? '' : apiKeyFor(view.id)
-      providerPayload = {
-        providerId: view.id,
-        model: ctx.model || view.model,
-        baseUrl: view.custom ? view.baseUrl : undefined,
-        thinking: view.sendThinking ? ctx.thinking ?? view.thinkingDepth : '',
-        sendThinking: view.sendThinking,
-        ...(apiKey ? { apiKey } : {})
-      }
-    }
-  }
-  await channel.resumeSession(input.sessionId, input.action, input.choice ?? '', workspace, providerPayload)
-  attachStream(input.sessionId, event.sender)
-  return { ok: true, chatId: input.sessionId }
-})
-
-ipcMain.handle('session:latest', async (): Promise<SessionLatest> => ({
-  ok: true,
-  session: (await channel.latestSession()) as SessionLatest['session']
-}))
-
-ipcMain.handle('session:list', async (): Promise<SessionList> => ({
-  ok: true,
-  sessions: (await channel.listSessions()) as unknown as SessionList['sessions']
-}))
-
-ipcMain.handle('session:get', async (_event, raw: unknown): Promise<SessionGet> => {
-  const id = typeof raw === 'string' ? raw.trim() : ''
-  if (!id) throw new Error('缺少会话 id')
-  return { ok: true, session: (await channel.getSession(id)) as SessionGet['session'] }
-})
-
-ipcMain.handle('session:delete', async (_event, raw: unknown) => {
-  const id = typeof raw === 'string' ? raw.trim() : ''
-  if (!id) throw new Error('缺少会话 id')
-  await channel.deleteSession(id)
+ipcMain.handle('run:cancel', async (_event, raw: unknown) => {
+  const runId = typeof raw === 'string' ? raw : ''
+  if (!runId) throw new Error('缺少运行 id')
+  await channel.cancelRun(runId)
+  // provider 正在等下一块数据时 cancel 只能等它醒来；2 秒后断开本地流兜底。
+  const controller = activeStreams.get(runId)
+  if (controller) setTimeout(() => controller.abort(), 2000)
   return { ok: true }
 })
 
-ipcMain.handle('session:clear', async () => ({
-  ok: true,
-  removed: await channel.clearSessions()
-}))
+ipcMain.handle('artifact:open', async (_event, raw: unknown) => {
+  const path = typeof raw === 'string' ? raw : ''
+  if (!insideRuns(path)) throw new Error('只能打开本次运行的产物')
+  const error = await shell.openPath(path)
+  if (error) throw new Error(error)
+  return { ok: true }
+})
 
-ipcMain.handle('files:pick', (event) => pickFiles(BrowserWindow.fromWebContents(event.sender)))
+ipcMain.handle('artifact:reveal', (_event, raw: unknown) => {
+  const path = typeof raw === 'string' ? raw : ''
+  if (!insideRuns(path)) throw new Error('只能定位本次运行的产物')
+  shell.showItemInFolder(path)
+  return { ok: true }
+})
 
-ipcMain.handle('files:stage', (_event, raw: unknown) => stageFiles(raw))
-
-ipcMain.handle('files:attach', (_event, raw: unknown) => attachWorkspace(raw))
-
-ipcMain.handle('files:stage-blob', (_event, raw: unknown) => stageBlob(raw))
-
-ipcMain.handle('files:discard', (_event, raw: unknown) => discardStaged(raw))
-
-ipcMain.handle('files:context', (_event, raw: unknown) => attachmentContext(raw))
-
-ipcMain.handle('files:reveal', () => revealStaged())
-
-ipcMain.handle('workspace:get', (_event, raw: unknown) => listWorkspace(projectInfoFor(raw)?.path))
-
-ipcMain.handle('workspace:choose', (event) =>
-  chooseWorkspace(BrowserWindow.fromWebContents(event.sender))
-)
-
-ipcMain.handle('workspace:reset', () => resetWorkspace())
-
-ipcMain.handle('workspace:reveal', () => revealWorkspace())
-
-ipcMain.handle('workspace:open', (_event, raw: unknown) => openWorkspaceEntry(raw))
-
-ipcMain.handle('workspace:reveal-entry', (_event, raw: unknown) => revealWorkspaceEntry(raw))
-
-ipcMain.handle('workspace:copy-path', (_event, raw: unknown) => copyWorkspacePath(raw))
-
-ipcMain.handle('workspace:trash', (_event, raw: unknown) => trashWorkspaceEntry(raw))
-ipcMain.handle('workspace:project', (_event, raw: unknown) => projectInfoFor(raw))
-ipcMain.handle('workspace:open-project', (_event, raw: unknown) => openProjectFolder(raw))
-
-function imageDataUrl(path: unknown): string | null {
-  if (typeof path !== 'string' || !path) return null
+ipcMain.handle('artifact:image', (_event, raw: unknown) => {
+  const path = typeof raw === 'string' ? raw : ''
+  if (!insideRuns(path)) return null
   try {
     const bytes = readFileSync(path)
     if (!bytes.length || bytes.length > 12 * 1024 * 1024) return null
@@ -392,91 +219,18 @@ function imageDataUrl(path: unknown): string | null {
   } catch {
     return null
   }
-}
-
-function pdfDataUrl(path: unknown): string | null {
-  if (typeof path !== 'string' || !path) return null
-  try {
-    const bytes = readFileSync(path)
-    if (!bytes.length || bytes.length > 12 * 1024 * 1024) return null
-    return `data:application/pdf;base64,${bytes.toString('base64')}`
-  } catch {
-    return null
-  }
-}
-
-function withImages(raw: Record<string, unknown>): WorkbenchState {
-  const figure = (raw['figure'] ?? {}) as Record<string, unknown>
-  const paper = (raw['paper'] ?? {}) as Record<string, unknown>
-  const artifacts = (paper['artifacts'] ?? {}) as Record<string, { path?: string }>
-  return {
-    ...(raw as unknown as WorkbenchState),
-    figure: {
-      ...(figure as unknown as WorkbenchState['figure']),
-      activeImage: imageDataUrl(figure['active_png']),
-      previousImage: imageDataUrl(figure['previous_png'])
-    },
-    paper: {
-      ...(paper as unknown as WorkbenchState['paper']),
-      pdfData: pdfDataUrl(artifacts.pdf?.path)
-    }
-  }
-}
-
-function sessionScope(raw: unknown): string | undefined {
-  return typeof raw === 'string' && raw ? raw : undefined
-}
-
-ipcMain.handle('workbench:state', async (_event, raw: unknown) =>
-  withImages(await channel.workbenchState(sessionScope(raw)))
-)
-
-ipcMain.handle('workbench:render', async (_event, raw: unknown): Promise<WorkbenchResult> => {
-  if (!raw || typeof raw !== 'object') throw new Error('渲染请求格式不对')
-  const obj = raw as Record<string, unknown>
-  const template = typeof obj.template === 'string' ? obj.template : ''
-  const theme = typeof obj.theme === 'string' ? obj.theme : ''
-  if (!template || !theme) throw new Error('缺少模板或主题')
-  const data = await channel.renderFigure(template, theme, sessionScope(obj.sessionId))
-  return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
-})
-
-ipcMain.handle('workbench:rollback', async (_event, raw: unknown): Promise<WorkbenchResult> => {
-  if (!raw || typeof raw !== 'object') throw new Error('回滚请求格式不对')
-  const version = (raw as Record<string, unknown>).version
-  if (typeof version !== 'string' || !version) throw new Error('缺少版本 id')
-  const data = await channel.rollbackFigure(version, sessionScope((raw as Record<string, unknown>).sessionId))
-  return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
-})
-
-ipcMain.handle('paper:build', async (_event, raw: unknown): Promise<WorkbenchResult> => {
-  const data = await channel.buildPaper(sessionScope(raw))
-  return { ok: true, state: withImages((data['state'] ?? {}) as Record<string, unknown>) }
-})
-
-ipcMain.handle('chat:cancel', async (_event, raw: unknown) => {
-  const chatId = typeof raw === 'string' ? raw : ''
-  if (!chatId) throw new Error('缺少会话 id')
-  await channel.cancel(chatId)
-  // provider 正在等下一块数据时，cancel 只能等它醒来；2 秒后断开本地流兜底。
-  const controller = activeStreams.get(chatId)
-  if (controller) setTimeout(() => controller.abort(), 2000)
-  return { ok: true }
 })
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    // 1440×900 是布局的设计基准，所以它必须指内容区：
-    // 默认的 width/height 含窗口边框，实测内容区会掉到 1439x872，跨平台不可比。
+    width: 1280,
+    height: 860,
     useContentSize: true,
-    minWidth: 1100,
-    minHeight: 700,
+    minWidth: 980,
+    minHeight: 640,
     show: false,
-    // 主色调是白：窗口底色先于首帧就位，避免 Windows 上黑底闪一下
     backgroundColor: '#ffffff',
-    title: 'mathmodel-studio',
+    title: 'MathModel Studio',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -487,9 +241,7 @@ function createWindow(): BrowserWindow {
   })
 
   win.once('ready-to-show', () => {
-    // 分数缩放（本机 150%）下，Windows 会把 useContentSize 的结果再抖动 1–2 DIP；
-    // 布局基准是内容区 1440×900，显示前再钉一次。
-    win.setContentSize(1440, 900)
+    win.setContentSize(1280, 860)
     win.show()
   })
 
@@ -516,12 +268,7 @@ app.on('web-contents-created', (_event, contents) => {
 })
 
 app.whenReady().then(() => {
-  // Windows/Linux 上默认的英文 File/Edit/View 菜单没有用武之地；中文界面不挂它。
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
-  // 默认工作区（桌面「赛题」）在首启就建出来，用户打开桌面就能看到。
-  void ensureWorkspace().catch((err: unknown) => {
-    console.error('[workspace] 创建失败:', err instanceof Error ? err.message : err)
-  })
   void channel.start().catch((err: unknown) => {
     console.error('[runtime] 启动失败:', err instanceof Error ? err.message : err)
   })

@@ -1,7 +1,6 @@
 """mathmodel-studio 运行时。
 
-版本号与仓库根 VERSION、package.json、pyproject.toml 三处同源，
-由 scripts/validate-contracts.py 在 CI 里钉一致，改一处不改其余就会红。
+版本号与仓库根 VERSION、package.json、pyproject.toml 同源，改一处要同步其余。
 """
 
 __version__ = "0.2.0"

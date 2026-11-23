@@ -1,10 +1,7 @@
-"""阶段五 · 论文正文生成：骨架 + 写作规范 + 真实求解结果 → 完整 paper.tex。
+"""论文正文生成：骨架 + 写作规范 + 真实求解结果 → 完整 paper.tex。
 
-一次生成起步：整篇 tex 由模型按骨架写出，门禁与编译失败回喂修复 ≤3 轮。
-实测输出被截断时再考虑分章生成（见 docs/PLAN.md 的取舍记录）。
-
-离线兜底：没有可用模型时返回演示样例稿，并在对话里标明是兜底，
-不冒充按本题生成的论文。
+一次生成起步：整篇 tex 由模型按骨架写出，编译失败回喂修复。
+离线兜底：没有可用模型时返回样例稿，并在事件里标明是兜底。
 """
 
 from __future__ import annotations
@@ -14,7 +11,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import llm
-from .registry import repo_root
+
+TEMPLATES = Path(__file__).resolve().parent / "templates"
 
 P5_INSTRUCTION = (
     "你是数学建模竞赛的论文写作助手。按题面、所选方法、数据画像与真实求解结果，"
@@ -28,7 +26,7 @@ P5_INSTRUCTION = (
     "所有数值必须来自给定的 result.json，禁止编造没有运行过的结果；"
     "图用 \\includegraphics[width=0.85\\textwidth]{figures/final/fig1_residual.png} 引用（文件已就位）；"
     "参考文献至少 3 条真实可查的文献；正文不出现作者身份与页眉。"
-    "修复轮次会附上门禁命中项或编译错误与上一版稿件，请针对性修改后重新输出完整稿件。"
+    "修复轮次会附上编译错误与上一版稿件，请针对性修改后重新输出完整稿件。"
 )
 
 MAX_RESULT_CHARS = 6000
@@ -37,18 +35,16 @@ MAX_FEEDBACK_CHARS = 3000
 MAX_PREV_TEX_CHARS = 12000
 
 
-def _skeleton(root: Path) -> str:
-    path = root / "skills" / "mathmodel-paper" / "templates" / "paper.tex"
+def _skeleton() -> str:
     try:
-        return path.read_text(encoding="utf-8")
+        return (TEMPLATES / "paper.tex").read_text(encoding="utf-8")
     except OSError:
         return ""
 
 
-def _writing_rules(root: Path) -> str:
-    path = root / "skills" / "mathmodel-paper" / "docs" / "writing-rules.md"
+def _writing_rules() -> str:
     try:
-        return path.read_text(encoding="utf-8")[:MAX_RULES_CHARS]
+        return (TEMPLATES / "writing-rules.md").read_text(encoding="utf-8")[:MAX_RULES_CHARS]
     except OSError:
         return ""
 
@@ -58,11 +54,9 @@ def build_context(
     picked: dict,
     profile: dict,
     result: dict,
-    root: Path | None = None,
     feedback: str = "",
     prev_tex: str = "",
 ) -> str:
-    root = root or repo_root()
     explain = picked.get("explain") or {}
     parts = [
         f"题面：\n{problem}",
@@ -73,14 +67,12 @@ def build_context(
         "数据画像：\n" + json.dumps(profile, ensure_ascii=False)[:2000],
         "真实求解结果（result.json，论文数值只能来自这里）：\n"
         + json.dumps(result, ensure_ascii=False)[:MAX_RESULT_CHARS],
-        "LaTeX 骨架（导言区原样沿用，章节结构照此组织）：\n" + _skeleton(root),
-        "写作规范节选：\n" + _writing_rules(root),
+        "LaTeX 骨架（导言区原样沿用，章节结构照此组织）：\n" + _skeleton(),
+        "写作规范节选：\n" + _writing_rules(),
         "配图已就位：figures/final/fig1_residual.png（求解产物图），正文必须引用它。",
     ]
     if feedback:
-        parts.append(
-            f"上一轮未通过，问题如下（请针对性修复）：\n{feedback[:MAX_FEEDBACK_CHARS]}"
-        )
+        parts.append(f"上一轮未通过，问题如下（请针对性修复）：\n{feedback[:MAX_FEEDBACK_CHARS]}")
     if prev_tex:
         parts.append(f"上一版稿件：\n{prev_tex[:MAX_PREV_TEX_CHARS]}")
     return "\n\n".join(parts)
@@ -108,28 +100,19 @@ def generate(
     picked: dict,
     profile: dict,
     result: dict,
-    root: Path | None = None,
     feedback: str = "",
     prev_tex: str = "",
     should_stop: Callable[[], bool] | None = None,
     on_delta: Callable[[str, str], None] | None = None,
-) -> tuple[str, str]:
-    """调模型生成完整 tex，返回 (tex, 来源)。失败抛 LlmError，由编排层决定回退或终止。
-
-    来源为 llm（真实模型）或 fallback（离线演示的样例稿）；调用方必须把
-    fallback 标明给用户，不冒充按本题生成的论文。
-    """
-    context = build_context(problem, picked, profile, result, root, feedback, prev_tex)
-    tex = llm.complete_text(
+) -> str:
+    context = build_context(problem, picked, profile, result, feedback, prev_tex)
+    return llm.complete_text(
         provider, api_key, model, "p5-paper", P5_INSTRUCTION, context, _validate_tex,
         should_stop=should_stop, on_delta=on_delta,
     )
-    source = "fallback" if (provider or {}).get("id") == "fake" else "llm"
-    return tex, source
 
 
 def sample_tex() -> str:
-    """离线兜底：演示样例稿（三门禁全绿），调用方必须标明是兜底。"""
-    from .paper_build import SAMPLE_TEX
-
-    return SAMPLE_TEX.read_text(encoding="utf-8")
+    """离线兜底：样例稿，调用方必须标明是兜底。"""
+    path = Path(__file__).resolve().parent / "paper_sample" / "paper.tex"
+    return path.read_text(encoding="utf-8")

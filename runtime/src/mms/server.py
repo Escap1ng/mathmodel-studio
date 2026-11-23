@@ -1,8 +1,5 @@
 """本机通道服务器：stdout 握手，此后只走 127.0.0.1 HTTP + SSE。
 
-为什么不是 stdio JSON-RPC：SSE 自带事件 id 与断线续传语义，主进程只需转发；
-端口与 token 由子进程生成并只交给父进程，渲染层既拿不到端口也拿不到 token。
-
 安全边界：
 - 只绑 127.0.0.1，每个请求校验 Host 与 Origin（防 DNS rebinding）。
 - 每个请求校验 Bearer token（防同机其他进程顺手调用）。
@@ -19,471 +16,91 @@ import signal
 import sys
 import threading
 import time
-import traceback
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import __version__, harness, orchestrator
-from .invoke import list_templates
-from .store import SessionStore, data_dir, session_scope, snapshot
-from . import paper_build, project_export, workbench_figure, workbench_score
-from .provider import (
-    CancelledError,
-    ProviderError,
-    fake_completion,
-    find_provider,
-    load_providers,
-    stream_completion,
-    validate_base_url,
-)
-from .registry import EnvError
+from . import __version__
+from .pipeline import Pipeline
+from .provider import ProviderError, find_provider, load_providers, validate_base_url
 
-MAX_BODY = 16 << 20
-MAX_MESSAGES = 200
-MAX_TOTAL_CHARS = 1_600_000
-MAX_TOOL_RESULT_CHARS = 8_000
-TOOL_ROUNDS = 8
+MAX_BODY = 1 << 20
+MAX_PROBLEM = 200_000
 PING_SECONDS = 15
-DEPTHS = ("medium", "high", "max")
-
-SYSTEM_PROMPT = (
-    "你是 mathmodel-studio 的数学建模助手。工具返回的数据以工具结果为准，不要编造没有运行过的结果；"
-    "回答简洁，关键判断留给使用者确认。"
-)
-
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "list_templates",
-            "description": "列出本机技能内置的图表与示意图模板（只读注册表，不渲染）。",
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "suggest_models",
-            "description": (
-                "用户讨论该用什么模型/方法时调用：向界面推送三张可选模型卡，由用户自己点选。"
-                "用户要求换一批时，把 batch 加 1 再调用；不要替用户做选择，也不要编造用户已选。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "question": {
-                        "type": "string",
-                        "description": "要建模的子问题或用户原话；省略时用最近一条用户消息。",
-                    },
-                    "batch": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 9,
-                        "description": "第几批候选，默认 1；换一批时递增。",
-                    },
-                },
-                "additionalProperties": False,
-            },
-        },
-    },
-]
+DATA_SUFFIXES = (".csv", ".tsv")
 
 
-def fake_enabled() -> bool:
-    return os.environ.get("MMS_FAKE_PROVIDER") == "1"
+def data_root(root: Path) -> Path:
+    return Path(os.environ.get("MMS_DATA_DIR") or (root / ".mms")).resolve()
 
 
-def core_name() -> str:
-    """对话内核：0.2.0 起只有自研 Python 内核（DSH 双内核已移除）。"""
-    return "python"
-
-
-def provider_rows(fake: bool | None = None) -> list[dict]:
-    rows = [dict(p) for p in load_providers()]
-    for row in rows:
-        row.setdefault("requires_key", True)
-    if fake is None:
-        fake = fake_enabled()
-    if fake:
-        rows.insert(
-            0,
+def provider_rows() -> list[dict]:
+    rows = [
+        {
+            "id": "fake",
+            "display": "离线模式",
+            "models": ["offline"],
+            "model": "offline",
+            "base_url": "",
+            "requires_key": False,
+            "custom": False,
+            "note": "不联网：用内置基线与样例论文跑通链路。",
+        }
+    ]
+    for item in load_providers():
+        models = [str(m) for m in item.get("models") or []]
+        rows.append(
             {
-                "id": "fake",
-                "display": "离线演示（不联网）",
-                "base_url": "",
-                "auth_style": "none",
-                "models": ["fake-stream"],
-                "tool_calling": True,
-                "streaming_tools": True,
-                "context_len": 4096,
-                "max_out": 1024,
-                "requires_key": False,
-                "custom": False,
-                "note": "只在 MMS_FAKE_PROVIDER=1 时出现，用于验证通道与工具卡。",
-            },
+                "id": item.get("id"),
+                "display": item.get("display"),
+                "models": models,
+                "model": models[0] if models else "",
+                "base_url": item.get("base_url") or "",
+                "requires_key": not item.get("custom"),
+                "custom": bool(item.get("custom")),
+                "note": item.get("note") or "",
+            }
         )
     return rows
 
 
-def run_tool(name: str, args: dict | None, context: str = "") -> tuple[dict, bool]:
-    if name == "list_templates":
-        try:
-            rows = list_templates()
-        except (EnvError, OSError, json.JSONDecodeError) as exc:
-            return {"ok": False, "error": str(exc)}, False
-        counts: dict[str, int] = {}
-        for row in rows:
-            counts[row["skill"]] = counts.get(row["skill"], 0) + 1
-        return {"ok": True, "total": len(rows), "by_skill": counts, "templates": rows}, True
-    if name == "suggest_models":
-        args = args or {}
-        question = str(args.get("question") or context or "").strip()
-        if not question:
-            return {"ok": False, "error": "没有可用的建模问题文本"}, False
-        try:
-            batch = int(args.get("batch") or 1)
-        except (TypeError, ValueError):
-            batch = 1
-        batch = min(max(batch, 1), 9)
-        candidates = orchestrator.model_candidates(question, batch)
-        return {"ok": True, "batch": batch, "candidates": candidates}, True
-    return {"ok": False, "error": f"未知工具: {name}"}, False
-
-
-def normalize_messages(raw) -> list[dict]:
-    if not isinstance(raw, list) or not raw:
-        raise ValueError("消息必须是非空数组")
-    if len(raw) > MAX_MESSAGES:
-        raise ValueError(f"消息超过 {MAX_MESSAGES} 条")
-    out: list[dict] = []
-    total = 0
-    for item in raw:
-        if not isinstance(item, dict):
-            raise ValueError("消息每一项必须是对象")
-        role = item.get("role")
-        content = item.get("content")
-        if role not in ("user", "assistant", "system"):
-            raise ValueError(f"不支持的消息角色: {role!r}")
-        if not isinstance(content, str):
-            raise ValueError("消息 content 必须是字符串")
-        total += len(content)
-        if total > MAX_TOTAL_CHARS:
-            raise ValueError("消息总长度超过上限")
-        out.append({"role": role, "content": content})
-    if not any(m["role"] == "user" for m in out):
-        raise ValueError("至少需要一条 user 消息")
-    if out[0]["role"] != "system":
-        out.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
-    return out
-
-
-def estimate_tokens(text: str) -> int:
-    """兼容旧调用点；真正的实现在 harness 里。"""
-    return harness.estimate_tokens(text)
-
-
-class ChatSession:
-    """一次对话：后台线程写事件，SSE 订阅者按 id 续读。"""
-
-    def __init__(
-        self,
-        chat_id: str,
-        provider: dict,
-        api_key: str,
-        model: str,
-        messages: list[dict],
-        depth: str = "",
-        context_tokens: int | None = None,
-        send_thinking: bool = True,
-        goal: str = "",
-        workspace: str = "",
-    ):
-        self.id = chat_id
-        self.provider = provider
-        self.api_key = api_key
-        self.model = model
-        self.messages = messages
-        self.depth = depth if send_thinking else ""
-        self.context_tokens = context_tokens
-        self.goal = goal
-        self.workspace = workspace
+class RunJob:
+    def __init__(self, run_id: str) -> None:
+        self.id = run_id
         self.events: list[dict] = []
         self.cond = threading.Condition()
         self.done = False
         self.cancelled = False
-        self.reason = ""
-        self.usage: dict | None = None
-        self.thread = threading.Thread(target=self._run, name=f"chat-{chat_id}", daemon=True)
 
-    def start(self) -> None:
-        self.thread.start()
-
-    def should_stop(self) -> bool:
-        return self.cancelled
-
-    def append(self, event: str, data: dict) -> None:
+    def emit(self, event: str, data: dict) -> None:
         with self.cond:
-            if self.done:
-                return
-            eid = len(self.events) + 1
-            self.events.append({"id": str(eid), "event": event, "data": data})
+            self.events.append({"id": str(len(self.events) + 1), "event": event, "data": data})
             self.cond.notify_all()
 
-    def finish(self, reason: str, usage: dict | None = None) -> None:
+    def finish(self) -> None:
         with self.cond:
-            if self.done:
-                return
             self.done = True
-            self.reason = reason
-            self.usage = usage
-            payload = {"reason": reason}
-            if usage:
-                payload["usage"] = usage
-            eid = len(self.events) + 1
-            self.events.append({"id": str(eid), "event": "done", "data": payload})
             self.cond.notify_all()
 
     def cancel(self) -> None:
-        with self.cond:
-            if self.done:
-                return
-            self.cancelled = True
-            self.cond.notify_all()
-        # 不在这里 finish：worker 可能在一次工具调用中间，由它收尾，
-        # 这样 done 一定排在最后一个真实事件之后。
+        self.cancelled = True
 
-    def _pause(self, seconds: float) -> None:
-        end = time.monotonic() + max(0.0, seconds)
-        while time.monotonic() < end:
-            if self.cancelled:
-                raise CancelledError()
-            time.sleep(min(0.02, max(0.0, end - time.monotonic())))
-
-    def _context_plan(
-        self, ratio: float = harness.COMPACT_RATIO, reason: str = "auto"
-    ) -> harness.Plan:
-        turn = sum(1 for message in self.messages if message.get("role") == "user")
-        extra = [f"工作区：{self.workspace}"] if self.workspace else []
-        anchor = harness.anchor_text(self.goal, turn, extra)
-        return harness.prepare(
-            self.messages, self.context_tokens, anchor=anchor, ratio=ratio, reason=reason
-        )
-
-    def _apply_plan(self, plan: harness.Plan) -> None:
-        self.messages = plan.messages
-        if plan.reason:
-            self.append("compaction", plan.event())
-
-    def _complete(self, tools, deltas):
-        recovered = False
-        while True:
-            if self.cancelled:
-                raise CancelledError()
-            try:
-                if self.provider.get("id") == "fake":
-                    try:
-                        delay = max(0.0, float(os.environ.get("MMS_FAKE_DELAY_MS") or "20") / 1000)
-                    except ValueError:
-                        delay = 0.02
-                    return fake_completion(self.messages, deltas, self.should_stop, delay)
-                return stream_completion(
-                    self.provider,
-                    self.api_key,
-                    self.model,
-                    self.messages,
-                    tools,
-                    deltas,
-                    self.should_stop,
-                    depth=self.depth,
-                )
-            except ProviderError as exc:
-                if recovered or not harness.looks_like_overflow(str(exc)):
-                    raise
-                # provider 报上下文溢出：压得更狠再试一次，别把错误直接甩给用户。
-                recovered = True
-                self._apply_plan(
-                    self._context_plan(ratio=harness.OVERFLOW_RATIO, reason="overflow")
-                )
-
-    def _tool_context(self) -> str:
-        for message in reversed(self.messages):
-            if message.get("role") == "user" and isinstance(message.get("content"), str):
-                return message["content"]
-        return ""
-
-    def _run(self) -> None:
-        tools = TOOLS if self.provider.get("tool_calling") else None
-        self._apply_plan(self._context_plan())
-        seen: dict[str, dict] = {}
-        try:
-            for _round in range(TOOL_ROUNDS):
-                if self.cancelled:
-                    raise CancelledError()
-                deltas = lambda kind, text: self.append(kind, {"text": text})
-                completion = self._complete(tools, deltas)
-                if not completion.tool_calls:
-                    self.finish("stop", completion.usage)
-                    return
-                self.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": completion.content or None,
-                        "tool_calls": completion.tool_calls,
-                    }
-                )
-                for call in completion.tool_calls:
-                    if self.cancelled:
-                        raise CancelledError()
-                    call_id = call.get("id") or f"call_{secrets.token_hex(4)}"
-                    fn = call.get("function") or {}
-                    name = fn.get("name") or ""
-                    raw_args = fn.get("arguments") or "{}"
-                    try:
-                        args = json.loads(raw_args) if raw_args.strip() else {}
-                    except json.JSONDecodeError:
-                        args = None
-                    shown = args if args is not None else raw_args
-                    self.append("tool_call", {"id": call_id, "name": name, "status": "running", "args": shown})
-                    started = time.monotonic()
-                    if args is None:
-                        result, ok = {"ok": False, "error": "工具参数不是合法 JSON"}, False
-                    else:
-                        key = f"{name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
-                        if key in seen:
-                            result = {**seen[key], "note": "重复调用，返回上次结果"}
-                            ok = bool(seen[key].get("ok"))
-                        else:
-                            result, ok = run_tool(name, args, self._tool_context())
-                            seen[key] = result
-                    duration = int((time.monotonic() - started) * 1000)
-                    self.append(
-                        "tool_call",
-                        {
-                            "id": call_id,
-                            "name": name,
-                            "status": "ok" if ok else "error",
-                            "args": shown,
-                            "result": result,
-                            "duration_ms": duration,
-                        },
-                    )
-                    if name == "suggest_models" and ok:
-                        # 卡片是给界面的插层，工具结果仍照常回给模型。
-                        self.append(
-                            "interrupt",
-                            {
-                                "card": "model-choice",
-                                "payload": {
-                                    "title": "算法选择",
-                                    "intro": "这三条路线来自本机方法库；点一张卡就按它继续，也可以再换一批。",
-                                    "batch": result.get("batch", 1),
-                                    "candidates": result.get("candidates", []),
-                                },
-                            },
-                        )
-                    content = json.dumps(result, ensure_ascii=False)
-                    if len(content) > MAX_TOOL_RESULT_CHARS:
-                        content = content[:MAX_TOOL_RESULT_CHARS] + "…[工具结果已截断]"
-                    self.messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": call_id,
-                            "name": name,
-                            "content": content,
-                        }
-                    )
-                # 工具结果可能把上下文推过阈值：下一轮之前再压一次。
-                if self.context_tokens:
-                    self._apply_plan(self._context_plan())
-            self.finish("max_tool_rounds")
-        except CancelledError:
-            self.finish("cancelled")
-        except ProviderError as exc:
-            self.append("error", {"message": str(exc)})
-            self.finish("error")
-        except Exception:
-            # 堆栈只进 stderr；事件里不回显请求体或密钥。
-            traceback.print_exc(file=sys.stderr)
-            self.append("error", {"message": "运行时内部错误，详情见 stderr"})
-            self.finish("error")
-
-
-class WorkflowSession(ChatSession):
-    """编排会话：复用事件缓冲与 SSE 语义，内容由状态机产生。
-
-    provider/api_key/model 按次传入：K2/K3 由 LLM 生产内容，
-    没有 Key 时状态机回退确定性路径。Key 不进 store、不进事件。
-    """
-
-    def __init__(
-        self,
-        chat_id: str,
-        store: SessionStore,
-        record: dict,
-        action: str,
-        choice: str,
-        workspace: str = "",
-        provider: dict | None = None,
-        api_key: str = "",
-        model: str = "",
-        depth: str = "",
-    ):
-        super().__init__(chat_id, provider or {}, api_key, model, [], workspace=workspace)
-        self.store = store
-        self.record = record
-        self.action = action
-        self.choice = choice
-        self.depth = depth
-
-    def _run(self) -> None:
-        try:
-            deltas = lambda kind, text: self.append(kind, {"text": text})
-            provider = self.provider if self.provider.get("id") else None
-            if self.action == "start":
-                events = orchestrator.start(
-                    self.store, self.record,
-                    provider=provider, api_key=self.api_key, model=self.model,
-                    should_stop=self.should_stop, on_delta=deltas,
-                )
-            else:
-                events = orchestrator.resume_iter(
-                    self.store, self.record, self.action, self.choice, self.workspace,
-                    provider=provider, api_key=self.api_key, model=self.model,
-                    should_stop=self.should_stop, on_delta=deltas,
-                )
-            for ev in events:
-                if self.cancelled:
-                    raise CancelledError()
-                delay = ev.get("delay")
-                if delay:
-                    self._pause(float(delay))
-                self.append(ev["event"], ev["data"])
-            # 状态机跑完后仍挂着待决卡（K2/K3/代码确认）就是等待用户，不是结束。
-            self.finish("waiting" if self.record.get("pending") else "stop")
-        except CancelledError:
-            self.finish("cancelled")
-        except ValueError as exc:
-            self.append("error", {"message": str(exc)})
-            self.finish("error")
-        except Exception:
-            traceback.print_exc(file=sys.stderr)
-            self.append("error", {"message": "编排状态机内部错误，详情见 stderr"})
-            self.finish("error")
+    def should_stop(self) -> bool:
+        return self.cancelled
 
 
 class ChannelServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address, handler, token: str, fake: bool, store: SessionStore, root: Path):
+    def __init__(self, address, handler, token: str, root: Path):
         super().__init__(address, handler)
         self.token = token
-        self.fake = fake
-        self.store = store
         self.root = root
-        self.sessions: dict[str, ChatSession] = {}
-        self.sessions_lock = threading.Lock()
+        self.data_root = data_root(root)
+        self.jobs: dict[str, RunJob] = {}
+        self.jobs_lock = threading.Lock()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -491,7 +108,6 @@ class Handler(BaseHTTPRequestHandler):
     server: ChannelServer
 
     def log_message(self, fmt: str, *args) -> None:
-        # 只记方法/路径/状态；不记 header 与 body，密钥没有机会进日志。
         sys.stderr.write("[mms] %s\n" % (fmt % args))
 
     def _json(self, status: int, payload: dict) -> None:
@@ -518,8 +134,7 @@ class Handler(BaseHTTPRequestHandler):
             self._error(403, "origin", "Origin 不在回环白名单")
             return False
         auth = (self.headers.get("Authorization") or "").strip()
-        expected = f"Bearer {self.server.token}"
-        if not hmac.compare_digest(auth, expected):
+        if not hmac.compare_digest(auth, f"Bearer {self.server.token}"):
             self._error(401, "auth", "缺少或错误的 token")
             return False
         return True
@@ -533,9 +148,8 @@ class Handler(BaseHTTPRequestHandler):
         if length <= 0 or length > MAX_BODY:
             self._error(400, "body", "请求体为空或过大")
             return None
-        raw = self.rfile.read(length)
         try:
-            data = json.loads(raw.decode("utf-8"))
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             self._error(400, "body", "请求体不是合法 JSON")
             return None
@@ -549,41 +163,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         parsed = urlparse(self.path)
         if parsed.path == "/health":
-            self._json(
-                200,
-                {
-                    "ok": True,
-                    "version": __version__,
-                    "fake": self.server.fake,
-                    "core": core_name(),
-                    "pid": os.getpid(),
-                },
-            )
+            self._json(200, {"ok": True, "version": __version__, "pid": os.getpid()})
             return
         if parsed.path == "/providers":
-            self._json(200, {"ok": True, "fake": self.server.fake, "providers": provider_rows(self.server.fake)})
+            self._json(200, {"ok": True, "providers": provider_rows()})
             return
-        if parsed.path == "/sessions/latest":
-            self._json(200, {"ok": True, "session": snapshot(self.server.store.latest())})
-            return
-        if parsed.path == "/sessions":
-            self._json(200, {"ok": True, "sessions": self.server.store.list_summaries()})
-            return
-        if parsed.path == "/workbench/state":
-            raw_session = parse_qs(parsed.query).get("session", [""])[0]
-            self._json(200, self._workbench(self._scope_session(raw_session)))
-            return
-        if parsed.path.startswith("/sessions/") and parsed.path.count("/") == 2:
-            session_id = parsed.path[len("/sessions/") :]
-            record = self.server.store.get(session_id)
-            if not record:
-                self._error(404, "session", "没有这个会话")
-                return
-            self._json(200, {"ok": True, "session": snapshot(record)})
-            return
-        if parsed.path.startswith("/chats/") and parsed.path.endswith("/events"):
-            chat_id = parsed.path[len("/chats/") : -len("/events")].strip("/")
-            self._stream(chat_id, parse_qs(parsed.query))
+        if parsed.path.startswith("/runs/") and parsed.path.endswith("/events"):
+            run_id = parsed.path[len("/runs/") : -len("/events")].strip("/")
+            self._stream(run_id, parse_qs(parsed.query))
             return
         self._error(404, "not_found", "没有这个端点")
 
@@ -591,366 +178,111 @@ class Handler(BaseHTTPRequestHandler):
         if not self._guard():
             return
         parsed = urlparse(self.path)
-        if parsed.path == "/chats":
-            self._start_chat()
+        if parsed.path == "/runs":
+            self._start_run()
             return
-        if parsed.path.startswith("/sessions/") and parsed.path.endswith("/resume"):
-            session_id = parsed.path[len("/sessions/") : -len("/resume")].strip("/")
-            self._resume_session(session_id)
-            return
-        if parsed.path == "/workbench/render":
-            self._render_figure()
-            return
-        if parsed.path == "/workbench/rollback":
-            self._rollback_figure()
-            return
-        if parsed.path == "/workbench/paper/build":
-            self._build_paper()
-            return
-        if parsed.path.startswith("/chats/") and parsed.path.endswith("/cancel"):
-            chat_id = parsed.path[len("/chats/") : -len("/cancel")].strip("/")
-            with self.server.sessions_lock:
-                session = self.server.sessions.get(chat_id)
-            if not session:
-                self._error(404, "chat", "没有这个对话")
+        if parsed.path.startswith("/runs/") and parsed.path.endswith("/cancel"):
+            run_id = parsed.path[len("/runs/") : -len("/cancel")].strip("/")
+            with self.server.jobs_lock:
+                job = self.server.jobs.get(run_id)
+            if not job:
+                self._error(404, "run", "没有这个运行")
                 return
-            session.cancel()
-            self._json(200, {"ok": True, "chatId": chat_id})
+            job.cancel()
+            self._json(200, {"ok": True, "runId": run_id})
             return
         self._error(404, "not_found", "没有这个端点")
 
-    def do_DELETE(self) -> None:  # noqa: N802
-        if not self._guard():
-            return
-        parsed = urlparse(self.path)
-        if parsed.path == "/sessions":
-            removed = self.server.store.clear()
-            self._json(200, {"ok": True, "removed": removed})
-            return
-        if parsed.path.startswith("/sessions/") and parsed.path.count("/") == 2:
-            session_id = parsed.path[len("/sessions/") :]
-            if not self.server.store.delete(session_id):
-                self._error(404, "session", "没有这个会话")
-                return
-            self._json(200, {"ok": True, "id": session_id})
-            return
-        self._error(404, "not_found", "没有这个端点")
-
-    def _scope_session(self, raw: object) -> str:
-        """工作台请求定位会话产物目录：显式 sid 优先，缺省最近会话，非法 sid 回落全局。"""
-        sid = str(raw or "").strip()
-        if sid:
-            return sid
-        record = self.server.store.latest()
-        return str(record["id"]) if record else ""
-
-    def _scoped_dir(self, session_id: str) -> Path:
-        base = self.server.store.path.parent
-        return session_scope(base, session_id) if session_id else base
-
-    def _workbench(self, session_id: str = "") -> dict:
-        data_root = self._scoped_dir(session_id)
-        figure = workbench_figure.state_payload(self.server.root, data_root)
-        try:
-            # 评分优先读本会话真实轮次；没有时回落演示数据。章节门禁同样优先查本会话论文。
-            score = workbench_score.state(self.server.root, data_dir=data_root)
-            score["is_demo"] = not workbench_score._real_cards(data_root)
-            demo_rounds, demo_veto = workbench_score.demo_rounds(self.server.root)
-            score["demo"] = {"rounds": demo_rounds, "veto": demo_veto}
-            chapter = score.get("chapter", {})
-            round_row = next(
-                (r for r in score.get("rounds", []) if r.get("round") == score.get("defaultRound")),
-                None,
-            )
-            score_ok = bool(round_row and round_row.get("pass"))
-            score_detail = (
-                f"第 {round_row['round']} 轮 {round_row['total']} / 100"
-                if round_row
-                else (score.get("error") or "无法评分")
-            )
-        except Exception as exc:  # 评分脚本坏掉时工作台仍能打开
-            score = {"ok": False, "error": str(exc), "rounds": []}
-            chapter = {"ok": False, "error": str(exc)}
-            score_ok = False
-            score_detail = str(exc)
-        active = next(
-            (v for v in figure.get("versions", []) if v.get("id") == figure.get("active")),
-            None,
-        )
-        outputs = (active or {}).get("outputs", {})
-        figure_ok = bool(active) and all(
-            kind in outputs and Path(outputs[kind]).is_file() and Path(outputs[kind]).stat().st_size > 0
-            for kind in ("png", "pdf", "svg")
-        )
-        gate = [
-            {
-                "id": "figure",
-                "label": "图表产物",
-                "ok": figure_ok,
-                "detail": "PNG / PDF / SVG 齐全" if figure_ok else "尚未渲染出三件产物",
-            },
-            {"id": "score", "label": "评分", "ok": score_ok, "detail": score_detail},
-            {
-                "id": "chapter",
-                "label": "章节结构",
-                "ok": bool(chapter.get("pass")),
-                "detail": (
-                    f"hard {chapter.get('hard_failed', 0)} · soft {chapter.get('soft_failed', 0)} · 人工 {chapter.get('manual', 0)}"
-                    if chapter.get("ok")
-                    else chapter.get("error", "章节自检未运行")
-                ),
-            },
-        ]
-        paper = paper_build.state(data_root, self.server.root)
-        artifacts = paper.get("artifacts") or {}
-        paper_ok = bool(paper.get("ok")) and {"pdf", "docx"} <= set(artifacts)
-        if paper_ok:
-            paper_detail = f"PDF {artifacts['pdf']['size'] // 1024} KB · DOCX {artifacts['docx']['size'] // 1024} KB"
-        elif paper.get("builtAt"):
-            paper_detail = paper.get("error") or "上次构建未全绿"
-        else:
-            paper_detail = "尚未构建论文"
-        gate.append({"id": "paper", "label": "论文排版", "ok": paper_ok, "detail": paper_detail})
-        return {
-            "ok": True,
-            "figure": figure,
-            "score": score,
-            "chapter": chapter,
-            "paper": paper,
-            "gate": gate,
-        }
-
-    def _workspace_for(self, session_id: str) -> str:
-        record = self.server.store.get(session_id) if session_id else None
-        return str((record or {}).get("workspace") or "")
-
-    def _render_figure(self) -> None:
+    def _start_run(self) -> None:
         body = self._body()
         if body is None:
             return
-        template = str(body.get("template") or "")
-        theme = str(body.get("theme") or "")
-        session_id = self._scope_session(body.get("sessionId"))
-        data_root = self._scoped_dir(session_id)
-        code, result = workbench_figure.render(
-            template, theme, self.server.root, data_root
-        )
-        if code != 0:
-            self._error(400, "figure", str(result.get("error") or "渲染失败"))
+        problem = str(body.get("problem") or "").strip()
+        if len(problem) < 10:
+            self._error(400, "problem", "题面至少写一句完整的题目描述")
             return
-        outputs = (result.get("version") or {}).get("outputs") or {}
-        project_export.copy_outputs(self._workspace_for(session_id), "图表", outputs)
-        self._json(200, {"ok": True, "version": result.get("version"), "state": self._workbench(session_id)})
+        if len(problem) > MAX_PROBLEM:
+            self._error(400, "problem", "题面过长")
+            return
 
-    def _rollback_figure(self) -> None:
-        body = self._body()
-        if body is None:
+        data_path: Path | None = None
+        raw_paths = body.get("dataPaths")
+        if isinstance(raw_paths, list):
+            for item in raw_paths[:10]:
+                if not isinstance(item, str) or not item:
+                    continue
+                candidate = Path(item)
+                if candidate.is_file() and candidate.suffix.lower() in DATA_SUFFIXES:
+                    data_path = candidate.resolve()
+                    break
+        if data_path is None and raw_paths:
+            self._error(400, "data", "数据文件需为存在的 CSV/TSV")
             return
-        version = str(body.get("version") or "")
-        session_id = self._scope_session(body.get("sessionId"))
-        code, result = workbench_figure.rollback(
-            version, self.server.root, self._scoped_dir(session_id)
-        )
-        if code != 0:
-            self._error(404, "figure", str(result.get("error") or "没有这个版本"))
-            return
-        self._json(200, {"ok": True, "state": self._workbench(session_id)})
 
-    def _build_paper(self) -> None:
-        body = self._body()
-        if body is None:
-            return
-        session_id = self._scope_session(body.get("sessionId"))
-        code, result = paper_build.build(
-            self._scoped_dir(session_id), self.server.root
-        )
-        # 手动构建成功也推进阶段五：阶段轨道与工作台状态保持一致。
-        if code == 0 and session_id:
-            record = self.server.store.get(session_id)
-            if record:
-                changed = False
-                for row in record["phases"]:
-                    if row["phase"] == 5 and row["status"] != "passed":
-                        row["status"] = "passed"
-                        changed = True
-                    if row["phase"] == 6 and row["status"] == "idle" and changed:
-                        row["status"] = "idle"
-                if changed:
-                    self.server.store.put(record)
-        state = self._workbench(session_id)
-        deliverables = {
-            kind: str((row or {}).get("path") or "")
-            for kind, row in (state["paper"]["artifacts"] or {}).items()
-            if kind in ("pdf", "docx")
-        }
-        project_export.copy_outputs(self._workspace_for(session_id), "论文", deliverables)
-        self._json(
-            200,
-            {
-                "ok": bool(result.get("ok")),
-                "code": code,
-                "paper": result,
-                "state": state,
-            },
-        )
-
-    def _start_chat(self) -> None:
-        body = self._body()
-        if body is None:
-            return
-        provider_id = str(body.get("providerId") or "")
-        try:
-            messages = normalize_messages(body.get("messages"))
-        except ValueError as exc:
-            self._error(400, "messages", str(exc))
-            return
-        model = str(body.get("model") or "").strip()
-        api_key = str(body.get("apiKey") or "")
-        depth = str(body.get("thinking") or "")
-        if depth and depth not in DEPTHS:
-            self._error(400, "thinking", f"未知思维深度: {depth}")
-            return
-        context_tokens: int | None = None
-        raw_context = body.get("contextTokens")
-        if isinstance(raw_context, (int, float)) and not isinstance(raw_context, bool):
-            context_tokens = int(raw_context)
-            if context_tokens < 50_000 or context_tokens > 2_000_000:
-                self._error(400, "context", "上下文预算必须在 50k–2M 之间")
-                return
-        send_thinking = body.get("sendThinking") is not False
-
-        if provider_id == "fake":
-            if not self.server.fake:
-                self._error(400, "provider", "离线演示未启用")
-                return
-            provider = {
-                "id": "fake",
-                "display": "离线演示",
-                "tool_calling": True,
-                "base_url": "",
-            }
-            api_key = ""
-            model = model or "fake-stream"
-        else:
+        ctx = body.get("provider") if isinstance(body.get("provider"), dict) else {}
+        provider_id = str(ctx.get("id") or "fake").strip()
+        api_key = str(ctx.get("apiKey") or "")
+        model = str(ctx.get("model") or "").strip()
+        provider: dict | None = None
+        if provider_id and provider_id != "fake":
             provider = find_provider(provider_id)
             if not provider:
-                self._error(400, "provider", f"未知服务商: {provider_id}")
+                self._error(400, "provider", "未知服务商")
                 return
             if provider.get("custom"):
-                provider["base_url"] = str(body.get("baseUrl") or "")
-            try:
-                validate_base_url(provider.get("base_url") or "")
-            except ProviderError as exc:
-                self._error(400, "base_url", str(exc))
-                return
-            if not api_key:
-                self._error(400, "key", "缺少 API Key（在模型设置里填写）")
-                return
-            if not model:
-                self._error(400, "model", "缺少模型名")
-                return
-
-        chat_id = secrets.token_hex(8)
-        mode = str(body.get("mode") or "chat")
-        if mode not in ("chat", "workflow"):
-            self._error(400, "mode", f"未知对话模式: {mode}")
-            return
-        workspace = str(body.get("workspace") or "")
-        raw_goal = next((m["content"] for m in messages if m["role"] == "user"), "")
-        goal = " ".join(str(raw_goal).split())[:80]
-        if mode == "workflow":
-            problem = next(m["content"] for m in reversed(messages) if m["role"] == "user")
-            record = self.server.store.create(chat_id, provider_id, model, problem, workspace)
-            session: ChatSession = WorkflowSession(
-                chat_id, self.server.store, record, "start", "", workspace=workspace,
-                provider=provider, api_key=api_key, model=model,
-                depth=depth if send_thinking else "",
-            )
-        else:
-            session = ChatSession(
-                chat_id,
-                provider,
-                api_key,
-                model,
-                messages,
-                depth=depth,
-                context_tokens=context_tokens,
-                send_thinking=send_thinking,
-                goal=goal,
-                workspace=workspace,
-            )
-        with self.server.sessions_lock:
-            self.server.sessions[chat_id] = session
-        session.start()
-        self._json(200, {"ok": True, "chatId": chat_id, "mode": mode})
-
-    def _resume_session(self, session_id: str) -> None:
-        body = self._body()
-        if body is None:
-            return
-        action = str(body.get("action") or "")
-        choice = str(body.get("choice") or "")
-        if action not in ("confirm", "reroll", "choose", "run"):
-            self._error(400, "action", f"未知动作: {action}")
-            return
-        if action == "choose" and not choice:
-            self._error(400, "choice", "选择候选时必须给出 choice")
-            return
-        record = self.server.store.get(session_id)
-        if not record:
-            self._error(404, "session", "没有这个会话")
-            return
-        if not record.get("pending"):
-            self._error(409, "pending", "这个会话没有等待中的决策")
-            return
-        # Key 按次传入：恢复时没带 Key（旧客户端或离线演示）不报错，
-        # 状态机回退确定性路径，卡片上会标明兜底。
-        provider: dict | None = None
-        api_key = str(body.get("apiKey") or "")
-        provider_id = str(body.get("providerId") or record.get("provider") or "")
-        model = str(body.get("model") or record.get("model") or "")
-        depth = str(body.get("thinking") or "")
-        if depth and depth not in DEPTHS:
-            self._error(400, "thinking", f"未知思维深度: {depth}")
-            return
-        if provider_id == "fake":
-            if self.server.fake:
-                provider = {"id": "fake", "display": "离线演示", "tool_calling": True, "base_url": ""}
-                model = model or "fake-stream"
-        elif provider_id:
-            candidate = find_provider(provider_id)
-            if candidate:
-                if candidate.get("custom"):
-                    candidate["base_url"] = str(body.get("baseUrl") or "")
                 try:
-                    validate_base_url(candidate.get("base_url") or "")
+                    provider["base_url"] = validate_base_url(str(ctx.get("baseUrl") or ""))
                 except ProviderError as exc:
-                    self._error(400, "base_url", str(exc))
+                    self._error(400, "provider", str(exc))
                     return
-                if api_key:
-                    provider = candidate
-        session = WorkflowSession(
-            session_id,
-            self.server.store,
-            record,
-            action,
-            choice,
-            workspace=str(body.get("workspace") or ""),
-            provider=provider,
-            api_key=api_key if provider else "",
-            model=model,
-            depth=depth if body.get("sendThinking") is not False else "",
-        )
-        with self.server.sessions_lock:
-            self.server.sessions[session_id] = session
-        session.start()
-        self._json(200, {"ok": True, "chatId": session_id})
+            if not api_key and not provider.get("custom"):
+                self._error(400, "provider", "还没配置 API Key")
+                return
+        if not model:
+            models = [str(m) for m in (provider or {}).get("models") or []]
+            model = models[0] if models else "offline"
 
-    def _stream(self, chat_id: str, query: dict) -> None:
-        with self.server.sessions_lock:
-            session = self.server.sessions.get(chat_id)
-        if not session:
-            self._error(404, "chat", "没有这个对话")
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        run_id = f"{stamp}-{secrets.token_hex(3)}"
+        job_dir = self.server.data_root / "runs" / run_id
+        try:
+            job_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            self._error(500, "dir", f"运行目录创建失败：{exc}")
+            return
+
+        job = RunJob(run_id)
+        with self.server.jobs_lock:
+            while len(self.server.jobs) >= 20:
+                oldest = next(iter(self.server.jobs))
+                self.server.jobs.pop(oldest, None)
+            self.server.jobs[run_id] = job
+
+        pipeline = Pipeline(
+            job_dir=job_dir,
+            problem=problem,
+            data_path=data_path,
+            provider=provider,
+            api_key=api_key,
+            model=model,
+            emit=job.emit,
+            should_stop=job.should_stop,
+        )
+
+        def _run() -> None:
+            try:
+                pipeline.run()
+            finally:
+                job.finish()
+
+        threading.Thread(target=_run, name=f"mms-run-{run_id}", daemon=True).start()
+        self._json(200, {"ok": True, "runId": run_id})
+
+    def _stream(self, run_id: str, query: dict) -> None:
+        with self.server.jobs_lock:
+            job = self.server.jobs.get(run_id)
+        if not job:
+            self._error(404, "run", "没有这个运行")
             return
 
         raw_last = (self.headers.get("Last-Event-ID") or (query.get("last_id") or [""])[0] or "0").strip()
@@ -962,8 +294,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
-        # 流结束后必须由服务端关连接：客户端是 urllib/fetch，不是 EventSource，
-        # 只认 EOF（或 chunked 结束），keep-alive 会让它一直等下去。
         self.send_header("Connection", "close")
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
@@ -971,16 +301,16 @@ class Handler(BaseHTTPRequestHandler):
         try:
             self.wfile.write(b"retry: 1500\n\n")
             self.wfile.flush()
-            index = min(last_id, len(session.events))
+            index = min(last_id, len(job.events))
             last_ping = time.monotonic()
             while True:
-                with session.cond:
-                    while index >= len(session.events) and not session.done:
-                        session.cond.wait(timeout=PING_SECONDS)
-                        if index >= len(session.events):
+                with job.cond:
+                    while index >= len(job.events) and not job.done:
+                        job.cond.wait(timeout=PING_SECONDS)
+                        if index >= len(job.events):
                             break
-                    pending = session.events[index:]
-                    done = session.done
+                    pending = job.events[index:]
+                    done = job.done
                 if pending:
                     for ev in pending:
                         frame = (
@@ -1004,18 +334,15 @@ class Handler(BaseHTTPRequestHandler):
 
 def serve(port: int = 0) -> int:
     token = secrets.token_hex(24)
-    fake = fake_enabled()
     root = Path(os.environ.get("MMS_HOME") or ".").resolve()
-    store = SessionStore(data_dir(root) / "sessions.db")
-    server = ChannelServer(("127.0.0.1", port), Handler, token, fake, store, root)
-    # 握手行是 stdout 的唯一内容；之后所有诊断都走 stderr。
+    server = ChannelServer(("127.0.0.1", port), Handler, token, root)
     print(
         json.dumps(
             {
                 "port": server.server_address[1],
                 "token": token,
                 "pid": os.getpid(),
-                "fake": fake,
+                "fake": True,
                 "version": __version__,
             }
         ),

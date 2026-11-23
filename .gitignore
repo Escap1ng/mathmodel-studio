@@ -24,19 +24,9 @@ vendor/python/
 vendor/pandoc/
 vendor/*.zip
 vendor/.downloads/
-# 冒烟产物由 CI 上传为 artifact；只挡这几个具体文件，
-# 免得将来要提交的界面截图（screenshots/*.png）被整目录规则一起吞掉
+# 冒烟产物由 CI 上传为 artifact
 screenshots/window-smoke.png
 screenshots/window-smoke.json
-screenshots/conversation.png
-screenshots/settings.png
-screenshots/decision.png
-screenshots/drawer.png
-screenshots/figure.png
-screenshots/score.png
-screenshots/dropzone.png
-screenshots/files.png
-screenshots/attachments.png
 *.7z
 *.dmg
 *.exe
@@ -55,11 +45,8 @@ open-dev.lnk
 .env.*
 !.env.example
 
-# 建模工作区（阶段二产物，用户内容不入库）
-workspaces/
-第*题_*/
 
-# M3 会话状态（SQLite；不含 Key，但属于本机运行数据）
+# 无界面运行的默认输出目录（本机运行数据）
 .mms/
 
 # 编辑器与系统
@@ -68,4 +55,3 @@ workspaces/
 .idea/
 .DS_Store
 Thumbs.db
-screenshots/paper.png

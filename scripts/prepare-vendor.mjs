@@ -6,9 +6,9 @@
  *   node scripts/prepare-vendor.mjs pandoc [--force]
  *
  * python: python-build-standalone 的解压版解释器（npmmirror 通道）解到 vendor/python，
- *         再按 requirements.txt 装依赖，最后逐个 import 自检。
+ *         再装 numpy 与 matplotlib，最后逐个 import 自检。
  * pandoc: 把本机 pandoc.exe 复制到 vendor/pandoc。pandoc 是 GPL-2.0-or-later，
- *         随安装包分发时需要保留上游许可与源码指引（见 docs/env-setup.md）。
+ *         随安装包分发时需要保留上游许可与源码指引（见 THIRD_PARTY_NOTICES.md）。
  *
  * 下载地址与版本都在下面常量里，换版本时改这两行；失败先换通道再下结论。
  */
@@ -35,7 +35,7 @@ const PY_DIR = join(VENDOR, 'python')
 const PY_EXE = join(PY_DIR, 'python.exe')
 const PANDOC_DIR = join(VENDOR, 'pandoc')
 const PANDOC_EXE = join(PANDOC_DIR, 'pandoc.exe')
-const MODULES = ['matplotlib', 'numpy', 'seaborn', 'docx', 'fitz', 'jsonschema']
+const MODULES = ['matplotlib', 'numpy']
 
 function log(message) {
   console.log(`[vendor] ${message}`)

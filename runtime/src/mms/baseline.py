@@ -14,7 +14,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-DATA_SUFFIXES = (".csv", ".tsv")
 SCRIPT_NAME = "solution.py"
 SAMPLE_NAME = "sample.csv"
 
@@ -254,25 +253,6 @@ def validate_script(code: str) -> list[str]:
     return problems
 
 
-def find_data(workspace: Path) -> Path | None:
-    """工作区里最新的 CSV/TSV；附件副本在 附件/日期/ 下，所以递归找。"""
-    if not workspace.is_dir():
-        return None
-    best: tuple[float, Path] | None = None
-    for path in workspace.rglob("*"):
-        if path.suffix.lower() not in DATA_SUFFIXES or not path.is_file():
-            continue
-        if any(part.startswith(".") for part in path.parts):
-            continue
-        try:
-            mtime = path.stat().st_mtime
-        except OSError:
-            continue
-        if best is None or mtime > best[0]:
-            best = (mtime, path)
-    return best[1] if best else None
-
-
 def ensure_sample(code_dir: Path) -> Path:
     """工作区没有数据时用一份内置样例把链路跑通，文件名与内容都标明 sample。"""
     path = code_dir / SAMPLE_NAME
@@ -289,13 +269,6 @@ def ensure_sample(code_dir: Path) -> Path:
         lines.append(f"{x1},{x2},{y}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
-
-
-def write_script(code_dir: Path) -> tuple[Path, int]:
-    code_dir.mkdir(parents=True, exist_ok=True)
-    path = code_dir / SCRIPT_NAME
-    path.write_text(SCRIPT, encoding="utf-8")
-    return path, len(SCRIPT.splitlines())
 
 
 def run_baseline(

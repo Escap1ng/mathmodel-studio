@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { join } from 'node:path'
-import type { ReasoningSpec, RuntimeStatus } from '../shared/api'
+import type { RunEvent, RuntimeStatus } from '../shared/api'
 
 // 与 runtime/src/mms/server.py 的握手契约。渲染层永远拿不到 port 与 token。
 export interface ChannelHandshake {
@@ -11,30 +11,21 @@ export interface ChannelHandshake {
   version: string
 }
 
-export interface ProviderRow {
+export interface RuntimeProvider {
   id: string
   display: string
-  base_url?: string
-  models?: string[]
-  tool_calling?: boolean
-  requires_key?: boolean
-  custom?: boolean
-  context_len?: number
-  model_context?: Record<string, number>
-  reasoning?: ReasoningSpec
+  models: string[]
+  model: string
+  base_url: string
+  requires_key: boolean
+  custom: boolean
   note?: string
 }
 
-export interface ChatEventPayload {
-  id: string
-  event: string
-  data: Record<string, unknown>
-}
-
-interface RequestOptions {
-  method?: string
-  body?: unknown
-  signal?: AbortSignal
+interface RunBody {
+  problem: string
+  dataPaths: string[]
+  provider: { id: string; model: string; baseUrl?: string; apiKey: string }
 }
 
 export class Channel {
@@ -66,6 +57,7 @@ export class Channel {
   }
 
   start(): Promise<void> {
+    if (this.handshake) return Promise.resolve()
     if (this.startPromise) return this.startPromise
     this.stopping = false
     this.startPromise = this.launch().finally(() => {
@@ -89,7 +81,6 @@ export class Channel {
         MMS_HOME: this.root,
         ...(this.dataDir ? { MMS_DATA_DIR: this.dataDir } : {}),
         MMS_PYTHON: this.python,
-        // 打包后 runtime 在只读的安装目录里；.pyc 统一写到 userData，别污染 resources
         ...(this.dataDir ? { PYTHONPYCACHEPREFIX: join(this.dataDir, 'pycache') } : {}),
         PYTHONIOENCODING: 'utf-8',
         PYTHONUTF8: '1'
@@ -99,8 +90,9 @@ export class Channel {
 
     try {
       const handshake = await this.readHandshake(child)
-      if (this.child !== child) throw new Error('运行时启动被新的启动请求取代')
+      if (this.child !== child) throw new Error('runtime 启动被新的启动请求取代')
       this.handshake = handshake
+      this.setStatus({ state: 'ready', version: handshake.version })
 
       child.stdout.on('data', (chunk: Buffer) => {
         const text = chunk.toString('utf8').trim()
@@ -118,21 +110,12 @@ export class Channel {
           this.setStatus({ state: 'error', message: `runtime 已退出（code ${code ?? '?'}）` })
         }
       })
-
-      const health = await this.request('/health')
-      this.setStatus({
-        state: 'ready',
-        version: String(health['version'] ?? ''),
-        fake: Boolean(health['fake'])
-      })
     } catch (err) {
-      if (this.child === child) {
-        this.child = null
-        this.handshake = null
-        if (child.exitCode === null) child.kill()
-      }
+      child.kill()
+      this.child = null
+      this.handshake = null
       const message = err instanceof Error ? err.message : String(err)
-      this.setStatus({ state: 'error', message })
+      if (!this.stopping) this.setStatus({ state: 'error', message })
       throw err
     }
   }
@@ -142,213 +125,111 @@ export class Channel {
       let buffer = ''
       const timer = setTimeout(() => {
         cleanup()
-        reject(new Error('runtime 15 秒内没有完成握手'))
-      }, 15000)
+        reject(new Error('runtime 握手超时'))
+      }, 20_000)
       const cleanup = (): void => {
         clearTimeout(timer)
         child.stdout.off('data', onData)
-        child.off('error', onError)
         child.off('exit', onExit)
       }
       const onData = (chunk: Buffer): void => {
         buffer += chunk.toString('utf8')
-        const newline = buffer.indexOf('\n')
-        if (newline < 0) return
-        const line = buffer.slice(0, newline).trim()
-        try {
-          const parsed = JSON.parse(line) as Partial<ChannelHandshake>
-          if (!parsed.port || !parsed.token) throw new Error('握手字段不完整')
-          cleanup()
-          resolve(parsed as ChannelHandshake)
-        } catch (err) {
-          cleanup()
-          reject(err instanceof Error ? err : new Error(String(err)))
-        }
-      }
-      const onError = (err: Error): void => {
+        const index = buffer.indexOf('\n')
+        if (index < 0) return
+        const line = buffer.slice(0, index).trim()
         cleanup()
-        reject(new Error(`无法启动 Python（${this.python}）：${err.message}`))
+        try {
+          resolve(JSON.parse(line) as ChannelHandshake)
+        } catch {
+          reject(new Error('runtime 握手不是合法 JSON'))
+        }
       }
       const onExit = (code: number | null): void => {
         cleanup()
-        reject(new Error(`runtime 在握手前退出（code ${code ?? '?'}）`))
+        reject(new Error(`runtime 启动即退出（code ${code ?? '?'}）`))
       }
       child.stdout.on('data', onData)
-      child.once('error', onError)
-      child.once('exit', onExit)
+      child.on('exit', onExit)
     })
   }
 
-  private async request(path: string, options: RequestOptions = {}): Promise<Record<string, unknown>> {
-    const hs = this.handshake
-    if (!hs) throw new Error('运行时未连接')
-    const headers: Record<string, string> = { Authorization: `Bearer ${hs.token}` }
-    let body: string | undefined
-    if (options.body !== undefined) {
-      headers['Content-Type'] = 'application/json'
-      body = JSON.stringify(options.body)
-    }
-    const res = await fetch(`http://127.0.0.1:${hs.port}${path}`, {
-      method: options.method ?? 'GET',
-      headers,
-      body,
-      signal: options.signal
+  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    await this.start()
+    const handshake = this.handshake
+    if (!handshake) throw new Error('runtime 未就绪')
+    const response = await fetch(`http://127.0.0.1:${handshake.port}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${handshake.token}`,
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {})
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined
     })
-    const text = await res.text()
-    let json: Record<string, unknown> = {}
+    const text = await response.text()
+    let data: unknown
     try {
-      json = text ? (JSON.parse(text) as Record<string, unknown>) : {}
+      data = JSON.parse(text)
     } catch {
-      json = {}
+      throw new Error(`runtime 返回非 JSON（HTTP ${response.status}）`)
     }
-    if (!res.ok) {
-      const detail = (json['error'] as { message?: string } | undefined)?.message
-      throw new Error(detail || `运行时 HTTP ${res.status}`)
+    const payload = data as { ok?: boolean; error?: { message?: string } }
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error?.message || `HTTP ${response.status}`)
     }
-    return json
+    return data as T
   }
 
-  async providers(): Promise<{ providers: ProviderRow[]; fake: boolean }> {
-    const data = await this.request('/providers')
-    return {
-      providers: (data['providers'] as ProviderRow[]) ?? [],
-      fake: Boolean(data['fake'])
-    }
+  async providers(): Promise<{ ok: true; providers: RuntimeProvider[] }> {
+    return this.request('GET', '/providers')
   }
 
-  async startChat(payload: Record<string, unknown>): Promise<string> {
-    const data = await this.request('/chats', { method: 'POST', body: payload })
-    const chatId = String(data['chatId'] ?? '')
-    if (!chatId) throw new Error('运行时没有返回会话 id')
-    return chatId
+  async startRun(body: RunBody): Promise<{ ok: true; runId: string }> {
+    return this.request('POST', '/runs', body)
   }
 
-  async cancel(chatId: string): Promise<void> {
-    await this.request(`/chats/${encodeURIComponent(chatId)}/cancel`, { method: 'POST', body: {} })
+  async cancelRun(runId: string): Promise<{ ok: true }> {
+    return this.request('POST', `/runs/${encodeURIComponent(runId)}/cancel`)
   }
 
-  async resumeSession(
-    sessionId: string,
-    action: string,
-    choice: string,
-    workspace?: string,
-    provider?: Record<string, unknown>
-  ): Promise<void> {
-    await this.request(`/sessions/${encodeURIComponent(sessionId)}/resume`, {
-      method: 'POST',
-      body: { action, choice, workspace, ...(provider ?? {}) }
-    })
-  }
-
-  async latestSession(): Promise<Record<string, unknown> | null> {
-    const data = await this.request('/sessions/latest')
-    const session = data['session']
-    return session && typeof session === 'object' ? (session as Record<string, unknown>) : null
-  }
-
-  async getSession(sessionId: string): Promise<Record<string, unknown> | null> {
-    const data = await this.request(`/sessions/${encodeURIComponent(sessionId)}`)
-    const session = data['session']
-    return session && typeof session === 'object' ? (session as Record<string, unknown>) : null
-  }
-
-  async listSessions(): Promise<Record<string, unknown>[]> {
-    const data = await this.request('/sessions')
-    return (data['sessions'] as Record<string, unknown>[]) ?? []
-  }
-
-  async deleteSession(sessionId: string): Promise<void> {
-    await this.request(`/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
-  }
-
-  async clearSessions(): Promise<number> {
-    const data = await this.request('/sessions', { method: 'DELETE' })
-    return Number(data['removed'] ?? 0)
-  }
-
-  async workbenchState(sessionId?: string): Promise<Record<string, unknown>> {
-    const query = sessionId ? `?session=${encodeURIComponent(sessionId)}` : ''
-    return this.request(`/workbench/state${query}`)
-  }
-
-  async renderFigure(
-    template: string,
-    theme: string,
-    sessionId?: string
-  ): Promise<Record<string, unknown>> {
-    return this.request('/workbench/render', {
-      method: 'POST',
-      body: { template, theme, sessionId }
-    })
-  }
-
-  async rollbackFigure(version: string, sessionId?: string): Promise<Record<string, unknown>> {
-    return this.request('/workbench/rollback', {
-      method: 'POST',
-      body: { version, sessionId }
-    })
-  }
-
-  async buildPaper(sessionId?: string): Promise<Record<string, unknown>> {
-    return this.request('/workbench/paper/build', {
-      method: 'POST',
-      body: { sessionId }
-    })
-  }
-
-  async stream(
-    chatId: string,
-    onEvent: (ev: ChatEventPayload) => void,
-    signal: AbortSignal
-  ): Promise<void> {
-    const hs = this.handshake
-    if (!hs) throw new Error('运行时未连接')
-    const res = await fetch(`http://127.0.0.1:${hs.port}/chats/${encodeURIComponent(chatId)}/events`, {
-      headers: { Authorization: `Bearer ${hs.token}` },
-      signal
-    })
-    if (!res.ok || !res.body) throw new Error(`事件流打开失败（HTTP ${res.status}）`)
-    const reader = res.body.getReader()
+  async stream(runId: string, cb: (event: RunEvent) => void, signal: AbortSignal): Promise<void> {
+    await this.start()
+    const handshake = this.handshake
+    if (!handshake) throw new Error('runtime 未就绪')
+    const response = await fetch(
+      `http://127.0.0.1:${handshake.port}/runs/${encodeURIComponent(runId)}/events`,
+      { headers: { Authorization: `Bearer ${handshake.token}` }, signal }
+    )
+    if (!response.ok || !response.body) throw new Error(`事件流打开失败（HTTP ${response.status}）`)
+    const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
-    try {
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true }).replace(/\r/g, '')
-        let split = buffer.indexOf('\n\n')
-        while (split >= 0) {
-          const frame = buffer.slice(0, split)
-          buffer = buffer.slice(split + 2)
-          this.emitFrame(frame, onEvent)
-          split = buffer.indexOf('\n\n')
-        }
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let index: number
+      while ((index = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, index)
+        buffer = buffer.slice(index + 2)
+        this.parseFrame(frame, runId, cb)
       }
-      if (buffer.trim()) this.emitFrame(buffer, onEvent)
-    } finally {
-      reader.releaseLock()
     }
   }
 
-  private emitFrame(frame: string, onEvent: (ev: ChatEventPayload) => void): void {
-    let id = ''
-    let event = ''
-    const dataLines: string[] = []
+  private parseFrame(frame: string, runId: string, cb: (event: RunEvent) => void): void {
+    let id = '0'
+    let event = 'message'
+    let data = ''
     for (const line of frame.split('\n')) {
-      if (!line || line.startsWith(':')) continue
-      const colon = line.indexOf(':')
-      const key = colon < 0 ? line : line.slice(0, colon)
-      const value = colon < 0 ? '' : line.slice(colon + 1).replace(/^ /, '')
-      if (key === 'id') id = value
-      else if (key === 'event') event = value
-      else if (key === 'data') dataLines.push(value)
+      if (line.startsWith('id:')) id = line.slice(3).trim()
+      else if (line.startsWith('event:')) event = line.slice(6).trim()
+      else if (line.startsWith('data:')) data += line.slice(5).trim()
     }
-    if (!event || dataLines.length === 0) return
+    if (!data) return
     try {
-      const data = JSON.parse(dataLines.join('\n')) as Record<string, unknown>
-      onEvent({ id, event, data })
+      cb({ runId, id, event, data: JSON.parse(data) as Record<string, unknown> })
     } catch {
-      // 坏帧不往渲染层送；流还会继续。
+      // 坏帧只跳过，不打断流
     }
   }
 
@@ -357,11 +238,6 @@ export class Channel {
     const child = this.child
     this.child = null
     this.handshake = null
-    if (!child || child.exitCode !== null) return
-    child.kill()
-    const timer = setTimeout(() => {
-      if (child.exitCode === null) child.kill('SIGKILL')
-    }, 3000)
-    timer.unref()
+    if (child) child.kill()
   }
 }

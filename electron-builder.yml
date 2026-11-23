@@ -1,6 +1,6 @@
-# electron-builder 配置（M6）
+# electron-builder 配置
 #
-# 资源布局：runtime/skills/schemas/VERSION/python/pandoc 都放在 resources/ 下，
+# 资源布局：runtime/VERSION/python/pandoc 都放在 resources/ 下，
 # 与 src/main/runtime-env.ts 的 APP_ROOT 对齐；app.asar 里只放 JS 产物。
 # vendor/python 与 vendor/pandoc 由 scripts/prepare-vendor.mjs 准备，不入库。
 appId: cn.escap1ng.mathmodel-studio
@@ -19,7 +19,6 @@ electronLanguages:
 files:
   - out/**/*
   - package.json
-  - node_modules/pdfjs-dist/**/*
 
 extraResources:
   - from: runtime
@@ -28,10 +27,6 @@ extraResources:
       - "**/*"
       - "!**/__pycache__/**"
       - "!**/*.pyc"
-  - from: skills
-    to: skills
-  - from: schemas
-    to: schemas
   - from: VERSION
     to: VERSION
   - from: LICENSE
@@ -45,10 +40,6 @@ extraResources:
   - from: vendor/pandoc/pandoc.exe
     to: pandoc/pandoc.exe
 
-# 主进程用 createRequire 加载 pdfjs 的 legacy 构建，从 asar 里读 worker/字体不稳。
-asarUnpack:
-  - node_modules/pdfjs-dist/**
-
 win:
   target:
     - target: nsis
@@ -60,8 +51,7 @@ nsis:
   # build/installer.nsh 自动被 include，负责把默认安装目录改成桌面的 MathModel Studio。
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
-  # 向导内两张图由 scripts/make-icon.mjs 从 build/icon.svg 生成；assisted 模式下
-  # installerHeaderIcon 不生效（只在 oneClick 分支读取），页头图要靠 installerHeader。
+  # 页头/侧栏图已入库；assisted 模式只读 installerHeader/installerSidebar。
   installerHeader: installerHeader.bmp
   installerSidebar: installerSidebar.bmp
   oneClick: false

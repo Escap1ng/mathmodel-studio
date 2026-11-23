@@ -3,6 +3,22 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
 
+## Unreleased - 精简
+
+### 变更
+
+- **一键流水线**：题面拆解 → 选模（自动采用推荐）→ 生成 `solution.py` → 运行与修复 ≤3 轮 → 论文生成与排版 ≤3 轮。删除七阶段人审卡、评分、雷达、门禁、会话恢复与工作台七页。
+- **单页界面**：一页三栏「赛题 / 进度 / 结果」，保留设置弹窗、离线模式、产物打开按钮；渲染层去掉 katex、pdfjs、markdown 依赖。
+- **运行时收敛**：删除技能包（`skills/`）、契约 schema、工作台图表/评分、长会话 harness、SQLite 会话库与七个自检；论文骨架与写作规范迁入 `runtime/src/mms/templates/`。
+- **依赖收敛**：Python 只留 `numpy`、`matplotlib`；Word 由 pandoc 直接转换，不再后处理 DOCX。
+- **通道与安全保留**：127.0.0.1 + Bearer token + Host/Origin 校验；Key 仍用 `safeStorage`，不落盘、不进事件。
+
+### 验证（本机 Windows，2026-11-23）
+
+- `npm run typecheck`、`npm run build` 通过；`npm run smoke:window` 12 项断言全绿（窗口、运行时握手、界面文本、墨迹占比）。
+- 离线全链：无界面 CLI 与桌面界面各跑一遍，5 阶段全通过，R²=0.997，PNG/PDF/SVG 与 paper.pdf/paper.docx 均生成，界面耗时 8.1s。
+- 未证：真实服务商 Key 的联网端到端；安装包未重新构建。
+
 ## 0.2.0 - 2026-11-15
 
 数模模块真正跑通：七阶段全链由 LLM 驱动（配 Key 时），离线演示与失败回退保留；移除 DSH 双内核，工作台精简。

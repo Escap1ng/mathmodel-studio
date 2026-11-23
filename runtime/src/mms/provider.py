@@ -1,8 +1,6 @@
-"""OpenAI 兼容 provider 的流式客户端。
+"""OpenAI 兼容 provider 的最小流式客户端。
 
-只做三件事：把 SSE chunk 归一成 content / reasoning / tool_calls；
-把历史里的 reasoning 字段剥掉再回放；对 429 与 5xx 做**有界**重试。
-
+只做三件事：把 SSE chunk 归一成正文、对 429/5xx 做有界重试、校验端点地址。
 密钥只从调用方按次传入，不落盘、不写日志、不放进异常文本。
 """
 
@@ -10,7 +8,7 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from urllib import error, request
 from urllib.parse import urlparse
@@ -20,24 +18,18 @@ MAX_ATTEMPTS = 3
 TIMEOUT_SECONDS = 120
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
-# 回放历史时只允许这些键。reasoning / reasoning_content 一律不带回去：
-# 部分 provider 在重放 reasoning 时会报错或重复计费。
-HISTORY_KEYS = {"role", "content", "tool_calls", "tool_call_id", "name"}
-
 
 class ProviderError(RuntimeError):
     """provider 调用失败。错误文本里不得出现 API Key。"""
 
 
 class CancelledError(RuntimeError):
-    """用户取消了这次对话。"""
+    """用户取消了这次运行。"""
 
 
 @dataclass
 class Completion:
     content: str = ""
-    reasoning: str = ""
-    tool_calls: list[dict] = field(default_factory=list)
     finish_reason: str = ""
     usage: dict | None = None
 
@@ -70,31 +62,6 @@ def validate_base_url(url: str) -> str:
     if parsed.scheme == "http" and parsed.hostname not in LOOPBACK_HOSTS:
         raise ProviderError("公网 base URL 必须是 https；http 只接受 127.0.0.1 / localhost / ::1")
     return value
-
-
-def strip_reasoning(messages: list[dict]) -> list[dict]:
-    return [{k: v for k, v in m.items() if k in HISTORY_KEYS} for m in messages]
-
-
-def apply_reasoning(payload: dict, provider: dict, model: str, depth: str) -> dict:
-    """把界面的「中/高/最大」翻成各服务商认识的思考参数。
-
-    预设里写清楚哪一档映射到什么值；不认识的模型名走 fallback（例如 Kimi K2.x
-    只认 thinking.type）。自定义端点由调用方决定是否发送，避免给不支持的端点塞参数。
-    """
-    spec = provider.get("reasoning") or {}
-    if not depth or not spec:
-        return payload
-    patterns = [str(p) for p in (spec.get("models") or [])]
-    if patterns and not any(model.startswith(p) for p in patterns):
-        fallback = spec.get("fallback") or {}
-        if isinstance(fallback, dict):
-            payload.update(fallback)
-        return payload
-    value = (spec.get("map") or {}).get(depth)
-    if value:
-        payload[str(spec.get("param") or "reasoning_effort")] = value
-    return payload
 
 
 def chat_url(base_url: str) -> str:
@@ -154,26 +121,13 @@ def stream_completion(
     api_key: str,
     model: str,
     messages: list[dict],
-    tools: list[dict] | None,
     on_delta,
     should_stop,
-    depth: str = "",
 ) -> Completion:
-    """跑一次流式补全。on_delta(kind, text) 会收到 token 或 reasoning。"""
-    base = provider.get("base_url") or ""
-    url = chat_url(base)
-    payload: dict = {
-        "model": model,
-        "messages": strip_reasoning(messages),
-        "stream": True,
-    }
-    if tools:
-        payload["tools"] = tools
-    apply_reasoning(payload, provider, model, depth)
-
+    """跑一次流式补全。on_delta("token", text) 会收到正文增量。"""
+    url = chat_url(provider.get("base_url") or "")
+    payload = {"model": model, "messages": messages, "stream": True}
     completion = Completion()
-    tool_slots: dict[int, dict] = {}
-    reasoning_field = provider.get("reasoning_field") or "reasoning_content"
 
     resp = _post_stream(payload, api_key, url)
     with resp:
@@ -181,9 +135,7 @@ def stream_completion(
             if should_stop():
                 raise CancelledError()
             line = raw.decode("utf-8", "replace").strip()
-            if not line or line.startswith(":"):
-                continue
-            if not line.startswith("data:"):
+            if not line or line.startswith(":") or not line.startswith("data:"):
                 continue
             data = line[5:].strip()
             if data == "[DONE]":
@@ -200,137 +152,6 @@ def stream_completion(
                 if text:
                     completion.content += text
                     on_delta("token", text)
-                thought = delta.get(reasoning_field) or delta.get("reasoning_content") or delta.get("reasoning")
-                if thought:
-                    completion.reasoning += thought
-                    on_delta("reasoning", thought)
-                for call in delta.get("tool_calls") or []:
-                    idx = int(call.get("index") or 0)
-                    slot = tool_slots.setdefault(
-                        idx,
-                        {"id": "", "type": "function", "function": {"name": "", "arguments": ""}},
-                    )
-                    if call.get("id"):
-                        slot["id"] = call["id"]
-                    fn = call.get("function") or {}
-                    if fn.get("name"):
-                        slot["function"]["name"] = fn["name"]
-                    args = fn.get("arguments")
-                    if args:
-                        if isinstance(args, str):
-                            slot["function"]["arguments"] += args
-                        else:
-                            slot["function"]["arguments"] += json.dumps(args, ensure_ascii=False)
                 if choice.get("finish_reason"):
                     completion.finish_reason = str(choice["finish_reason"])
-    completion.tool_calls = [tool_slots[i] for i in sorted(tool_slots) if tool_slots[i]["function"]["name"]]
     return completion
-
-
-def _sleep_checked(seconds: float, should_stop) -> None:
-    end = time.monotonic() + seconds
-    while time.monotonic() < end:
-        if should_stop():
-            raise CancelledError()
-        time.sleep(min(0.02, max(0.0, end - time.monotonic())))
-
-
-def _fake_stage_text(stage: str, messages: list[dict]) -> str | None:
-    """编排阶段的脚本化响应：内容与确定性路径同源，离线演示不冒充模型判断。"""
-    from . import baseline, orchestrator  # 局部 import：避免模块级循环依赖
-
-    if stage == "k2-problem":
-        user = next((str(m.get("content") or "") for m in messages if m.get("role") == "user"), "")
-        # 提示词模板形如「题面：\n…\n\n附件清单：…」；只取题面段，别把标签当题目。
-        problem = user.split("\n\n附件清单：", 1)[0]
-        if problem.startswith("题面：\n"):
-            problem = problem[len("题面：\n"):]
-        questions = orchestrator.split_questions(orchestrator.question_source(problem))
-        names = orchestrator.attachment_names(problem)
-        return json.dumps(
-            {
-                "questions": [
-                    {"id": f"q{i + 1}", "text": text, "data": "未附数据文件"}
-                    for i, text in enumerate(questions)
-                ],
-                "dataRoles": [],
-                "warning": (
-                    "离线演示：数据角色核对未接入，附件正文已并入题面。"
-                    if names
-                    else "离线演示：未附数据文件，确认后按文字题面继续。"
-                ),
-            },
-            ensure_ascii=False,
-        )
-    if stage == "k3-models":
-        user = next((str(m.get("content") or "") for m in messages if m.get("role") == "user"), "")
-        problem = user.split("\n\n附件清单：", 1)[0]
-        if problem.startswith("题面：\n"):
-            problem = problem[len("题面：\n"):]
-        return json.dumps({"candidates": orchestrator.model_candidates(problem)}, ensure_ascii=False)
-    if stage == "p4-code":
-        return json.dumps(
-            {"rationale": "离线演示：使用内置基线脚本，接真实模型后这里会按题生成代码。", "code": baseline.SCRIPT},
-            ensure_ascii=False,
-        )
-    if stage == "p5-paper":
-        # 离线兜底：演示样例稿（三门禁全绿）。编排层会在对话里标明是兜底。
-        sample = Path(__file__).with_name("paper_sample") / "paper.tex"
-        try:
-            return sample.read_text(encoding="utf-8")
-        except OSError:
-            return None
-    if stage == "p6-score":
-        import re
-
-        from . import score_gen
-
-        user = next((str(m.get("content") or "") for m in messages if m.get("role") == "user"), "")
-        match = re.search(r"第\s*(\d+)\s*轮", user)
-        round_no = int(match.group(1)) if match else 1
-        return json.dumps(score_gen.demo_card(round_no), ensure_ascii=False)
-    return None
-
-
-def fake_completion(messages: list[dict], on_delta, should_stop, delay: float = 0.02) -> Completion:
-    """仅测试与离线演示：不发任何网络请求。由 MMS_FAKE_PROVIDER=1 显式启用。"""
-    from .llm import stage_of
-
-    stage = stage_of(messages)
-    if stage:
-        text = _fake_stage_text(stage, messages)
-        if text is not None:
-            for i in range(0, len(text), 512):
-                _sleep_checked(delay, should_stop)
-                on_delta("token", text[i : i + 512])
-            return Completion(content=text, finish_reason="stop")
-
-    if any(m.get("role") == "tool" for m in messages):
-        final = (
-            "离线演示：共 25 个模板，20 张图表（matplotlib）+ 5 张示意图（JSON 驱动）。"
-            "这条回复来自本地假 provider，用来验证流式通道与工具卡；接真实模型后这里会换成模型自己的话。"
-        )
-        for i in range(0, len(final), 6):
-            _sleep_checked(delay, should_stop)
-            piece = final[i : i + 6]
-            on_delta("token", piece)
-        return Completion(content=final, finish_reason="stop")
-
-    for piece in ("先确认一下本机能列出哪些模板。", "这一步只读注册表，不联网。"):
-        _sleep_checked(delay, should_stop)
-        on_delta("reasoning", piece)
-    intro = "我先查一下模板清单。"
-    for i in range(0, len(intro), 4):
-        _sleep_checked(delay, should_stop)
-        on_delta("token", intro[i : i + 4])
-    return Completion(
-        content=intro,
-        finish_reason="tool_calls",
-        tool_calls=[
-            {
-                "id": "call_fake_templates",
-                "type": "function",
-                "function": {"name": "list_templates", "arguments": "{}"},
-            }
-        ],
-    )
