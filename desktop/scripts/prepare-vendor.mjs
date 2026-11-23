@@ -133,7 +133,7 @@ async function preparePython(force) {
   const version = run(PY_EXE, ['-c', 'import sys; print(sys.version)'], { stdio: 'pipe' })
   log(`解释器就绪：${String(version.stdout).trim().split('\n')[0]}`)
 
-  log(`安装 core/requirements.txt（索引 ${PIP_INDEX}）`)
+  log(`安装 modeling/requirements.txt（索引 ${PIP_INDEX}）`)
   run(PY_EXE, [
     '-m',
     'pip',
@@ -141,7 +141,7 @@ async function preparePython(force) {
     '--disable-pip-version-check',
     '--no-warn-script-location',
     '-r',
-    join(REPO, 'core', 'requirements.txt'),
+    join(REPO, 'modeling', 'requirements.txt'),
     '-i',
     PIP_INDEX
   ])

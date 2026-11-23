@@ -41,7 +41,7 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
       - name: 内核语法检查
-        run: python -m compileall -q core
+        run: python -m compileall -q modeling gateway
 
       - name: 类型检查
         run: npm run typecheck

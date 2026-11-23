@@ -1,18 +1,18 @@
 [project]
-name = "mms-runtime"
+name = "mms-modeling"
 version = "0.2.0"
-description = "mathmodel-studio 运行时：一键流水线（题面 → 选模 → 代码 → 论文）与本机通道"
+description = "mathmodel-studio 数模内核：一键流水线（题面 → 选模 → 代码 → 论文）"
 requires-python = ">=3.12"
 license = { text = "AGPL-3.0-only" }
 authors = [{ name = "Escap1ng" }]
 dependencies = []
 
 [project.scripts]
-mms = "mms.cli:main"
+mms = "mms_modeling.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mms"]
+packages = ["src/mms_modeling"]

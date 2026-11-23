@@ -12,6 +12,6 @@
     "vendor:python": "npm --workspace mathmodel-studio run vendor:python",
     "vendor:pandoc": "npm --workspace mathmodel-studio run vendor:pandoc",
     "smoke:window": "electron desktop/tests/window-smoke.cjs",
-    "mms": "python core/cli.py"
+    "mms": "python modeling/cli.py"
   }
 }

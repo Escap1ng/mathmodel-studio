@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { join } from 'node:path'
 import type { RunEvent, RuntimeStatus } from '../shared/api'
 
-// 与 core/src/mms/server.py 的握手契约。渲染层永远拿不到 port 与 token。
+// 与 gateway/src/mms_gateway/server.py 的握手契约。渲染层永远拿不到 port 与 token。
 export interface ChannelHandshake {
   port: number
   token: string
@@ -73,7 +73,7 @@ export class Channel {
 
   private async launch(): Promise<void> {
     this.setStatus({ state: 'starting' })
-    const child = spawn(this.python, [join(this.root, 'core', 'cli.py'), 'serve', '--port', '0'], {
+    const child = spawn(this.python, [join(this.root, 'modeling', 'cli.py'), 'serve', '--port', '0'], {
       cwd: this.root,
       windowsHide: true,
       env: {

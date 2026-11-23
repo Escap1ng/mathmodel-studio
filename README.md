@@ -17,7 +17,7 @@
 | 方式 | 命令 | 说明 |
 | --- | --- | --- |
 | 桌面开发 | `npm install` → `npm run dev` | 启动 Electron 与本地 Python 运行时 |
-| 无界面跑一遍 | `python core/cli.py run --problem-file 题面.txt [--data 数据.csv] [--out 目录]` | 事件按 JSON Lines 输出；默认离线模式 |
+| 无界面跑一遍 | `python modeling/cli.py run --problem-file 题面.txt [--data 数据.csv] [--out 目录]` | 事件按 JSON Lines 输出；默认离线模式 |
 | 类型检查 | `npm run typecheck` | 主进程、preload、渲染层全覆盖 |
 | 构建 | `npm run build` | 产物在 `desktop/out/` |
 | 真启动冒烟 | `npm run smoke:window` | 起生产入口，断言窗口、运行时与界面文本 |
@@ -26,7 +26,7 @@
 ## 环境要求
 
 - Node.js 22 及以上。
-- Python 3.12 及以上，并安装 `core/requirements.txt`（`numpy`、`matplotlib`）。
+- Python 3.12 及以上，并安装 `modeling/requirements.txt`（`numpy`、`matplotlib`）。
 - 生成 PDF 需要本机 `xelatex`；转 Word 需要 `pandoc`。缺失时求解结果仍保留，论文步骤会明确报缺。
 - 主平台为 Windows；macOS / Linux 可开发运行，未做安装包验证。
 
@@ -39,7 +39,7 @@
 
 ## 配置服务商
 
-设置弹窗内置 DeepSeek、通义千问、Kimi、智谱 GLM、OpenAI 格式端点与离线模式。预设模型与地址在 `core/src/mms/providers.json`，可自行增改。
+设置弹窗内置 DeepSeek、通义千问、Kimi、智谱 GLM、OpenAI 格式端点与离线模式。预设模型与地址在 `gateway/src/mms_gateway/providers.json`，可自行增改。
 
 - 真实服务商需要填写模型名与 API Key。
 - 自定义端点填到 `/v1` 为止，公网必须 https。
@@ -47,22 +47,26 @@
 
 ## 目录
 
-根目录是 npm workspace，只做脚本转发；内核与桌面端各自独立。
+根目录是 npm workspace，只做脚本转发；数模领域、通用通道与桌面端各自独立。
 
 ```
 .
-├─ core/                       Python 内核（不依赖 GUI）
-│  ├─ cli.py                   serve / run 入口
+├─ modeling/                   数模领域（不依赖 GUI）
+│  ├─ cli.py                   serve / run 入口，装配 modeling + gateway
 │  ├─ pyproject.toml
 │  ├─ requirements.txt
-│  └─ src/mms/
+│  └─ src/mms_modeling/
 │     ├─ pipeline.py           一键流水线
-│     ├─ provider.py           OpenAI 兼容流式客户端
-│     ├─ llm.py                JSON / 文本调用与重试
 │     ├─ baseline.py           数据画像、基线脚本、执行与产物收集
 │     ├─ paper_gen.py / paper_build.py   论文生成与排版
-│     ├─ server.py             本机 HTTP + SSE 通道
 │     └─ templates/            论文骨架与写作规范
+├─ gateway/                    通用通道（不依赖数模）
+│  ├─ pyproject.toml
+│  └─ src/mms_gateway/
+│     ├─ server.py             本机 HTTP + SSE 通道，runner 由外部注入
+│     ├─ provider.py           OpenAI 兼容流式客户端
+│     ├─ llm.py                JSON / 文本调用与重试
+│     └─ providers.json        预设服务商与模型
 ├─ desktop/                    Electron 桌面端
 │  ├─ src/
 │  │  ├─ main/                 通道、设置、文件选择、产物打开

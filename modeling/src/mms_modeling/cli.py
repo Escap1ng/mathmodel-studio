@@ -15,16 +15,16 @@ import sys
 import time
 from pathlib import Path
 
+from mms_gateway.common import utf8_console
+from mms_gateway.provider import find_provider
+from mms_gateway.server import serve
+
 from . import __version__
-from .common import utf8_console
 from .pipeline import Pipeline
-from .provider import find_provider
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
-    from .server import serve
-
-    return serve(args.port)
+    return serve(args.port, Pipeline)
 
 
 def _read_problem(args: argparse.Namespace) -> str:

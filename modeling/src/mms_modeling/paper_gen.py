@@ -10,7 +10,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from . import llm
+from mms_gateway import llm
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 

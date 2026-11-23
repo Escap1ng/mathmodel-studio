@@ -7,7 +7,8 @@ release/
 *.log
 
 # Python
-core/.venv/
+modeling/.venv/
+gateway/.venv/
 .venv/
 __pycache__/
 *.py[cod]

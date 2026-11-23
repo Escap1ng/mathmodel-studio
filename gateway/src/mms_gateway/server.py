@@ -22,7 +22,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__
-from .pipeline import Pipeline
 from .provider import ProviderError, find_provider, load_providers, validate_base_url
 
 MAX_BODY = 1 << 20
@@ -94,10 +93,11 @@ class ChannelServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address, handler, token: str, root: Path):
+    def __init__(self, address, handler, token: str, root: Path, runner_factory=None):
         super().__init__(address, handler)
         self.token = token
         self.root = root
+        self.runner_factory = runner_factory
         self.data_root = data_root(root)
         self.jobs: dict[str, RunJob] = {}
         self.jobs_lock = threading.Lock()
@@ -251,6 +251,10 @@ class Handler(BaseHTTPRequestHandler):
             self._error(500, "dir", f"运行目录创建失败：{exc}")
             return
 
+        if self.server.runner_factory is None:
+            self._error(503, "runner", "服务端没有装配数模流水线")
+            return
+
         job = RunJob(run_id)
         with self.server.jobs_lock:
             while len(self.server.jobs) >= 20:
@@ -258,7 +262,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.jobs.pop(oldest, None)
             self.server.jobs[run_id] = job
 
-        pipeline = Pipeline(
+        runner = self.server.runner_factory(
             job_dir=job_dir,
             problem=problem,
             data_path=data_path,
@@ -271,7 +275,7 @@ class Handler(BaseHTTPRequestHandler):
 
         def _run() -> None:
             try:
-                pipeline.run()
+                runner.run()
             finally:
                 job.finish()
 
@@ -332,10 +336,10 @@ class Handler(BaseHTTPRequestHandler):
             return
 
 
-def serve(port: int = 0) -> int:
+def serve(port: int = 0, runner_factory=None) -> int:
     token = secrets.token_hex(24)
     root = Path(os.environ.get("MMS_HOME") or ".").resolve()
-    server = ChannelServer(("127.0.0.1", port), Handler, token, root)
+    server = ChannelServer(("127.0.0.1", port), Handler, token, root, runner_factory)
     print(
         json.dumps(
             {

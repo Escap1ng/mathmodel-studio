@@ -12,8 +12,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from . import baseline, llm, paper_build, paper_gen
-from .provider import CancelledError
+from mms_gateway import llm
+from mms_gateway.provider import CancelledError
+
+from . import baseline, paper_build, paper_gen
 
 PHASES = [
     {"id": 1, "label": "题面拆解"},
