@@ -55,11 +55,13 @@
 │  ├─ cli.py                   serve / run 入口，装配 modeling + gateway
 │  ├─ pyproject.toml
 │  ├─ requirements.txt
+│  ├─ skills/                  技能包：core / methods / figure / diagram / paper / deai / score
 │  └─ src/mms_modeling/
 │     ├─ pipeline.py           一键流水线
 │     ├─ baseline.py           数据画像、基线脚本、执行与产物收集
 │     ├─ paper_gen.py / paper_build.py   论文生成与排版
 │     └─ templates/            论文骨架与写作规范
+│  （skills/ 是领域资产，当前一键流水线尚未调用）
 ├─ gateway/                    通用通道（不依赖数模）
 │  ├─ pyproject.toml
 │  └─ src/mms_gateway/
