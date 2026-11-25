@@ -1,0 +1,6 @@
+# mathmodel-studio 的 Python 依赖（生成代码与图表）
+# 安装（大陆镜像）：
+#   python -m pip install -r modeling/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
+
+matplotlib>=3.7
+numpy>=1.24

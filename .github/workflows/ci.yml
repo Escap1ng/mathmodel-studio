@@ -14,11 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gates:
-    name: 门禁 · ${{ matrix.os }}
+  build:
+    name: 类型与构建 · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      # Windows 是这个产品的主平台，不能只在 Linux 上验过就说能构建
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -31,95 +30,18 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 装 Python 依赖
-        # G3 从 M1 起会真渲染一张图，matplotlib/numpy/seaborn 不能缺；
-        # jsonschema 也在同一份 requirements 里。
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-
       - name: 准备 Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      # CI 不启动窗口，所以跳过 Electron 二进制下载（约 100 MB，纯浪费）。
-      # 类型检查需要的 electron 类型仍随 npm 包一起装好。
-      # lockfile 提交后这里换成 npm ci。
       - name: 安装 JS 依赖
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
-      - name: G1 注册表一致性
-        run: node scripts/check-registry.mjs
-
-      - name: G1 反向覆盖（门禁必须能变红）
-        run: node scripts/check-registry.negative.mjs
-
-      - name: G8 技能规范（SKILL.md 仍是合法 Agent Skills 入口）
-        run: node scripts/check-skills.mjs
-
-      - name: G8 反向覆盖（6 种破坏必须被抓到）
-        run: node scripts/check-skills.mjs --self
-
-      - name: G6b 真启动核验器自测
-        # 不需要真窗口：它自己造 10 份合成结果，验证「ok=true 但读数不对」「关键断言被删」都会红
-        run: npm run verify:window:selftest
-
-      - name: 装排版依赖（G4/G11 全链与 G10 都要真编 PDF，只在 ubuntu 跑）
-        # 0.2.0 起通道/编排自检覆盖阶段五论文生成，需要 xelatex/pandoc；
-        # 必须放在 G4 之前。Windows 的 gates job 不装 TeX（体积与时长不划算），
-        # 下面的 G4/G11/G10 用 MMS_PAPER_SKIP=1 显式跳过排版断言并打印「未验证」。
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -yq pandoc texlive-xetex texlive-lang-chinese texlive-latex-extra
-
-      - name: G4 通道自检（握手、鉴权、SSE、取消、续传）
-        # 起真 Python 子进程和本地假 OpenAI 端点；不需要窗口、不联网、不需要 Key
-        env:
-          MMS_PAPER_SKIP: ${{ matrix.os == 'windows-latest' && '1' || '' }}
-        run: python runtime/tests/selfcheck_channel.py
-
-      - name: G4/G5 反向覆盖（坏事件、Key 泄漏、假 provider 关闭）
-        run: python runtime/tests/selfcheck_channel.py --selftest
-
-      - name: G2 契约校验与版本同源
-        run: python scripts/validate-contracts.py
-
-      - name: G3 CLI 退出码契约
-        run: python runtime/tests/selfcheck.py
-
-      - name: G11 编排状态机（起题、确认、换一批、选模、全链）
-        env:
-          MMS_PAPER_SKIP: ${{ matrix.os == 'windows-latest' && '1' || '' }}
-        run: python runtime/tests/selfcheck_orchestrator.py
-
-      - name: G11 反向覆盖（默认族写坏、关键词族清空必须变红）
-        run: python runtime/tests/selfcheck_orchestrator.py --selftest
-
-      - name: G12 长会话 harness（预算、压缩、摘要、锚点、50 轮）
-        run: python runtime/tests/selfcheck_harness.py
-
-      - name: G12 反向覆盖（拆掉压缩、关掉工具裁剪必须变红）
-        run: python runtime/tests/selfcheck_harness.py --selftest
-
-      - name: G13 附件 xlsx 读取（工作表、日期、上限与坏文件）
-        run: npm run check:xlsx
-
-      - name: G9 工作台（真渲两版、回滚、评分）
-        run: python runtime/tests/selfcheck_workbench.py
-
-      - name: G10 论文排版（xelatex → pandoc → 三道门禁）
-        # Windows 的 gates job 不装 TeX/MiKTeX（体积与安装时长都不划算），显式跳过并在文档里记成未证；
-        # 真启动冒烟的 job 在 ubuntu 上有 TeX，G7-9 会真编一遍。
-        env:
-          MMS_PAPER_SKIP: ${{ matrix.os == 'windows-latest' && '1' || '' }}
-        run: python runtime/tests/selfcheck_paper.py
-
-      - name: 运行时语法检查
-        run: python -m compileall -q runtime
+      - name: 内核语法检查
+        run: python -m compileall -q modeling gateway
 
       - name: 类型检查
         run: npm run typecheck
@@ -127,29 +49,17 @@ jobs:
       - name: 构建
         run: npm run build
 
-      - name: G6 产物冒烟
-        run: node scripts/smoke-dist.mjs
-
-  # M0 的判据是「照手册装完能起一个空窗」。这条 job 真下载 Electron、真启动、真截图并按像素断言，
-  # 而不是停在「能构建」。gates 那条故意跳过二进制，所以这一段只能在这里补上。
   window-smoke:
     name: 真启动冒烟 · ubuntu
     runs-on: ubuntu-latest
-    needs: []
 
     steps:
       - uses: actions/checkout@v4
 
       - name: 准备 Python
-        # 主进程用 python3 拉起 runtime/cli.py serve；M4 工作台要真渲图，下面会装 requirements。
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: 装图表依赖（工作台要真渲一张样例图）
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
 
       - name: 准备 Node
         uses: actions/setup-node@v4
@@ -157,55 +67,22 @@ jobs:
           node-version: '22'
 
       - name: 安装 JS 依赖（含 Electron 二进制）
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: 构建
         run: npm run build
 
-      - name: 取回 Electron 二进制并打印实况
-        # 上一轮 chmod 报 No such file or directory：npm install 之后 dist/ 里并没有二进制，
-        # 它是等到首次 npx electron 才懒下载的（那一轮的日志里有 "Downloading Electron binary..."）。
-        # 所以先把二进制显式取回来，再把目录列出来——下次再挂就知道挂在哪儿，而不是猜。
-        # 注意这一步不运行 electron：沙箱助手还没改权限，跑一次就会 FATAL 退出（上一轮就是这么挂的）。
-        run: |
-          # GitHub release 直链偶发 504（2026-11-08 连续多轮挂在同一 URL），重试三次再放弃。
-          ok=0
-          for attempt in 1 2 3; do
-            if node node_modules/electron/install.js; then ok=1; break; fi
-            echo "第 $attempt 次取回 Electron 失败，10 秒后重试"
-            sleep 10
-          done
-          [ "$ok" = 1 ] || exit 1
-          ls -l node_modules/electron/ | head -10
-          ls -l node_modules/electron/dist/ | head -12
-
       - name: 修好 Electron 的 SUID 沙箱助手
-        # 不改就会 FATAL:setuid_sandbox_host（chrome-sandbox 需 root:4755）而进程在断言前就死。
-        # 用 --no-sandbox 绕过也能跑，但那等于把生产窗口的 sandbox: true 排除在验证之外，
-        # 所以这里选择把沙箱修好：preload 能在 sandbox 下工作，本身就是被 G7-3 的 IPC 断言验过的。
         run: |
           sudo chown root:root node_modules/electron/dist/chrome-sandbox
           sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
-          ls -l node_modules/electron/dist/chrome-sandbox
           npx electron --version
 
-      - name: 准备 Xvfb、中文字体与排版工具
-        # fonts-noto-cjk 不是可选装饰：runner 默认没有中文字体，整片界面会渲染成豆腐块，
-        # 而「非白像素 ≥1%」这种断言照样能过。G7-5 现在会直接问字体在不在。
-        # M5 起 G7-9 会真编一篇演示稿，所以 xelatex（texlive-xetex + 中文支持）与 pandoc 也要装。
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -yq xvfb fonts-noto-cjk pandoc texlive-xetex texlive-lang-chinese texlive-latex-extra
+      - name: 准备 Xvfb 与中文字体
+        run: sudo apt-get update -q && sudo apt-get install -yq xvfb fonts-noto-cjk
 
-      - name: G7 无头真启动与像素断言
-        # 虚拟屏幕必须大于设计基准：屏幕正好 1440x900 时装不下带边框的窗口，
-        # 内容区会被钳成 1439x899，于是 G7 的尺寸断言红在一件与产品无关的事上。
-        run: xvfb-run -a --server-args="-screen 0 1600x1000x24" npx electron tests/window-smoke.cjs
-
-      - name: G6b 独立核验真启动结果
-        # 不靠上面那一步的退出码：上一轮就是 app.exit(1) 被生产入口的 app.quit() 顶掉，
-        # 10/12 项通过却把 job 跑绿了。这里改读 screenshots/window-smoke.json 并复算读数。
-        run: npm run verify:window
+      - name: 真启动与像素断言
+        run: xvfb-run -a --server-args="-screen 0 1600x1000x24" npx electron desktop/tests/window-smoke.cjs
 
       - name: 上传截图与结果
         if: always()

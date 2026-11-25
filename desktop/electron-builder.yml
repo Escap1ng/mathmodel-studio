@@ -1,0 +1,68 @@
+# electron-builder 配置（桌面端）
+#
+# 资源布局：modeling/gateway/VERSION/python/pandoc 放在 resources/ 下，
+# 与 desktop/src/main/runtime-env.ts 的 APP_ROOT 对齐；app.asar 里只放 JS 产物。
+# vendor/python 与 vendor/pandoc 由 scripts/prepare-vendor.mjs 准备到仓库根 vendor/，不入库。
+appId: cn.escap1ng.mathmodel-studio
+productName: MathModel Studio
+copyright: Copyright © 2026 Escap1ng
+
+directories:
+  output: release
+  buildResources: build
+
+# 只留中英文 Chromium 语言包，其余 locale 不进包（约省 45MB）
+electronLanguages:
+  - zh-CN
+  - en-US
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: ../modeling
+    to: modeling
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+  - from: ../gateway
+    to: gateway
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+  - from: ../VERSION
+    to: VERSION
+  - from: ../LICENSE
+    to: LICENSE.txt
+  - from: ../THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+  - from: ../licenses
+    to: licenses
+  - from: ../vendor/python
+    to: python
+  - from: ../vendor/pandoc/pandoc.exe
+    to: pandoc/pandoc.exe
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+
+nsis:
+  # build/installer.nsh 自动被 include，负责把默认安装目录改成桌面的 MathModel Studio。
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  # 页头/侧栏图已入库；assisted 模式只读 installerHeader/installerSidebar。
+  installerHeader: installerHeader.bmp
+  installerSidebar: installerSidebar.bmp
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: MathModel Studio
+  artifactName: ${name}-${version}-setup.${ext}
