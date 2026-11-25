@@ -194,6 +194,18 @@ ipcMain.handle('run:cancel', async (_event, raw: unknown) => {
   return { ok: true }
 })
 
+ipcMain.handle('run:summary', (_event, raw: unknown) => {
+  const id = typeof raw === 'string' ? raw : ''
+  if (!id) return null
+  const path = join(RUNS_ROOT, id, 'summary.json')
+  if (!insideRuns(path)) return null
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as unknown
+  } catch {
+    return null
+  }
+})
+
 ipcMain.handle('artifact:open', async (_event, raw: unknown) => {
   const path = typeof raw === 'string' ? raw : ''
   if (!insideRuns(path)) throw new Error('只能打开本次运行的产物')

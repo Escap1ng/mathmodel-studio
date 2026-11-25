@@ -66,7 +66,7 @@ async function main() {
   const ready = await waitFor(
     async () => {
       const text = await win.webContents.executeJavaScript('document.body.innerText')
-      return text.includes('运行时就绪') ? text : null
+      return text.includes('就绪') && !text.includes('启动中') ? text : null
     },
     30_000,
     400
@@ -85,10 +85,9 @@ async function main() {
     win.webContents.getURL().includes('/out/renderer/index.html'),
     win.webContents.getURL()
   )
-  for (const text of ['MathModel Studio', '赛题', '进度', '结果', '开始建模']) {
+  for (const text of ['MathModel Studio', '把赛题变成可交付的论文', '工作区', '对话', '新建对话', '设置']) {
     record(`界面含「${text}」`, ready.includes(text), text)
   }
-  record('服务商已读取', ready.includes('离线模式'), '离线模式')
 
   const image = await win.webContents.capturePage()
   const ratio = inkRatio(image)

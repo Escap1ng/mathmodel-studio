@@ -100,3 +100,13 @@ export interface RunEvent {
   event: string
   data: Record<string, unknown>
 }
+
+export interface RunSummary {
+  ok: boolean
+  error: string
+  problem: string
+  picked?: { name?: string }
+  sources?: Record<string, string>
+  outputs: RunOutputs
+  seconds?: number
+}

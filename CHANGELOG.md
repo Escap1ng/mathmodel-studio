@@ -9,6 +9,7 @@
 
 - **目录分层**：`modeling/`（数模领域）、`gateway/`（通用通道）与 `desktop/`（Electron 桌面端）分开，根目录只保留 npm workspace 入口、版本与法务文档；`server` 不再直接 import 流水线，改由入口注入 runner。
 - **技能包归位**：原 `skills/` 恢复到 `modeling/skills/`（core / methods / figure / diagram / paper / deai / score），作为领域资产保留；当前流水线尚未调用。
+- **前端重做（极简聊天式）**：左侧「工作区 → 对话」两级树（多工作区、多对话，本地持久化）；首开中部欢迎文案与四步数模引导；中部对话流承载一次完整运行（进度、日志、求解图、PDF/Word）。核心流水线不变。
 - **一键流水线**：题面拆解 → 选模（自动采用推荐）→ 生成 `solution.py` → 运行与修复 ≤3 轮 → 论文生成与排版 ≤3 轮。删除七阶段人审卡、评分、雷达、门禁、会话恢复与工作台七页。
 - **单页界面**：一页三栏「赛题 / 进度 / 结果」，保留设置弹窗、离线模式、产物打开按钮；渲染层去掉 katex、pdfjs、markdown 依赖。
 - **运行时收敛**：删除技能包（`skills/`）、契约 schema、工作台图表/评分、长会话 harness、SQLite 会话库与七个自检；论文骨架与写作规范迁入 `modeling/src/mms_modeling/templates/`。

@@ -5,6 +5,7 @@ import type {
   RunEvent,
   RunInput,
   RunStartResult,
+  RunSummary,
   RuntimeStatus,
   SaveProviderInput,
   StudioMeta
@@ -39,6 +40,7 @@ const studioApi = {
   run: {
     start: (input: RunInput): Promise<RunStartResult> => ipcRenderer.invoke('run:start', input),
     cancel: (runId: string): Promise<{ ok: true }> => ipcRenderer.invoke('run:cancel', runId),
+    summary: (runId: string): Promise<RunSummary | null> => ipcRenderer.invoke('run:summary', runId),
     onEvent: (cb: (event: RunEvent) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, payload: RunEvent): void => cb(payload)
       ipcRenderer.on('run:event', handler)
