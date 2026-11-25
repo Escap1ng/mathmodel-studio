@@ -1,6 +1,6 @@
 [project]
 name = "mms-modeling"
-version = "0.2.0"
+version = "0.3.0"
 description = "mathmodel-studio 数模内核：一键流水线（题面 → 选模 → 代码 → 论文）"
 requires-python = ">=3.12"
 license = { text = "AGPL-3.0-only" }

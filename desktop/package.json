@@ -1,6 +1,6 @@
 {
   "name": "mathmodel-studio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "数学建模桌面工作台：题面 → 选模 → 代码 → 论文",
   "author": "Escap1ng",

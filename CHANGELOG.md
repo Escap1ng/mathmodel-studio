@@ -3,7 +3,7 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
 
-## Unreleased - 精简
+## 0.3.0 - 2026-11-25
 
 ### 变更
 
@@ -15,12 +15,15 @@
 - **运行时收敛**：删除技能包（`skills/`）、契约 schema、工作台图表/评分、长会话 harness、SQLite 会话库与七个自检；论文骨架与写作规范迁入 `modeling/src/mms_modeling/templates/`。
 - **依赖收敛**：Python 只留 `numpy`、`matplotlib`；Word 由 pandoc 直接转换，不再后处理 DOCX。
 - **通道与安全保留**：127.0.0.1 + Bearer token + Host/Origin 校验；Key 仍用 `safeStorage`，不落盘、不进事件。
+- **图标统一**：侧栏品牌标与开发态窗口图标接上环形新图标，与安装包三件套、安装向导图一致。
+- **README 产品化**：居中 hero（深浅两版 SVG 按主题自动切换）、统一配色徽章、三张真实界面截图（1.5 倍像素密度、按面板裁切）、目录改两列表、新增「参与贡献」节。
 
-### 验证（本机 Windows，2026-11-23）
+### 验证（本机 Windows，2026-11-25）
 
 - `npm run typecheck`、`npm run build` 通过；`npm run smoke:window` 12 项断言全绿（窗口、运行时握手、界面文本、墨迹占比）。
-- 离线全链：无界面 CLI 与桌面界面各跑一遍，5 阶段全通过，R²=0.997，PNG/PDF/SVG 与 paper.pdf/paper.docx 均生成，界面耗时 8.1s。
-- 未证：真实服务商 Key 的联网端到端；安装包未重新构建。
+- 离线全链：桌面界面跑内置示例一遍，5 阶段全通过，R²=0.997、RMSE=0.432，求解图与 paper.pdf/paper.docx 均生成，界面耗时 8.3s；README 截图取自本次运行。
+- CI（main @ `4c66544`，run 45611617648）：类型与构建 ubuntu/windows、真启动冒烟 ubuntu、核心离线全链 ubuntu 四 job 全绿。
+- 未证：真实服务商 Key 的联网端到端；安装包未重建且未签名（预期 SmartScreen 警告）。
 
 ## 0.2.0 - 2026-11-15
 

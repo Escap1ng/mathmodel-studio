@@ -3,4 +3,4 @@
 版本号与 VERSION、desktop/package.json 及两个 pyproject 同源，改一处要同步其余。
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

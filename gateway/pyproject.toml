@@ -1,6 +1,6 @@
 [project]
 name = "mms-gateway"
-version = "0.2.0"
+version = "0.3.0"
 description = "mathmodel-studio 通用通道：OpenAI 兼容流式调用与本机 HTTP + SSE 服务"
 requires-python = ">=3.12"
 license = { text = "AGPL-3.0-only" }
