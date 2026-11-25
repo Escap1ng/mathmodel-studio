@@ -1,4 +1,5 @@
 import { useEffect, useState, type JSX } from 'react'
+import brandIcon from '../../../../build/icon.svg'
 import type { RuntimeStatus } from '../../../shared/api'
 import type { Workspace } from '../lib/store'
 
@@ -35,7 +36,7 @@ export default function Sidebar(props: Props): JSX.Element {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <span className="brand-mark">MM</span>
+        <img className="brand-mark" src={brandIcon} alt="" />
         <span className="brand-name">MathModel Studio</span>
       </div>
 

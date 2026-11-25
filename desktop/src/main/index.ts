@@ -243,6 +243,7 @@ function createWindow(): BrowserWindow {
     show: false,
     backgroundColor: '#ffffff',
     title: 'MathModel Studio',
+    icon: app.isPackaged ? undefined : join(APP_ROOT, 'desktop', 'build', 'icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
