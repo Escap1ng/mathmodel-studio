@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 400" font-family="Georgia, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif">
+  <defs>
+    <radialGradient id="glow" cx="82%" cy="18%" r="60%">
+      <stop offset="0%" style="stop-color:#16a36a" stop-opacity="0.10"/>
+      <stop offset="100%" style="stop-color:#16a36a" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#16a36a" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect x="8" y="8" width="1584" height="384" rx="24" fill="#fefdfb"/>
+  <rect x="8" y="8" width="1584" height="384" rx="24" fill="url(#grid)"/>
+  <rect x="8" y="8" width="1584" height="384" rx="24" fill="url(#glow)"/>
+  <rect x="9" y="9" width="1582" height="382" rx="23" fill="none" stroke="#16a36a" stroke-opacity="0.22" stroke-width="1.5"/>
+  <text x="120" y="78" font-family="Consolas, 'SF Mono', Menlo, monospace" font-size="20" letter-spacing="6" fill="#5f6b64">MATHEMATICAL MODELING WORKBENCH</text>
+  <text x="118" y="172" font-size="88" font-weight="bold" fill="#121614">From Problem to Paper<tspan fill="#16a36a">.</tspan></text>
+  <text x="120" y="228" font-size="27" fill="#5f6b64">拆题 · 选模 · 生成并运行求解代码 · 按真实结果排论文，一条本地流水线</text>
+  <g font-family="Consolas, 'SF Mono', Menlo, monospace" font-size="18" fill="#8a948d">
+    <text x="160" y="288" text-anchor="middle">01</text>
+    <text x="480" y="288" text-anchor="middle">02</text>
+    <text x="800" y="288" text-anchor="middle">03</text>
+    <text x="1120" y="288" text-anchor="middle">04</text>
+    <text x="1440" y="288" text-anchor="middle">05</text>
+  </g>
+  <line x1="160" y1="308" x2="1440" y2="308" stroke="#16a36a" stroke-opacity="0.35" stroke-width="1.5"/>
+  <g fill="#fefdfb" stroke="#16a36a" stroke-width="2">
+    <circle cx="160" cy="308" r="7"/>
+    <circle cx="480" cy="308" r="7"/>
+    <circle cx="800" cy="308" r="7"/>
+    <circle cx="1120" cy="308" r="7"/>
+    <circle cx="1440" cy="308" r="7"/>
+  </g>
+  <circle cx="1440" cy="308" r="3.5" fill="#16a36a"/>
+  <g font-size="24" fill="#121614" text-anchor="middle">
+    <text x="160" y="352">拆题</text>
+    <text x="480" y="352">选模</text>
+    <text x="800" y="352">生成代码</text>
+    <text x="1120" y="352">运行求解</text>
+    <text x="1440" y="352">论文排版</text>
+  </g>
+</svg>
