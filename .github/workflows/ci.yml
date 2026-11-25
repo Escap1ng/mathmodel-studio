@@ -69,6 +69,18 @@ jobs:
       - name: 安装 JS 依赖（含 Electron 二进制）
         run: npm ci --no-audit --no-fund
 
+      - name: 取回 Electron 二进制
+        # npm ci 在此环境不触发 electron 的下载，dist/ 为空；显式跑 install.js，失败重试三次。
+        run: |
+          ok=0
+          for attempt in 1 2 3; do
+            if node node_modules/electron/install.js; then ok=1; break; fi
+            echo "第 $attempt 次取回 Electron 失败，10 秒后重试"
+            sleep 10
+          done
+          [ "$ok" = 1 ] || exit 1
+          ls -l node_modules/electron/dist | head -12
+
       - name: 构建
         run: npm run build
 
