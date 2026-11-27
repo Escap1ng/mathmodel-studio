@@ -42,7 +42,7 @@ export default function Conversation(props: Props): JSX.Element {
   async function pickData(): Promise<void> {
     try {
       const paths = await window.studio.files.pickData()
-      if (paths.length) setDataPaths(paths.slice(0, 1))
+      if (paths.length) setDataPaths((prev) => [...new Set([...prev, ...paths])].slice(0, 10))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -105,14 +105,14 @@ export default function Conversation(props: Props): JSX.Element {
               {dataPaths.map((path) => (
                 <span className="chip" key={path} title={path}>
                   {baseName(path)}
-                  <button className="chip-x" onClick={() => setDataPaths([])}>×</button>
+                  <button className="chip-x" onClick={() => setDataPaths((prev) => prev.filter((item) => item !== path))}>×</button>
                 </span>
               ))}
             </div>
           )}
           <div className="composer-bar">
             <button className="ghost small" onClick={pickProblem} disabled={running}>导入题面</button>
-            <button className="ghost small" onClick={pickData} disabled={running}>数据</button>
+            <button className="ghost small" onClick={pickData} disabled={running}>附件</button>
             <span className="composer-provider">{props.providerLabel}</span>
             {running ? (
               <button className="danger small" onClick={props.onCancel}>取消</button>

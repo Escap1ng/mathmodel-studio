@@ -27,7 +27,7 @@ from .provider import ProviderError, find_provider, load_providers, validate_bas
 MAX_BODY = 1 << 20
 MAX_PROBLEM = 200_000
 PING_SECONDS = 15
-DATA_SUFFIXES = (".csv", ".tsv")
+DATA_SUFFIXES = (".csv", ".tsv", ".xlsx", ".docx", ".zip")
 
 
 def data_root(root: Path) -> Path:
@@ -205,7 +205,7 @@ class Handler(BaseHTTPRequestHandler):
             self._error(400, "problem", "题面过长")
             return
 
-        data_path: Path | None = None
+        data_paths: list[Path] = []
         raw_paths = body.get("dataPaths")
         if isinstance(raw_paths, list):
             for item in raw_paths[:10]:
@@ -213,10 +213,9 @@ class Handler(BaseHTTPRequestHandler):
                     continue
                 candidate = Path(item)
                 if candidate.is_file() and candidate.suffix.lower() in DATA_SUFFIXES:
-                    data_path = candidate.resolve()
-                    break
-        if data_path is None and raw_paths:
-            self._error(400, "data", "数据文件需为存在的 CSV/TSV")
+                    data_paths.append(candidate.resolve())
+        if not data_paths and raw_paths:
+            self._error(400, "data", "数据文件需为存在的 CSV/TSV/XLSX/DOCX/ZIP")
             return
 
         ctx = body.get("provider") if isinstance(body.get("provider"), dict) else {}
@@ -265,7 +264,7 @@ class Handler(BaseHTTPRequestHandler):
         runner = self.server.runner_factory(
             job_dir=job_dir,
             problem=problem,
-            data_path=data_path,
+            data_paths=data_paths,
             provider=provider,
             api_key=api_key,
             model=model,

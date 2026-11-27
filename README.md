@@ -65,12 +65,14 @@
 
 所有论文数值只来自本次运行的 `result.json`。没有可用模型时进入离线模式：内置基线脚本 + 样例稿，事件与界面会标明兜底，不冒充按本题生成。
 
+附件支持 CSV / TSV / XLSX / DOCX 以及包含它们的 ZIP。XLSX 的每个工作表转成一份 CSV，第一张可用表作为主表喂给 `solution.py`，其余表只进入数据画像；DOCX 只抽正文文字，并入题面上下文。解析只用标准库，不新增运行时依赖。
+
 ## 运行方式
 
 | 方式 | 命令 | 说明 |
 | --- | --- | --- |
 | 桌面开发 | `npm install` → `npm run dev` | 启动 Electron 与本地 Python 运行时 |
-| 无界面跑一遍 | `python modeling/cli.py run --problem-file 题面.txt [--data 数据.csv] [--out 目录]` | 事件按 JSON Lines 输出；默认离线模式 |
+| 无界面跑一遍 | `python modeling/cli.py run --problem-file 题面.txt [--data 附件] [--out 目录]` | `--data` 可重复，接受 CSV/TSV/XLSX/DOCX/ZIP；事件按 JSON Lines 输出；默认离线模式 |
 | 类型检查 | `npm run typecheck` | 主进程、preload、渲染层全覆盖 |
 | 构建 | `npm run build` | 产物在 `desktop/out/` |
 | 真启动冒烟 | `npm run smoke:window` | 起生产入口，断言窗口、运行时与界面文本 |
@@ -107,6 +109,7 @@
 | `modeling/cli.py` | serve / run 入口，装配 modeling + gateway |
 | `modeling/src/mms_modeling/pipeline.py` | 一键流水线 |
 | `modeling/src/mms_modeling/baseline.py` | 数据画像、基线脚本、执行与产物收集 |
+| `modeling/src/mms_modeling/ingest.py` | 附件解析：XLSX / DOCX / ZIP → CSV 与上下文文字 |
 | `modeling/src/mms_modeling/paper_gen.py` / `paper_build.py` | 论文生成与排版 |
 | `modeling/src/mms_modeling/templates/` | 论文骨架与写作规范 |
 | `modeling/skills/` | 技能包：core / methods / figure / diagram / paper / deai / score（领域资产，当前一键流水线尚未调用） |

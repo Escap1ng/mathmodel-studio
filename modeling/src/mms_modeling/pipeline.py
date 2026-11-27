@@ -15,7 +15,7 @@ from pathlib import Path
 from mms_gateway import llm
 from mms_gateway.provider import CancelledError
 
-from . import baseline, paper_build, paper_gen
+from . import baseline, ingest, paper_build, paper_gen
 
 PHASES = [
     {"id": 1, "label": "题面拆解"},
@@ -195,7 +195,7 @@ class Pipeline:
         self,
         job_dir: Path,
         problem: str,
-        data_path: Path | None,
+        data_paths: list[Path] | None,
         provider: dict | None,
         api_key: str,
         model: str,
@@ -204,7 +204,7 @@ class Pipeline:
     ) -> None:
         self.job_dir = job_dir
         self.problem = problem.strip()
-        self.data_path = data_path
+        self.data_paths = [Path(item) for item in (data_paths or [])]
         self.provider = provider
         self.api_key = api_key
         self.model = model
@@ -213,6 +213,9 @@ class Pipeline:
         self.questions: list[dict] = []
         self.picked: dict = {}
         self.profile: dict = {}
+        self.attachments: dict = {"tables": [], "docs": [], "errors": []}
+        self.data_path: Path | None = None
+        self.doc_text = ""
         self.sources: dict[str, str] = {}
         self.outputs: dict[str, str] = {}
         self.error = ""
@@ -247,6 +250,7 @@ class Pipeline:
 
     def run(self) -> dict:
         try:
+            self._prepare_data()
             self._step_problem()
             self._step_method()
             self._step_solve()
@@ -263,6 +267,39 @@ class Pipeline:
         self._finish(True)
         return self.summary()
 
+    def _prepare_data(self) -> None:
+        """把附件统一成 CSV 与文字：主表喂求解脚本，docx 文字并入上下文。"""
+        if not self.data_paths:
+            return
+        try:
+            info = ingest.prepare(self.data_paths, self.job_dir / "attachments")
+        except Exception as exc:  # noqa: BLE001  附件是外部输入，失败原因必须报给用户
+            raise RuntimeError(f"附件解析失败：{exc}") from exc
+        self.attachments = info
+        for message in info["errors"]:
+            self._log(message, "warn")
+        tables: list[dict] = info["tables"]
+        docs: list[dict] = info["docs"]
+        usable = [item for item in tables if item.get("rows", 0) >= 1]
+        if usable:
+            primary = usable[0]
+            self.data_path = Path(primary["path"])
+            where = f"{primary['name']} / {primary['sheet']}" if primary.get("sheet") else primary["name"]
+            extra = f"；其余 {len(tables) - 1} 张表只作画像" if len(tables) > 1 else ""
+            self._log(
+                f"附件：{len(tables)} 张表、{len(docs)} 份文字；主表 {where}"
+                f"（{primary['rows']} 行 × {primary['cols']} 列{extra}）。"
+            )
+        elif docs or tables:
+            self._log("附件里没有可用的表格数据，求解用内置示例数据，附件文字并入题面上下文。", "warn")
+        elif not info["errors"]:
+            raise RuntimeError("附件里没有可用的表格或文字：" + "、".join(p.name for p in self.data_paths))
+        else:
+            raise RuntimeError("附件无法解析：" + "；".join(info["errors"]))
+        if docs:
+            self.doc_text = "\n\n".join(item["text"] for item in docs)[:8000]
+            self._log("附件文字：" + "；".join(f"{item['name']}（{item['chars']} 字）" for item in docs))
+
     def _step_problem(self) -> None:
         self._phase(1, "running")
         if len(self.problem) < 10:
@@ -273,7 +310,7 @@ class Pipeline:
         ]
         source = "按小节切分"
         if self.provider:
-            user = f"题面：\n{self.problem}\n\n数据画像：\n{self._profile_json()}"
+            user = f"题面：\n{self.problem}\n\n{self._doc_block()}数据画像：\n{self._profile_json()}"
             try:
                 parsed = llm.complete_json(
                     self.provider, self.api_key, self.model, "k2-problem",
@@ -325,7 +362,7 @@ class Pipeline:
         sample = data_path is None
         if data_path is None:
             data_path = baseline.ensure_sample(code_dir)
-            self._log("没有选择数据文件，使用内置示例数据 sample.csv 跑通链路。", "warn")
+            self._log("没有可用的表格数据，使用内置示例数据 sample.csv 跑通链路。", "warn")
         self.data_path = data_path
         self.profile = baseline.profile_data(data_path)
         self._log(
@@ -457,14 +494,26 @@ class Pipeline:
         if not self.questions:
             return self.problem
         lines = "\n".join(f"- {q['text']}" for q in self.questions)
-        return f"{self.problem}\n\n拆出的子问题：\n{lines}"
+        return f"{self.problem}\n\n拆出的子问题：\n{lines}\n\n{self._doc_block()}"
+
+    def _doc_block(self) -> str:
+        if not self.doc_text:
+            return ""
+        return f"附件文字（节选）：\n{self.doc_text}\n\n"
 
     def _profile_json(self) -> str:
         if not self.profile and self.data_path is not None:
             self.profile = baseline.profile_data(self.data_path)
         if not self.profile:
             return "无（未选择数据文件）"
-        return json.dumps(self.profile, ensure_ascii=False)[:3000]
+        payload = dict(self.profile)
+        others = [item for item in self.attachments.get("tables") or [] if item["path"] != str(self.data_path)]
+        if others:
+            payload["otherTables"] = [
+                {"name": item["name"], "sheet": item.get("sheet", ""), "rows": item["rows"], "cols": item["cols"]}
+                for item in others[:10]
+            ]
+        return json.dumps(payload, ensure_ascii=False)[:4000]
 
     def _result_json(self) -> dict:
         path = Path(self.outputs.get("resultJson") or "")
@@ -492,6 +541,14 @@ class Pipeline:
     # ---------- 收尾 ----------
 
     def summary(self) -> dict:
+        attachments = {
+            "tables": [
+                {"name": item["name"], "sheet": item.get("sheet", ""), "rows": item["rows"], "cols": item["cols"]}
+                for item in self.attachments.get("tables") or []
+            ],
+            "docs": [{"name": item["name"], "chars": item["chars"]} for item in self.attachments.get("docs") or []],
+            "errors": self.attachments.get("errors") or [],
+        }
         return {
             "ok": not self.error,
             "error": self.error,
@@ -499,6 +556,7 @@ class Pipeline:
             "questions": self.questions,
             "picked": self.picked,
             "data": str(self.data_path or ""),
+            "attachments": attachments if self.data_paths else {},
             "sources": self.sources,
             "outputs": {key: value for key, value in self.outputs.items() if value},
             "seconds": round(time.time() - self.started, 1),

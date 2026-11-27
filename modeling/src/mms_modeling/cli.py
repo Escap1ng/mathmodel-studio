@@ -20,6 +20,7 @@ from mms_gateway.provider import find_provider
 from mms_gateway.server import serve
 
 from . import __version__
+from . import ingest
 from .pipeline import Pipeline
 
 
@@ -42,10 +43,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         print("题面太短：用 --problem 或 --problem-file 给一段完整题目。", file=sys.stderr)
         return 2
 
-    data_path = Path(args.data).resolve() if args.data else None
-    if data_path is not None and (not data_path.is_file() or data_path.suffix.lower() not in (".csv", ".tsv")):
-        print(f"数据文件需为存在的 CSV/TSV：{data_path}", file=sys.stderr)
-        return 2
+    data_paths = [Path(item).resolve() for item in (args.data or [])]
+    for path in data_paths:
+        if not path.is_file() or path.suffix.lower() not in ingest.SUFFIXES:
+            print(
+                "数据文件需为存在的 " + " / ".join(s.lstrip(".").upper() for s in ingest.SUFFIXES) + f"：{path}",
+                file=sys.stderr,
+            )
+            return 2
 
     provider = None
     if args.provider and args.provider != "fake":
@@ -67,7 +72,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
         job_dir=job_dir,
         problem=problem,
-        data_path=data_path,
+        data_paths=data_paths,
         provider=provider,
         api_key=os.environ.get("MMS_API_KEY", ""),
         model=args.model or ((provider or {}).get("models") or ["offline"])[0],
@@ -92,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="无界面跑一遍：题面 → 选模 → 代码 → 论文")
     p_run.add_argument("--problem", "-p", help="题目文本")
     p_run.add_argument("--problem-file", help="题目文本文件")
-    p_run.add_argument("--data", help="CSV/TSV 数据文件（省略则用内置样例）")
+    p_run.add_argument("--data", action="append", help="数据/附件文件，可重复：CSV/TSV/XLSX/DOCX/ZIP（省略则用内置样例）")
     p_run.add_argument("--provider", default="fake", help="服务商 id（默认 fake 离线）")
     p_run.add_argument("--model", help="模型名（省略取服务商第一个）")
     p_run.add_argument("--out", help="输出目录（省略 runs/<时间戳>）")
