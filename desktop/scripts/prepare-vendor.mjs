@@ -36,7 +36,7 @@ const PY_DIR = join(VENDOR, 'python')
 const PY_EXE = join(PY_DIR, 'python.exe')
 const PANDOC_DIR = join(VENDOR, 'pandoc')
 const PANDOC_EXE = join(PANDOC_DIR, 'pandoc.exe')
-const MODULES = ['matplotlib', 'numpy']
+const MODULES = ['matplotlib', 'numpy', 'pypdf']
 
 function log(message) {
   console.log(`[vendor] ${message}`)

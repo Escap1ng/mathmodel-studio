@@ -1,10 +1,11 @@
 """附件入口：把竞赛附件统一成可跑的 CSV 与可读的文字。
 
-支持 CSV / TSV / XLSX / DOCX，以及包含它们的 ZIP（只展开一层）。解析只用标准库：
-xlsx 与 docx 都是 zip + XML，读它们不需要 openpyxl，随包 Python 无需新增依赖。
+支持 CSV / TSV / XLSX / DOCX / PDF，以及包含它们的 ZIP（只展开一层）。XLSX 与
+DOCX 都是 zip + XML，用标准库直接解析；PDF 文字抽取依赖纯 Python 的 pypdf，
+Chrome / Word 导出常见的康熙部首字符会归一成统一码。
 
 约定：xlsx 的每个非空工作表各写成一份 UTF-8-SIG CSV；日期单元格按样式号转成
-ISO 文本；docx 只抽正文文字，供题面拆解与论文撰写当上下文。
+ISO 文本；docx / pdf 只抽正文文字，供题面拆解与论文撰写当上下文。
 """
 
 from __future__ import annotations
@@ -14,15 +15,17 @@ import datetime as dt
 import io
 import re
 import shutil
+import unicodedata
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-SUFFIXES = (".csv", ".tsv", ".xlsx", ".docx", ".zip")
+SUFFIXES = (".csv", ".tsv", ".xlsx", ".docx", ".pdf", ".zip")
 MAX_UNZIP_BYTES = 200 * 1024 * 1024
 MAX_XML_BYTES = 64 * 1024 * 1024
 MAX_SHEET_ROWS = 200_000
 MAX_DOC_CHARS = 4000
+MAX_PDF_PAGES = 30
 
 _NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
@@ -74,7 +77,13 @@ def prepare(paths: list[Path], work_dir: Path) -> dict:
                     docs.append({"name": label, "chars": len(text), "text": text[:MAX_DOC_CHARS]})
                 else:
                     errors.append(f"{label} 里没有可读文字")
-        except (OSError, KeyError, ValueError, zipfile.BadZipFile, ET.ParseError) as exc:
+            elif suffix == ".pdf":
+                text = _pdf_text(path).strip()
+                if text:
+                    docs.append({"name": label, "chars": len(text), "text": text[:MAX_DOC_CHARS]})
+                else:
+                    errors.append(f"{label} 里没有可提取的文字（可能是扫描件）")
+        except (OSError, KeyError, ValueError, RuntimeError, zipfile.BadZipFile, ET.ParseError) as exc:
             errors.append(f"{label} 解析失败：{exc}")
     return {"tables": tables, "docs": docs, "errors": errors}
 
@@ -383,6 +392,50 @@ def _docx_text(path: Path) -> str:
         if text:
             lines.append(text)
     return "\n".join(lines)
+
+
+# ---------- PDF ----------
+
+
+def _normalize_cjk(text: str) -> str:
+    """康熙部首与 CJK 兼容汉字归一成统一码，Chrome / Word 导出的 PDF 常这样编码。"""
+    out: list[str] = []
+    for char in text:
+        code = ord(char)
+        if 0x2E80 <= code <= 0x2FDF or 0xF900 <= code <= 0xFAFF:
+            out.append(unicodedata.normalize("NFKC", char))
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def _pdf_text(path: Path) -> str:
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:
+        raise RuntimeError(
+            "PDF 需要 pypdf：开发机 pip install pypdf，打包版需随包 Python 提供 pypdf"
+        ) from exc
+    try:
+        reader = PdfReader(str(path))
+        if reader.is_encrypted and not reader.decrypt(""):
+            raise ValueError("PDF 已加密，需要先解除密码")
+        parts: list[str] = []
+        total = 0
+        for index, page in enumerate(reader.pages):
+            if index >= MAX_PDF_PAGES:
+                parts.append(f"（仅抽取前 {MAX_PDF_PAGES} 页）")
+                break
+            text = _normalize_cjk(page.extract_text() or "")
+            parts.append(text)
+            total += len(text)
+            if total > MAX_DOC_CHARS * 3:
+                break
+        return "\n".join(parts)
+    except ValueError:
+        raise
+    except Exception as exc:  # noqa: BLE001  pypdf 的 PdfReadError 不在 ValueError 之下
+        raise ValueError(f"PDF 读取失败：{exc}") from exc
 
 
 # ---------- 工具 ----------

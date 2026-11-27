@@ -1,4 +1,4 @@
-"""附件入口的回归测试：用手工拼的最小 xlsx/docx/zip 夹具跑 prepare。"""
+"""附件入口的回归测试：用手工拼的最小 xlsx/docx/pdf/zip 夹具跑 prepare。"""
 
 from __future__ import annotations
 
@@ -75,6 +75,37 @@ def make_docx(path: Path, text: str = "问题一：预测产量", dtd: bool = Fa
         body = body.replace("<w:document", '<!DOCTYPE w:document [<!ENTITY x "y">]><w:document')
     with zipfile.ZipFile(path, "w") as zf:
         zf.writestr("word/document.xml", body)
+
+
+def make_pdf(path: Path, text: str | None) -> None:
+    stream = b""
+    if text:
+        escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        stream = f"BT /F1 12 Tf 20 100 Td ({escaped}) Tj ET".encode("latin-1")
+    content = b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream"
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Contents 4 0 R "
+            b"/Resources << /Font << /F1 5 0 R >> >> >>"
+        ),
+        content,
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode() + b"0000000000 65535 f \n"
+    for offset in offsets:
+        out += f"{offset:010d} 00000 n \n".encode()
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    )
+    path.write_bytes(bytes(out))
 
 
 def read_csv(path: Path) -> list[list[str]]:
@@ -164,6 +195,25 @@ class IngestTests(unittest.TestCase):
         info = ingest.prepare([src], self.work)
         self.assertEqual(info["docs"], [])
         self.assertTrue(any("DTD" in item for item in info["errors"]))
+
+    def test_pdf_text_extracted(self) -> None:
+        src = self.root / "赛题.pdf"
+        make_pdf(src, "Attachment Probe")
+        info = ingest.prepare([src], self.work)
+        self.assertEqual(info["tables"], [])
+        self.assertEqual(len(info["docs"]), 1)
+        self.assertIn("Attachment Probe", info["docs"][0]["text"])
+
+    def test_pdf_without_text_layer_reports_error(self) -> None:
+        src = self.root / "扫描件.pdf"
+        make_pdf(src, None)
+        info = ingest.prepare([src], self.work)
+        self.assertEqual(info["docs"], [])
+        self.assertTrue(any("没有可提取的文字" in item for item in info["errors"]))
+
+    def test_kangxi_radicals_normalized(self) -> None:
+        self.assertEqual(ingest._normalize_cjk("问题⼀：⽴⽅"), "问题一：立方")
+        self.assertEqual(ingest._normalize_cjk("全角：，不动"), "全角：，不动")
 
 
 if __name__ == "__main__":

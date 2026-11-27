@@ -17,10 +17,10 @@ from pathlib import Path
 SCRIPT_NAME = "solution.py"
 SAMPLE_NAME = "sample.csv"
 
-SCRIPT = '''"""阶段四 · 基线回归：读一份表，报形状与拟合优度，输出三联图。
+SCRIPT = '''"""阶段四 · 基线回归：读一份或多份表，报形状与拟合优度，输出三联图。
 
 由 MathModel Studio 生成，可单独重跑：
-    python solution.py --data <csv> --out <dir>
+    python solution.py --data <csv> [<csv> ...] --out <dir>
 """
 
 from __future__ import annotations
@@ -148,13 +148,14 @@ def draw(target_values, fit, header, target_name, missing, out_dir: Path) -> lis
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", required=True)
+    parser.add_argument("--data", required=True, nargs="+")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    header, matrix = read_table(Path(args.data))
+    frames = [(Path(item), read_table(Path(item))) for item in args.data]
+    data_path, (header, matrix) = frames[0]
     numeric = numeric_columns(matrix)
     if not numeric:
         raise SystemExit("没有可用的数值列：基线需要至少一列数字")
@@ -169,7 +170,7 @@ def main() -> int:
 
     result = {
         "ok": True,
-        "data": Path(args.data).name,
+        "data": data_path.name,
         "rows": int(matrix.shape[0]),
         "cols": int(matrix.shape[1]),
         "numeric_columns": [header[index] for index in numeric],
@@ -179,6 +180,10 @@ def main() -> int:
         "r2": None if fit is None else round(fit["r2"], 4),
         "rmse": None if fit is None else round(fit["rmse"], 4),
         "fit_rows": None if fit is None else fit["rows"],
+        "datasets": [
+            {"name": path.name, "rows": int(table.shape[0]), "cols": int(table.shape[1])}
+            for path, (_, table) in frames
+        ],
         "outputs": outputs,
     }
     (out_dir / "result.json").write_text(
@@ -272,7 +277,7 @@ def ensure_sample(code_dir: Path) -> Path:
 
 
 def run_baseline(
-    code_dir: Path, data_path: Path, out_dir: Path, timeout: int = 180
+    code_dir: Path, data_paths: list[Path], out_dir: Path, timeout: int = 180
 ) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     env = {
@@ -285,7 +290,7 @@ def run_baseline(
         sys.executable,
         str(code_dir / SCRIPT_NAME),
         "--data",
-        str(data_path),
+        *[str(path) for path in data_paths],
         "--out",
         str(out_dir),
     ]

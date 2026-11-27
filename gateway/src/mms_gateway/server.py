@@ -27,7 +27,7 @@ from .provider import ProviderError, find_provider, load_providers, validate_bas
 MAX_BODY = 1 << 20
 MAX_PROBLEM = 200_000
 PING_SECONDS = 15
-DATA_SUFFIXES = (".csv", ".tsv", ".xlsx", ".docx", ".zip")
+DATA_SUFFIXES = (".csv", ".tsv", ".xlsx", ".docx", ".pdf", ".zip")
 
 
 def data_root(root: Path) -> Path:
@@ -215,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
                 if candidate.is_file() and candidate.suffix.lower() in DATA_SUFFIXES:
                     data_paths.append(candidate.resolve())
         if not data_paths and raw_paths:
-            self._error(400, "data", "数据文件需为存在的 CSV/TSV/XLSX/DOCX/ZIP")
+            self._error(400, "data", "数据文件需为存在的 CSV/TSV/XLSX/DOCX/PDF/ZIP")
             return
 
         ctx = body.get("provider") if isinstance(body.get("provider"), dict) else {}

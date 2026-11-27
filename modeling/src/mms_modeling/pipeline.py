@@ -56,12 +56,13 @@ P4_INSTRUCTION = (
     "你是数学建模竞赛的求解代码生成助手。按题面、所选方法与数据画像，写一个完整可运行的 Python 脚本 solution.py。"
     "只输出一个 JSON 对象，不要围栏、不要解释，形状："
     '{"rationale":"两三句实现思路","code":"完整 Python 源码"}。'
-    "脚本硬性契约：用 argparse 接受 --data（CSV/TSV 路径）与 --out（输出目录）；"
-    "在 --out 写出 result.json（含 ok、rows、cols、target 与本题关键数值结果）"
+    "脚本硬性契约：用 argparse 接受 --data（一个或多个 CSV/TSV 路径，nargs='+'，按附件顺序传入）与 --out（输出目录）；"
+    "在 --out 写出 result.json（含 ok、rows、cols、target、datasets 与本题关键数值结果）"
     "和 figure.png / figure.pdf / figure.svg 三件图（matplotlib 用 Agg 后端，dpi≥150）；"
     "只用标准库 + numpy + matplotlib，不依赖 pandas / scikit-learn；"
     "数据编码按 utf-8-sig / gbk / utf-8 依次尝试；固定随机种子保证可复现；"
     "不得联网、不得读写 --data/--out 之外的路径、不得执行系统命令。"
+    "只有一份数据时 --data 只有一个路径；多份数据按顺序给出，脚本按题面分别读取，不要假设它们同构。"
     "修复轮次会附上上一版代码与失败输出，请针对性修改后重新输出完整脚本。"
 )
 
@@ -214,6 +215,8 @@ class Pipeline:
         self.picked: dict = {}
         self.profile: dict = {}
         self.attachments: dict = {"tables": [], "docs": [], "errors": []}
+        self.tables: list[dict] = []
+        self.table_paths: list[Path] = []
         self.data_path: Path | None = None
         self.doc_text = ""
         self.sources: dict[str, str] = {}
@@ -283,9 +286,11 @@ class Pipeline:
         usable = [item for item in tables if item.get("rows", 0) >= 1]
         if usable:
             primary = usable[0]
-            self.data_path = Path(primary["path"])
+            self.tables = usable
+            self.table_paths = [Path(item["path"]) for item in usable]
+            self.data_path = self.table_paths[0]
             where = f"{primary['name']} / {primary['sheet']}" if primary.get("sheet") else primary["name"]
-            extra = f"；其余 {len(tables) - 1} 张表只作画像" if len(tables) > 1 else ""
+            extra = f"；连同其余 {len(usable) - 1} 张表按序传入脚本" if len(usable) > 1 else ""
             self._log(
                 f"附件：{len(tables)} 张表、{len(docs)} 份文字；主表 {where}"
                 f"（{primary['rows']} 行 × {primary['cols']} 列{extra}）。"
@@ -358,15 +363,15 @@ class Pipeline:
         code_dir = self.job_dir / "code"
         out_dir = code_dir / "outputs"
         code_dir.mkdir(parents=True, exist_ok=True)
-        data_path = self.data_path
-        sample = data_path is None
-        if data_path is None:
-            data_path = baseline.ensure_sample(code_dir)
+        sample = not self.table_paths
+        data_paths = list(self.table_paths)
+        if not data_paths:
+            data_paths = [baseline.ensure_sample(code_dir)]
             self._log("没有可用的表格数据，使用内置示例数据 sample.csv 跑通链路。", "warn")
-        self.data_path = data_path
-        self.profile = baseline.profile_data(data_path)
+        self.data_path = data_paths[0]
+        self.profile = baseline.profile_data(self.data_path)
         self._log(
-            f"数据：{data_path.name}（{self.profile.get('rows', '?')} 行 × "
+            f"数据：{len(data_paths)} 个文件，主表 {self.data_path.name}（{self.profile.get('rows', '?')} 行 × "
             f"{self.profile.get('cols', '?')} 列{'，示例数据' if sample else ''}）"
         )
 
@@ -396,7 +401,7 @@ class Pipeline:
             self._phase(3, "ok", f"solution.py · {len(code.splitlines())} 行")
 
             self._phase(4, "running")
-            run = baseline.run_baseline(code_dir, data_path, out_dir)
+            run = baseline.run_baseline(code_dir, data_paths, out_dir)
             if run.get("ok"):
                 stats = run.get("result") or {}
                 self.outputs = {
@@ -534,6 +539,17 @@ class Pipeline:
             ),
             "数据画像：\n" + self._profile_json(),
         ]
+        if self.tables:
+            lines = []
+            for index, item in enumerate(self.tables, 1):
+                name = item["name"] + (f" / {item['sheet']}" if item.get("sheet") else "")
+                lines.append(
+                    f"{index}. {name}（{item['rows']} 行 × {item['cols']} 列，文件 {Path(item['path']).name}）"
+                )
+            parts.append(
+                "求解脚本运行时 --data 会按下列顺序给出这些 CSV；不同表的列结构可能不同，按题面分别读取：\n"
+                + "\n".join(lines)
+            )
         if feedback:
             parts.append(feedback)
         return "\n\n".join(parts)

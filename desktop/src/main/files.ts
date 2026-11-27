@@ -22,7 +22,7 @@ export async function pickDataFiles(win: BrowserWindow | null): Promise<string[]
   const options = {
     title: '选择数据与附件',
     properties: ['openFile' as const, 'multiSelections' as const],
-    filters: [{ name: '数据与附件', extensions: ['csv', 'tsv', 'xlsx', 'docx', 'zip'] }]
+    filters: [{ name: '数据与附件', extensions: ['csv', 'tsv', 'xlsx', 'docx', 'pdf', 'zip'] }]
   }
   const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
   if (result.canceled) return []
