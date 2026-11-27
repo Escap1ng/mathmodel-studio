@@ -3,6 +3,30 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 从 `0.1.0` 起，CLI 参数与退出码、注册表字段、产物路径为 Stable；`--json` 字段顺序与错误措辞仍为 Experimental。
 
+## 0.4.0 - 2026-11-27
+
+### 新增
+
+- **附件入口**：支持 CSV / TSV / XLSX / DOCX / PDF 以及包含它们的 ZIP；界面与 CLI 每次最多 10 个附件，ZIP 只展开一层，挡越界路径。
+- **XLSX 解析**：每个非空工作表转成一份 CSV；日期按样式号转 ISO，支持共享字符串、内联字符串与公式缓存值；同名工作表自动去重命名。
+- **多表求解**：`--data` 契约改为可重复，所有可用表按附件顺序传给 `solution.py`，`result.json` 新增 `datasets` 记录每份数据的形状。
+- **PDF 文字**：用纯 Python 的 pypdf 抽取正文，Chrome / Word 导出常见的康熙部首归一成统一码；加密 PDF 与无文字层扫描件明确报错。
+- **附件当题面**：题面留空或不足 10 字时，直接用 DOCX / PDF 附件文字作为题面；手写短题面会与附件文字拼接。
+- **DOCX 文字**：标准库解析正文，按原顺序并入题面上下文。
+
+### 变更
+
+- 题面校验放宽为「题面 ≥10 字或有附件」，服务端、CLI、界面三处一致。
+- 附件多选、逐项移除；题面为空时对话仍显示附件 chip，标题回落为「附件建模」。
+- 运行时依赖新增 `pypdf`（随包 Python 体积 +3.8 MB）；许可与第三方声明同步（BSD-3-Clause）。
+
+### 验证（本机 Windows，2026-11-27）
+
+- 16 条单测（ingest / baseline / pipeline）全过；xlsx 解析结果与 openpyxl 写出的真实文件交叉核对一致。
+- 离线全链：2 工作表 xlsx + 多份文字附件，`datasets` 两条、R²=0.943；仅附 PDF 不给题面时拆出 6 个子问题，五阶段全通过。
+- 用随包 Python 复跑 PDF 附件全链，`compileall`、typecheck、build、窗口冒烟通过。
+- 未证：真实服务商 Key 的联网端到端；安装包未签名（预期 SmartScreen 警告）；扫描件 PDF 需先 OCR。
+
 ## 0.3.0 - 2026-11-25
 
 ### 变更
