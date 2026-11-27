@@ -78,12 +78,14 @@ function parseRunInput(raw: unknown): RunInput {
   const obj = raw as Record<string, unknown>
   const problem = typeof obj.problem === 'string' ? obj.problem.trim() : ''
   const providerId = typeof obj.providerId === 'string' ? obj.providerId.trim() : ''
-  if (problem.length < 10) throw new Error('题面至少写一句完整的题目描述')
-  if (problem.length > 200_000) throw new Error('题面过长')
-  if (!providerId) throw new Error('没有选择服务商')
   const dataPaths = Array.isArray(obj.dataPaths)
     ? obj.dataPaths.filter((item): item is string => typeof item === 'string' && Boolean(item)).slice(0, 10)
     : []
+  if (problem.length < 10 && dataPaths.length === 0) {
+    throw new Error('题面至少写一句完整的题目描述，或附加含题面的 PDF/DOCX')
+  }
+  if (problem.length > 200_000) throw new Error('题面过长')
+  if (!providerId) throw new Error('没有选择服务商')
   return {
     problem,
     dataPaths,

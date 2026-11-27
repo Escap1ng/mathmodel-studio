@@ -57,7 +57,7 @@
 
 ## 工作流
 
-1. **题面拆解**：模型把赛题拆成子问题；模型不可用时按小节切分。
+1. **题面拆解**：模型把赛题拆成子问题；题面留空时直接取 PDF/DOCX 附件文字作为题面；模型不可用时按小节切分。
 2. **方法选择**：模型给出三条候选并标出推荐，直接采用推荐；失败时用内置方法族。
 3. **生成代码**：按题面、所选方法与数据画像生成 `solution.py`，契约固定为 `--data`（可多份，按附件顺序）/ `--out`，须写出 `result.json` 与 `figure.png/pdf/svg`。
 4. **运行求解**：执行脚本；失败把 stderr 与上一版代码回喂模型，最多 3 轮。
@@ -65,14 +65,14 @@
 
 所有论文数值只来自本次运行的 `result.json`。没有可用模型时进入离线模式：内置基线脚本 + 样例稿，事件与界面会标明兜底，不冒充按本题生成。
 
-附件支持 CSV / TSV / XLSX / DOCX / PDF 以及包含它们的 ZIP。XLSX 的每个工作表转成一份 CSV，可用表按附件顺序作为 `--data` 传给 `solution.py`（第一张为主表，用于数据画像与基线拟合）；DOCX / PDF 只抽正文文字，并入题面上下文。PDF 文字抽取用纯 Python 的 pypdf（Chrome / Word 导出常见的康熙部首会归一成统一码）；扫描件没有文字层，需先自行 OCR。
+附件支持 CSV / TSV / XLSX / DOCX / PDF 以及包含它们的 ZIP。XLSX 的每个工作表转成一份 CSV，可用表按附件顺序作为 `--data` 传给 `solution.py`（第一张为主表，用于数据画像与基线拟合）；DOCX / PDF 只抽正文文字，并入题面上下文，题面留空时直接作为题面。PDF 文字抽取用纯 Python 的 pypdf（Chrome / Word 导出常见的康熙部首会归一成统一码）；扫描件没有文字层，需先自行 OCR。
 
 ## 运行方式
 
 | 方式 | 命令 | 说明 |
 | --- | --- | --- |
 | 桌面开发 | `npm install` → `npm run dev` | 启动 Electron 与本地 Python 运行时 |
-| 无界面跑一遍 | `python modeling/cli.py run --problem-file 题面.txt [--data 附件] [--out 目录]` | `--data` 可重复，接受 CSV/TSV/XLSX/DOCX/PDF/ZIP；事件按 JSON Lines 输出；默认离线模式 |
+| 无界面跑一遍 | `python modeling/cli.py run [--problem-file 题面.txt] [--data 附件] [--out 目录]` | `--data` 可重复，接受 CSV/TSV/XLSX/DOCX/PDF/ZIP；题面可从 PDF/DOCX 附件取；事件按 JSON Lines 输出；默认离线模式 |
 | 类型检查 | `npm run typecheck` | 主进程、preload、渲染层全覆盖 |
 | 构建 | `npm run build` | 产物在 `desktop/out/` |
 | 真启动冒烟 | `npm run smoke:window` | 起生产入口，断言窗口、运行时与界面文本 |

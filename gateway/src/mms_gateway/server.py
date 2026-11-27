@@ -198,9 +198,6 @@ class Handler(BaseHTTPRequestHandler):
         if body is None:
             return
         problem = str(body.get("problem") or "").strip()
-        if len(problem) < 10:
-            self._error(400, "problem", "题面至少写一句完整的题目描述")
-            return
         if len(problem) > MAX_PROBLEM:
             self._error(400, "problem", "题面过长")
             return
@@ -216,6 +213,9 @@ class Handler(BaseHTTPRequestHandler):
                     data_paths.append(candidate.resolve())
         if not data_paths and raw_paths:
             self._error(400, "data", "数据文件需为存在的 CSV/TSV/XLSX/DOCX/PDF/ZIP")
+            return
+        if len(problem) < 10 and not data_paths:
+            self._error(400, "problem", "题面至少写一句完整的题目描述，或附加含题面的 PDF/DOCX")
             return
 
         ctx = body.get("provider") if isinstance(body.get("provider"), dict) else {}

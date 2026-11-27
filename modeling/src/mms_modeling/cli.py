@@ -39,9 +39,6 @@ def _read_problem(args: argparse.Namespace) -> str:
 
 def cmd_run(args: argparse.Namespace) -> int:
     problem = _read_problem(args).strip()
-    if len(problem) < 10:
-        print("题面太短：用 --problem 或 --problem-file 给一段完整题目。", file=sys.stderr)
-        return 2
 
     data_paths = [Path(item).resolve() for item in (args.data or [])]
     for path in data_paths:
@@ -51,6 +48,9 @@ def cmd_run(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
+    if len(problem) < 10 and not data_paths:
+        print("题面太短：用 --problem / --problem-file 给一段题目，或用 --data 附加含题面的 PDF/DOCX。", file=sys.stderr)
+        return 2
 
     provider = None
     if args.provider and args.provider != "fake":

@@ -215,7 +215,7 @@ export default function App(): JSX.Element {
       patchConversation(convId, {
         problem,
         dataPaths,
-        title: conversationTitle(problem),
+        title: problem ? conversationTitle(problem) : '附件建模',
         status: 'running',
         runId: result.runId,
         error: undefined

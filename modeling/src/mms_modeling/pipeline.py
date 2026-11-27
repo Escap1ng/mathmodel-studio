@@ -219,6 +219,7 @@ class Pipeline:
         self.table_paths: list[Path] = []
         self.data_path: Path | None = None
         self.doc_text = ""
+        self.problem_from_docs = False
         self.sources: dict[str, str] = {}
         self.outputs: dict[str, str] = {}
         self.error = ""
@@ -307,8 +308,12 @@ class Pipeline:
 
     def _step_problem(self) -> None:
         self._phase(1, "running")
+        if len(self.problem) < 10 and self.doc_text:
+            self.problem = (self.problem + "\n\n" + self.doc_text).strip() if self.problem else self.doc_text
+            self.problem_from_docs = True
+            self._log(f"题面不足：改用附件文字作为题面（{len(self.doc_text)} 字）。")
         if len(self.problem) < 10:
-            raise RuntimeError("题面太短：至少写一句完整的题目描述")
+            raise RuntimeError("题面太短：至少写一句完整的题目描述，或附加含题面的 PDF/DOCX")
         questions = [
             {"id": f"q{index + 1}", "text": text}
             for index, text in enumerate(split_questions(self.problem))
@@ -502,7 +507,7 @@ class Pipeline:
         return f"{self.problem}\n\n拆出的子问题：\n{lines}\n\n{self._doc_block()}"
 
     def _doc_block(self) -> str:
-        if not self.doc_text:
+        if not self.doc_text or self.problem_from_docs:
             return ""
         return f"附件文字（节选）：\n{self.doc_text}\n\n"
 

@@ -49,8 +49,8 @@ export default function Conversation(props: Props): JSX.Element {
   }
 
   function send(): void {
-    if (problem.trim().length < 10) {
-      setError('先把题目写完整（至少一句描述）。')
+    if (problem.trim().length < 10 && dataPaths.length === 0) {
+      setError('写下题目，或附加含题面的 PDF/DOCX 文件。')
       return
     }
     setError('')
@@ -63,9 +63,9 @@ export default function Conversation(props: Props): JSX.Element {
   return (
     <div className="conversation">
       <div className="thread">
-        {conversation.problem && (
+        {(conversation.problem || conversation.dataPaths.length > 0) && (
           <div className="msg user">
-            <div className="msg-body">{conversation.problem}</div>
+            {conversation.problem && <div className="msg-body">{conversation.problem}</div>}
             {conversation.dataPaths.length > 0 && (
               <div className="chips">
                 {conversation.dataPaths.map((path) => (
@@ -86,7 +86,7 @@ export default function Conversation(props: Props): JSX.Element {
           </div>
         )}
         {idle && !conversation.problem && (
-          <p className="thread-hint">写下赛题开始一次建模；一个对话对应一次完整运行。</p>
+          <p className="thread-hint">写下赛题开始一次建模，或只附加含题面的 PDF/DOCX；一个对话对应一次完整运行。</p>
         )}
       </div>
 
@@ -96,7 +96,7 @@ export default function Conversation(props: Props): JSX.Element {
             className="composer-input"
             value={problem}
             onChange={(event) => setProblem(event.target.value)}
-            placeholder="粘贴赛题，或导入文本文件……"
+            placeholder="粘贴赛题；留空则用附件里的文字……"
             disabled={running}
             spellCheck={false}
           />
